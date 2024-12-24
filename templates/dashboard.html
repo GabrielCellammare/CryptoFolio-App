@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoFolio - APP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <style>
+        .profit { color: #28a745; }
+        .loss { color: #dc3545; }
+        .select2-container { width: 100% !important; }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content:
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loading-spinner {
+            color: white;
+            font-size: 24px;
+        }
+        .edit-input.d-none {
+            display: none !important;
+        }
+        .table td {
+            vertical-align: middle;
+        }
+        .btn-group-sm > .btn {
+            margin: 0 2px;
+        }
+        .flash-messages {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            max-width: 350px;
+        }
+        #currencySelect {
+            background-color: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 0.25rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        #currencySelect option {
+            background-color: #212529;
+            color: white;
+        }
+        
+        #currencySelect:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i> Loading...
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Crypto Portfolio</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <span class="nav-link text-light">Last update: <span id="lastUpdate">{{ last_update }}</span></span>
+                    </li>
+                    <li class="nav-item">
+                        <span class="nav-link text-light">Welcome, {{ username }}</span>
+                    </li>
+                    <li class="nav-item">
+                        <div class="d-flex align-items-center">
+                            <select id="currencySelect" class="form-select form-select-sm">
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                            </select>
+                        </div>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/auth/logout">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Flash Messages Container -->
+        <div id="flashMessages" class="flash-messages"></div>
+
+        <!-- Portfolio Overview -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div id="portfolio-value-root" 
+                             data-value="{{ total_value }}" 
+                             data-last-update="{{ last_update }}">
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Portfolio Table -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Your Portfolio</h5>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="window.location.reload()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="portfolioTable">
+                                <thead>
+                                    <tr>
+                                        <th>Cryptocurrency</th>
+                                        <th>Amount</th>
+                                        <th>Purchase Price</th>
+                                        <th>Purchase Date</th>
+                                        <th>Current Price</th>
+                                        <th>Current Value</th>
+                                        <th>Profit/Loss</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in portfolio %}
+                                    <tr data-crypto-id="{{ item.id }}">
+                                        <td class="crypto-name">{{ item.symbol }}</td>
+                                        <td>
+                                            <span class="display-value">{{ "%.8f"|format(item.amount) }}</span>
+                                            <input type="number" class="form-control form-control-sm edit-input d-none" 
+                                                   value="{{ "%.8f"|format(item.amount) }}" step="0.00000001" min="0">
+                                        </td>
+                                        <td>
+                                            <span class="display-value">{{ "%.2f"|format(item.purchase_price) }}</span>
+                                            <input type="number" class="form-control form-control-sm edit-input d-none" 
+                                                   value="{{ "%.2f"|format(item.purchase_price) }}" step="0.01" min="0">
+                                        </td>
+                                        <td>
+                                            <span class="display-value">{{ item.purchase_date }}</span>
+                                            <input type="date" class="form-control form-control-sm edit-input d-none" 
+                                                   value="{{ item.purchase_date }}">
+                                        </td>
+                                        <td class="current-price">{{ "%.2f"|format(item.current_price) }}</td>
+                                        <td class="current-value">{{ "%.2f"|format(item.current_value) }}</td>
+                                        <td class="profit-loss {% if item.profit_loss >= 0 %}profit{% else %}loss{% endif %}">
+                                            {{ "%.2f"|format(item.profit_loss) }} ({{ "%.2f"|format(item.profit_loss_percentage) }}%)
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary edit-btn" onclick="toggleEdit(this)">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-success save-btn d-none" onclick="saveChanges(this)">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                                <button class="btn btn-secondary cancel-btn d-none" onclick="cancelEdit(this)">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger" onclick="removeCrypto('{{ item.id }}')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forms Column -->
+            <div class="col-lg-4">
+                <!-- Add Cryptocurrency Form -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Add Cryptocurrency</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="addCryptoForm">
+                            <div class="mb-3">
+                                <label for="crypto-select" class="form-label">Select Cryptocurrency</label>
+                                <select id="crypto-select" class="form-control" required></select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="amount" class="form-label">Amount</label>
+                                <input type="number" class="form-control" id="amount" 
+                                       step="0.00000001" min="0" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="purchase-price" class="form-label">Purchase Price (USD)</label>
+                                <input type="number" class="form-control" id="purchase-price" 
+                                       step="0.01" min="0" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="purchase-date" class="form-label">Purchase Date</label>
+                                <input type="date" class="form-control" id="purchase-date" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-plus"></i> Add to Portfolio
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row Template for Portfolio (Hidden) -->
+    <template id="portfolioRowTemplate">
+        <tr data-crypto-id="">
+            <td class="crypto-name"></td>
+            <td>
+                <span class="display-value"></span>
+                <input type="number" class="form-control form-control-sm edit-input d-none" step="0.00000001" min="0">
+            </td>
+            <td>
+                <span class="display-value"></span>
+                <input type="number" class="form-control form-control-sm edit-input d-none" step="0.01" min="0">
+            </td>
+            <td>
+                <span class="display-value"></span>
+                <input type="date" class="form-control form-control-sm edit-input d-none">
+            </td>
+            <td class="current-price"></td>
+            <td class="current-value"></td>
+            <td class="profit-loss"></td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary edit-btn" onclick="toggleEdit(this)">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-success save-btn d-none" onclick="saveChanges(this)">
+                        <i class="fas fa-check"></i>
+                    </button>
+                    <button class="btn btn-secondary cancel-btn d-none" onclick="cancelEdit(this)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="removeCrypto(this.closest('tr').dataset.cryptoId)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    </template>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script type="module" src="/static/js/utils.js"></script>
+    <script type="module" src="/static/js/api-service.js"></script>
+    <script type="module" src="/static/js/portfolio-manager.js"></script>
+    <script type="module" src="/static/js/portfolio-ui.js"></script>
+    <script type="module" src="/static/js/main.js"></script>
+    <script type="module" src="/static/js/portfolio-value-init.js"></script>
+    <script type="module" src="/static/js/currency-manager.js"></script>
+    <script type="module" src="/static/js/portfolio-charts.js"></script>
+</body>
+</html>
