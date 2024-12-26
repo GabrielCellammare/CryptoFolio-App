@@ -1,4 +1,3 @@
-
 import { ApiService } from './api-service.js';
 import { showError } from './utils.js';
 
@@ -22,8 +21,16 @@ export async function initializePortfolio() {
  */
 async function loadAvailableCryptos() {
     try {
-        availableCryptos = await ApiService.fetchCryptocurrencies();
-        populateCryptoSelect(availableCryptos);
+        // Get the response from the API
+        const response = await ApiService.fetchCryptocurrencies();
+
+        // Check if the response has the expected structure
+        if (response.status === 'success' && Array.isArray(response.data)) {
+            availableCryptos = response.data;
+            populateCryptoSelect(availableCryptos);
+        } else {
+            throw new Error('Invalid cryptocurrency data format');
+        }
     } catch (error) {
         console.error('Error loading cryptocurrencies:', error);
         showError('Failed to load cryptocurrencies');
@@ -36,18 +43,32 @@ async function loadAvailableCryptos() {
  */
 function populateCryptoSelect(cryptos) {
     const select = document.getElementById('crypto-select');
+    if (!select) {
+        console.error('Crypto select element not found');
+        return;
+    }
+
+    // Clear existing options
     select.innerHTML = '<option value="">Select a cryptocurrency</option>';
 
-    cryptos.forEach(crypto => {
-        const option = new Option(
-            `${crypto.name} (${crypto.symbol}) - $${crypto.current_price.toFixed(2)}`,
-            crypto.id
-        );
-        $(option).data('symbol', crypto.symbol);
-        $(option).data('name', crypto.name);
-        select.appendChild(option);
-    });
+    // Ensure cryptos is an array before attempting to iterate
+    if (!Array.isArray(cryptos)) {
+        console.error('Invalid cryptocurrencies data format');
+        return;
+    }
 
+    cryptos.forEach(crypto => {
+        // Add null checks to prevent errors with malformed data
+        if (crypto && crypto.id && crypto.name && crypto.symbol && crypto.current_price != null) {
+            const option = new Option(
+                `${crypto.name} (${crypto.symbol}) - $${crypto.current_price.toFixed(2)}`,
+                crypto.id
+            );
+            $(option).data('symbol', crypto.symbol);
+            $(option).data('name', crypto.name);
+            select.appendChild(option);
+        }
+    });
 
     // Update purchase price when crypto is selected
     $('#crypto-select').on('select2:select', function (e) {

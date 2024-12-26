@@ -1,3 +1,5 @@
+import { ApiService } from './api-service.js';
+
 // currency-manager.js
 export default class CurrencyManager {
     constructor() {
@@ -45,12 +47,8 @@ export default class CurrencyManager {
 
     async getCurrentCurrency() {
         try {
-            const response = await fetch('/api/preferences/currency');
-            if (!response.ok) {
-                throw new Error('Failed to fetch currency preference');
-            }
-            const data = await response.json();
-            return data.currency || 'USD';
+            const response = await ApiService.getCurrentCurrency();
+            return response.currency || 'USD';
         } catch (error) {
             console.error('Error fetching currency:', error);
             return 'USD'; // Default fallback
@@ -58,38 +56,30 @@ export default class CurrencyManager {
     }
 
     async updateCurrency(currency) {
-        const response = await fetch('/api/preferences/currency', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ currency })
-        });
+        try {
+            // Use ApiService for the secure PUT request
+            await ApiService.safeFetch('/api/preferences/currency', {
+                method: 'PUT',
+                body: JSON.stringify({ currency })
+            });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Currency update failed');
-        }
-
-        // Update crypto select prices if available
-        const cryptoSelect = document.getElementById('crypto-select');
-        if (cryptoSelect) {
-            await this.updateCryptoSelectPrices(currency);
+            // Update crypto select prices if available
+            const cryptoSelect = document.getElementById('crypto-select');
+            if (cryptoSelect) {
+                await this.updateCryptoSelectPrices(currency);
+            }
+        } catch (error) {
+            console.error('Currency update error:', error);
+            throw error; // Propagate the error for handling in the caller
         }
     }
 
     async updateCryptoSelectPrices(currency) {
         try {
-            const response = await fetch('/api/cryptocurrencies');
-            if (!response.ok) {
-                throw new Error('Failed to fetch cryptocurrency data');
-            }
-
-            const data = await response.json();
+            const data = await ApiService.fetchCryptocurrencies();
 
             if (data.status === 'success' && data.data) {
                 const select2Element = $('#crypto-select');
-
                 const { formatCurrency } = await import('./utils.js');
 
                 // Update prices in select2 options

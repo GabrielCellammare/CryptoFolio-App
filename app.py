@@ -1,3 +1,5 @@
+from flask import current_app, request
+from typing import List, Dict
 import base64
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from authlib.integrations.flask_client import OAuth
@@ -11,6 +13,7 @@ import os
 
 from portfolio_encryption import PortfolioEncryption
 from secure_bye_array import SecureByteArray
+from security import CSRFProtection
 
 # Application initialization
 
@@ -19,10 +22,124 @@ from secure_bye_array import SecureByteArray
 load_dotenv()
 
 
+def parse_origins(origins_string: str) -> List[str]:
+    """
+    Converte una stringa di origins separati da virgole in una lista.
+    Rimuove spazi extra e valori vuoti.
+    """
+    if not origins_string:
+        return []
+    return [origin.strip() for origin in origins_string.split(',') if origin.strip()]
+
+
+def setup_environments_config() -> Dict:
+    """
+    Configura gli ambienti caricando i valori dal file .env
+    """
+    return {
+        'development': {
+            'origins': parse_origins(os.getenv('DEV_ALLOWED_ORIGINS',
+                                               'http://localhost:5173,http://localhost:3000,http://localhost:5000,http://127.0.0.1:5173,http://127.0.0.1:5000,http://127.0.0.1:3000'))
+        },
+        'ngrok': {
+            'origins': []  # Verrà popolato dinamicamente
+        },
+        'production': {
+            'origins': parse_origins(os.getenv('PROD_ALLOWED_ORIGINS', ''))
+        }
+    }
+
+
+def initialize_cors_config(app):
+    """
+    Inizializza la configurazione CORS nell'applicazione
+    """
+    app.config['ENVIRONMENTS'] = setup_environments_config()
+
+    # Configurazioni di sicurezza aggiuntive dal .env
+    app.config['CORS_MAX_AGE'] = int(os.getenv('CORS_MAX_AGE', '3600'))
+    app.config['HSTS_MAX_AGE'] = int(os.getenv('HSTS_MAX_AGE', '31536000'))
+    app.config['INCLUDE_SUBDOMAINS'] = os.getenv(
+        'INCLUDE_SUBDOMAINS', 'true').lower() == 'true'
+
+
+def get_allowed_origins() -> List[str]:
+    """
+    Recupera gli origins permessi in base all'ambiente corrente
+    """
+    env = os.getenv('FLASK_ENV', 'development')
+
+    # Gestione speciale per ngrok in development
+    if env == 'development':
+        ngrok_url = os.getenv('NGROK_URL')
+        if ngrok_url:
+            current_app.config['ENVIRONMENTS']['ngrok']['origins'] = [
+                ngrok_url]
+            return (
+                current_app.config['ENVIRONMENTS']['development']['origins'] +
+                [ngrok_url]
+            )
+
+    return current_app.config['ENVIRONMENTS'].get(env, {}).get('origins', [])
+
+
+def add_cors_headers(response):
+    """
+    Aggiunge gli headers CORS appropriati alla risposta
+    """
+    request_origin = request.headers.get('Origin')
+    allowed_origins = get_allowed_origins()
+
+    if request_origin and request_origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = request_origin
+
+        # Headers CORS dal .env
+        response.headers['Access-Control-Allow-Headers'] = os.getenv(
+            'CORS_ALLOWED_HEADERS',
+            'Content-Type, X-CSRF-Token, X-CSRF-Nonce, X-Requested-With, X-Client-Version'
+        )
+
+        response.headers['Access-Control-Allow-Methods'] = os.getenv(
+            'CORS_ALLOWED_METHODS',
+            'GET, POST, PUT, DELETE, OPTIONS'
+        )
+
+        response.headers['Access-Control-Allow-Credentials'] = os.getenv(
+            'CORS_ALLOW_CREDENTIALS',
+            'true'
+        )
+
+        response.headers['Access-Control-Expose-Headers'] = os.getenv(
+            'CORS_EXPOSE_HEADERS',
+            'Content-Type'
+        )
+
+        if request.method == 'OPTIONS':
+            response.headers['Access-Control-Max-Age'] = str(
+                current_app.config['CORS_MAX_AGE']
+            )
+
+    # Headers di sicurezza
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+
+    if current_app.config['INCLUDE_SUBDOMAINS']:
+        response.headers['Strict-Transport-Security'] = (
+            f"max-age={current_app.config['HSTS_MAX_AGE']}; includeSubDomains"
+        )
+    else:
+        response.headers['Strict-Transport-Security'] = (
+            f"max-age={current_app.config['HSTS_MAX_AGE']}"
+        )
+
+    return response
+
+
 def create_app():
     # Create Flask application instance
     app = Flask(__name__)
-
+    initialize_cors_config(app)
+    app.after_request(add_cors_headers)
     # Set secret key
     app.secret_key = os.environ.get('FLASK_SECRET_KEY')
     if not app.secret_key:
@@ -48,6 +165,7 @@ def create_app():
 
 # Create the Flask application
 app = create_app()
+csrf = CSRFProtection(app)
 
 # Initialize other components after app creation
 db = firestore.client()
@@ -126,8 +244,12 @@ def login(provider):
         flash('Invalid authentication provider', 'error')
         return redirect(url_for('index'))
 
+    # Store the CSRF token in session before OAuth redirect
+    csrf_token = csrf.generate_token()
+    session['oauth_csrf'] = csrf_token
+
     return oauth.create_client(provider).authorize_redirect(
-        url_for('auth_callback', provider=provider, _external=True)
+        url_for('auth_callback', provider=provider, _external=True), state=csrf_token
     )
 
 
@@ -141,6 +263,9 @@ def auth_callback(provider):
     Implements secure user creation with proper email handling and encryption
     """
     try:
+        if request.args.get('state') != session.get('oauth_csrf'):
+            raise ValueError("Invalid CSRF state")
+
         # Create OAuth client for the specified provider
         client = oauth.create_client(provider)
         token = client.authorize_access_token()
@@ -149,6 +274,16 @@ def auth_callback(provider):
         user_id = None
         user_email = None
         username = None
+
+        state = request.args.get('state')
+        stored_state = session.get('oauth_csrf')
+
+        print(f"Received state: {state}")
+        print(f"Stored state: {stored_state}")
+        print(f"Session contents: {dict(session)}")
+
+        if state != stored_state:
+            raise ValueError("Invalid CSRF state")
 
         # Handle Google authentication
         if provider == 'google':
@@ -263,6 +398,7 @@ def auth_callback(provider):
         return redirect(url_for('dashboard'))
 
     except Exception as e:
+
         # Log the error securely
         error_ref = db.collection('error_logs').add({
             'error_type': 'authentication_error',
@@ -279,9 +415,11 @@ def auth_callback(provider):
         # Clean up any remaining secure objects
         if 'secure_salt' in locals():
             secure_salt.secure_zero()
+        session.pop('oauth_csrf', None)
 
 
 @app.route('/auth/logout')
+@csrf.csrf_protect
 def logout():
     session.clear()
     flash('Logout successful!', 'success')
@@ -352,6 +490,7 @@ def index():
 
 @app.route('/dashboard')
 @login_required
+@csrf.csrf_protect
 def dashboard():
     user_id = session['user_id']
     user_ref = db.collection('users').document(user_id)
@@ -363,10 +502,17 @@ def dashboard():
 
         if not security_data or 'salt' not in security_data:
             flash('Security configuration error. Please contact support.', 'error')
+            # Genera token e nonce per il template
+            csrf_token = csrf.generate_token()
+            csrf_nonce = csrf.generate_nonce()
+
             return render_template('dashboard.html',
                                    portfolio=[],
+                                   environment="development",
                                    total_value=0,
                                    currency='USD',
+                                   csrf_token=csrf_token,
+                                   csrf_nonce=csrf_nonce,
                                    last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                    username=user_data.get('username'))
 
@@ -430,10 +576,15 @@ def dashboard():
                 })
                 continue
 
+        csrf_token = csrf.generate_token()
+        csrf_nonce = csrf.generate_nonce()
         return render_template('dashboard.html',
                                portfolio=portfolio,
                                total_value=total_value,
+                               environment="development",
                                currency=currency,
+                               csrf_token=csrf_token,
+                               csrf_nonce=csrf_nonce,
                                last_update=current_time,
                                username=user_data.get('username'))
 
@@ -456,6 +607,7 @@ def dashboard():
 
 @app.route('/api/cryptocurrencies')
 @login_required
+@csrf.csrf_protect
 def get_cryptocurrencies():
     try:
         cryptos = crypto_cache.get_available_cryptocurrencies()
@@ -466,6 +618,7 @@ def get_cryptocurrencies():
 
 @app.route('/api/portfolio/add', methods=['POST'])
 @login_required
+@csrf.csrf_protect
 def add_portfolio():
     """
     Add a new portfolio item with secure encryption handling.
@@ -546,8 +699,9 @@ def add_portfolio():
             secure_salt.secure_zero()
 
 
-@app.route('/portfolio/update/<doc_id>', methods=['PUT'])
+@app.route('/api/portfolio/update/<doc_id>', methods=['PUT'])
 @login_required
+@csrf.csrf_protect
 def update_portfolio(doc_id):
     """
     Update an existing portfolio item with secure encryption handling.
@@ -632,8 +786,9 @@ def update_portfolio(doc_id):
             secure_salt.secure_zero()
 
 
-@app.route('/portfolio/delete/<doc_id>', methods=['DELETE'])
+@app.route('/api/portfolio/delete/<doc_id>', methods=['DELETE'])
 @login_required
+@csrf.csrf_protect
 def delete_portfolio(doc_id):
     """
     Securely delete a portfolio item while maintaining an encrypted backup.
@@ -754,6 +909,7 @@ def delete_portfolio(doc_id):
 
 @app.route('/api/preferences/currency', methods=['GET'])
 @login_required
+@csrf.csrf_protect
 def get_currency_preference():
     user_ref = db.collection('users').document(session['user_id'])
     user_data = user_ref.get().to_dict()
@@ -762,6 +918,7 @@ def get_currency_preference():
 
 @app.route('/api/preferences/currency', methods=['PUT'])
 @login_required
+@csrf.csrf_protect
 def update_currency_preference():
     try:
         data = request.get_json()
@@ -776,6 +933,63 @@ def update_currency_preference():
         return jsonify({'message': 'Currency preference updated successfully'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/csrf/nonce', methods=['GET'])
+@login_required
+def refresh_csrf_nonce():
+    """
+    Generate and return a new CSRF nonce.
+    This route is called by the frontend to get a fresh nonce for each request that modifies data.
+
+    Returns:
+        JSON response containing:
+        - new nonce value
+        - expiration timestamp
+        - status message
+    """
+    try:
+        # Generate a new nonce using the CSRF protection instance
+        new_nonce = csrf.generate_nonce()
+
+        # Get the expiration time for this nonce
+        expiration_time = csrf.used_nonces.get(new_nonce)
+
+        # Convert timestamp to ISO format for frontend
+        expiration_iso = datetime.fromtimestamp(
+            expiration_time).isoformat() if expiration_time else None
+
+        # Return the new nonce in the response
+        response_data = {
+            'status': 'success',
+            'nonce': new_nonce,
+            'expires': expiration_iso
+        }
+
+        # Create an audit log entry for nonce generation
+        db.collection('audit_logs').add({
+            'user_id': session.get('user_id'),
+            'action': 'nonce_refresh',
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'ip_address': request.remote_addr,
+            'user_agent': request.user_agent.string
+        })
+
+        return jsonify(response_data)
+
+    except Exception as e:
+        # Log the error securely
+        db.collection('error_logs').add({
+            'error_type': 'nonce_generation_error',
+            'user_id': session.get('user_id'),
+            'error_message': str(e),
+            'timestamp': firestore.SERVER_TIMESTAMP
+        })
+
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to generate security token'
+        }), 500
 
 
 if __name__ == '__main__':

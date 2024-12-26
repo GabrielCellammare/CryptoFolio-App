@@ -13,6 +13,34 @@ export function setupUIHandlers() {
  * Set up add cryptocurrency form handler
  */
 function setupAddCryptoForm() {
+
+    // Validazione input
+    function validateInput(value, type) {
+        switch (type) {
+            case 'amount':
+            case 'price':
+                return !isNaN(value) && value > 0 && value < 1000000000;
+            case 'date':
+                const date = new Date(value);
+                return date instanceof Date && !isNaN(date) && date <= new Date();
+            default:
+                return true;
+        }
+    }
+
+    // Sanitizzazione input
+    function sanitizeInput(value, type) {
+        switch (type) {
+            case 'amount':
+            case 'price':
+                return parseFloat(value).toFixed(8);
+            case 'string':
+                return DOMPurify.sanitize(value);
+            default:
+                return value;
+        }
+    }
+
     document.getElementById('addCryptoForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         showLoading();
@@ -24,6 +52,21 @@ function setupAddCryptoForm() {
                 throw new Error('Please select a cryptocurrency');
             }
 
+            // Validazione e sanitizzazione degli input
+            const amount = document.getElementById('amount').value;
+            const purchasePrice = document.getElementById('purchase-price').value;
+            const purchaseDate = document.getElementById('purchase-date').value;
+
+            if (!validateInput(amount, 'amount')) {
+                throw new Error('Invalid amount');
+            }
+            if (!validateInput(purchasePrice, 'price')) {
+                throw new Error('Invalid purchase price');
+            }
+            if (!validateInput(purchaseDate, 'date')) {
+                throw new Error('Invalid date');
+            }
+
             const cryptoData = {
                 crypto_id: selectedOption.id,
                 symbol: $(selectedOption.element).data('symbol'),
@@ -31,6 +74,12 @@ function setupAddCryptoForm() {
                 purchase_price: parseFloat(document.getElementById('purchase-price').value),
                 purchase_date: document.getElementById('purchase-date').value
             };
+
+            // Aggiungi nonce per ulteriore protezione CSRF
+            const nonce = document.querySelector('meta[name="csrf-nonce"]')?.content;
+            if (nonce) {
+                cryptoData.nonce = nonce;
+            }
 
             await ApiService.addCrypto(cryptoData);
             showSuccess('Cryptocurrency added successfully');
