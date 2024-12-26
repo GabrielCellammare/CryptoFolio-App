@@ -8,7 +8,7 @@ from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
 from config import Config
-from crypto_utils import AESCipher
+from cryptography_utils import AESCipher
 from cryptocache import CryptoCache
 import os
 
