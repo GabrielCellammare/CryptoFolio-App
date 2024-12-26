@@ -7,6 +7,7 @@ from firebase_admin import credentials, firestore, initialize_app
 from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
+from config import Config
 from crypto_utils import AESCipher
 from cryptocache import CryptoCache
 import os
@@ -22,124 +23,12 @@ from security import CSRFProtection
 load_dotenv()
 
 
-def parse_origins(origins_string: str) -> List[str]:
-    """
-    Converte una stringa di origins separati da virgole in una lista.
-    Rimuove spazi extra e valori vuoti.
-    """
-    if not origins_string:
-        return []
-    return [origin.strip() for origin in origins_string.split(',') if origin.strip()]
-
-
-def setup_environments_config() -> Dict:
-    """
-    Configura gli ambienti caricando i valori dal file .env
-    """
-    return {
-        'development': {
-            'origins': parse_origins(os.getenv('DEV_ALLOWED_ORIGINS',
-                                               'http://localhost:5173,http://localhost:3000,http://localhost:5000,http://127.0.0.1:5173,http://127.0.0.1:5000,http://127.0.0.1:3000'))
-        },
-        'ngrok': {
-            'origins': []  # Verrà popolato dinamicamente
-        },
-        'production': {
-            'origins': parse_origins(os.getenv('PROD_ALLOWED_ORIGINS', ''))
-        }
-    }
-
-
-def initialize_cors_config(app):
-    """
-    Inizializza la configurazione CORS nell'applicazione
-    """
-    app.config['ENVIRONMENTS'] = setup_environments_config()
-
-    # Configurazioni di sicurezza aggiuntive dal .env
-    app.config['CORS_MAX_AGE'] = int(os.getenv('CORS_MAX_AGE', '3600'))
-    app.config['HSTS_MAX_AGE'] = int(os.getenv('HSTS_MAX_AGE', '31536000'))
-    app.config['INCLUDE_SUBDOMAINS'] = os.getenv(
-        'INCLUDE_SUBDOMAINS', 'true').lower() == 'true'
-
-
-def get_allowed_origins() -> List[str]:
-    """
-    Recupera gli origins permessi in base all'ambiente corrente
-    """
-    env = os.getenv('FLASK_ENV', 'development')
-
-    # Gestione speciale per ngrok in development
-    if env == 'development':
-        ngrok_url = os.getenv('NGROK_URL')
-        if ngrok_url:
-            current_app.config['ENVIRONMENTS']['ngrok']['origins'] = [
-                ngrok_url]
-            return (
-                current_app.config['ENVIRONMENTS']['development']['origins'] +
-                [ngrok_url]
-            )
-
-    return current_app.config['ENVIRONMENTS'].get(env, {}).get('origins', [])
-
-
-def add_cors_headers(response):
-    """
-    Aggiunge gli headers CORS appropriati alla risposta
-    """
-    request_origin = request.headers.get('Origin')
-    allowed_origins = get_allowed_origins()
-
-    if request_origin and request_origin in allowed_origins:
-        response.headers['Access-Control-Allow-Origin'] = request_origin
-
-        # Headers CORS dal .env
-        response.headers['Access-Control-Allow-Headers'] = os.getenv(
-            'CORS_ALLOWED_HEADERS',
-            'Content-Type, X-CSRF-Token, X-CSRF-Nonce, X-Requested-With, X-Client-Version'
-        )
-
-        response.headers['Access-Control-Allow-Methods'] = os.getenv(
-            'CORS_ALLOWED_METHODS',
-            'GET, POST, PUT, DELETE, OPTIONS'
-        )
-
-        response.headers['Access-Control-Allow-Credentials'] = os.getenv(
-            'CORS_ALLOW_CREDENTIALS',
-            'true'
-        )
-
-        response.headers['Access-Control-Expose-Headers'] = os.getenv(
-            'CORS_EXPOSE_HEADERS',
-            'Content-Type'
-        )
-
-        if request.method == 'OPTIONS':
-            response.headers['Access-Control-Max-Age'] = str(
-                current_app.config['CORS_MAX_AGE']
-            )
-
-    # Headers di sicurezza
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
-
-    if current_app.config['INCLUDE_SUBDOMAINS']:
-        response.headers['Strict-Transport-Security'] = (
-            f"max-age={current_app.config['HSTS_MAX_AGE']}; includeSubDomains"
-        )
-    else:
-        response.headers['Strict-Transport-Security'] = (
-            f"max-age={current_app.config['HSTS_MAX_AGE']}"
-        )
-
-    return response
-
-
 def create_app():
     # Create Flask application instance
     app = Flask(__name__)
-    initialize_cors_config(app)
-    app.after_request(add_cors_headers)
+    config = Config(app)
+    app.after_request(config.add_cors_headers())
+
     # Set secret key
     app.secret_key = os.environ.get('FLASK_SECRET_KEY')
     if not app.secret_key:
