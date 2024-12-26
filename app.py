@@ -7,7 +7,7 @@ from firebase_admin import credentials, firestore, initialize_app
 from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
-from config import Config
+from config import Config, ConfigurationError
 from cryptography_utils import AESCipher
 from cryptocache import CryptoCache
 import os
@@ -24,10 +24,26 @@ load_dotenv()
 
 
 def create_app():
+    """
+    Creates and configures the Flask application.
+
+    Returns:
+        Flask: A properly initialized Flask application instance.
+
+    Raises:
+        ValueError: If required environment variables are missing
+        ConfigurationError: If CORS configuration fails
+        FirebaseError: If Firebase initialization fails
+    """
     # Create Flask application instance
     app = Flask(__name__)
-    config = Config(app)
-    app.after_request(config.add_cors_headers())
+
+    # Initialize CORS configuration - this sets up all CORS-related settings
+    try:
+        Config.initialize_cors_config(app)
+    except ConfigurationError as e:
+        app.logger.error(f"Failed to initialize CORS configuration: {e}")
+        raise
 
     # Set secret key
     app.secret_key = os.environ.get('FLASK_SECRET_KEY')
@@ -40,7 +56,7 @@ def create_app():
         cred = credentials.Certificate('firebase_config.json')
         initialize_app(cred)
     except Exception as e:
-        print(f"Firebase initialization error: {e}")
+        app.logger.error(f"Firebase initialization error: {e}")
         raise
 
     # Verify master encryption key
@@ -106,6 +122,12 @@ def configure_oauth(app):
 # Initialize OAuth after app creation
 oauth = configure_oauth(app)
 
+
+# Middleware
+# Register the CORS headers handler - this will be called automatically after each request
+@app.after_request
+def add_cors_headers(response):
+    return Config.add_cors_headers(response)
 
 # Decorator for requiring login
 
