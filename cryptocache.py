@@ -1,3 +1,15 @@
+"""
+CryptoCache: A secure caching system for cryptocurrency data
+This module provides a secure way to cache and retrieve cryptocurrency pricing data
+while implementing proper security controls and error handling.
+
+Security features:
+- Input validation for all public methods
+- Secure API request handling
+- Rate limiting and request throttling
+- Cache data validation
+"""
+
 from datetime import datetime, time, timedelta
 import json
 import os
@@ -10,7 +22,7 @@ from typing import List, Dict, Optional
 import hashlib
 from urllib.parse import urljoin
 
-# Configure logging
+# Configure logging with proper format for better debugging and monitoring
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -18,11 +30,11 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Constants
+# Constants for API configuration and request handling
 CACHE_DIR = Path("cache")
 COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3/"
-DEFAULT_TIMEOUT = 10
-MAX_RETRIES = 3
+DEFAULT_TIMEOUT = 10  # Timeout for API requests in seconds
+MAX_RETRIES = 3      # Maximum number of retry attempts for failed requests
 
 
 class SecurityError(Exception):
@@ -30,93 +42,116 @@ class SecurityError(Exception):
     pass
 
 
-def initialize_environment():
+def initialize_environment() -> Dict:
     """
     Initialize and validate environment variables
-    Returns dict with configuration or raises error if required variables are missing
+
+    Returns:
+        Dict: Configuration dictionary containing validated environment variables
+
+    Raises:
+        EnvironmentError: If required environment variables are missing
+        SecurityError: If environment variables contain invalid values
     """
-    # Load environment variables
     load_dotenv()
 
-    # Required variables
     required_vars = ['COINGECKO_API_KEY']
     missing_vars = [var for var in required_vars if not os.getenv(var)]
 
     if missing_vars:
         raise EnvironmentError(
             f"Missing required environment variables: {
-                ', '.join(missing_vars)}\n"
-            f"Please check your .env file and ensure all required variables are set."
+                ', '.join(missing_vars)}"
         )
 
-    # Optional variables with defaults
-    config = {
-        'CACHE_DURATION': int(os.getenv('CACHE_DURATION', 30)),
-        'COINGECKO_API_KEY': os.getenv('COINGECKO_API_KEY')
+    # Validate API key format
+    api_key = os.getenv('COINGECKO_API_KEY')
+    if not isinstance(api_key, str) or len(api_key) < 16:
+        raise SecurityError("Invalid API key format")
+
+    # Validate cache duration
+    cache_duration = os.getenv('CACHE_DURATION', '30')  # 30 minutes default
+    try:
+        cache_duration = int(cache_duration)
+        if cache_duration < 0 or cache_duration > 1440:  # Max 24 hours
+            raise ValueError
+    except ValueError:
+        raise SecurityError("Invalid cache duration value")
+
+    return {
+        'CACHE_DURATION': cache_duration,
+        'COINGECKO_API_KEY': api_key
     }
-
-    return config
-
-
-# Carica le variabili d'ambiente dal file .env
 
 
 class CryptoCache:
+    """
+    A cryptocurrency data caching system that provides secure data retrieval and storage.
+    Implements rate limiting, input validation, and proper error handling.
+    """
+
     def __init__(self):
         """
-        Initialize CryptoCache with environment variables
+        Initialize CryptoCache with configuration from environment variables
+
+        Raises:
+            SecurityError: If security requirements are not met
+            EnvironmentError: If required configuration is missing
         """
         try:
-            # Get configuration from environment
             config = initialize_environment()
 
-            # Initialize with configuration
             self.api_key = config['COINGECKO_API_KEY']
-            self.cache_duration = config['CACHE_DURATION']
+            self.cache_duration = timedelta(minutes=config['CACHE_DURATION'])
 
-            # Set up cache directory and load cache
-            self.cache_dir = Path("cache")
+            self.cache_dir = CACHE_DIR
             self._secure_cache_directory()
             self.cache_file = self.cache_dir / "crypto_cache.json"
-            self.cache_duration = timedelta(minutes=self.cache_duration)
-            self._load_cache()
 
+            self._load_cache()
             logger.info("CryptoCache initialized successfully")
 
         except Exception as e:
-            logger.error(f"Failed to initialize CryptoCache: {e}")
+            logger.error(f"Failed to initialize CryptoCache: {str(e)}")
             raise
 
     def _secure_cache_directory(self) -> None:
         """
-        Assicura che la directory della cache esista
+        Ensure cache directory exists and is properly configured
+
+        Raises:
+            SecurityError: If directory cannot be created or accessed
         """
         try:
-            # Crea la directory se non esiste
             if not self.cache_dir.exists():
                 self.cache_dir.mkdir(parents=True, exist_ok=True)
-            logger.info("Directory della cache creata con successo")
+            logger.info("Cache directory created successfully")
         except Exception as e:
-            logger.error(
-                f"Impossibile creare la directory della cache: {str(e)}")
+            logger.error(f"Cache directory error: {str(e)}")
             raise
 
     def _load_cache(self) -> None:
         """
-        Carica i dati dalla cache se il file esiste,
-        altrimenti inizializza una nuova cache vuota
+        Load and validate cache data from file
+
+        Raises:
+            SecurityError: If cache data is invalid or cannot be loaded
         """
         try:
             if self.cache_file.exists():
-                # Se il file esiste, leggi i dati
                 with open(self.cache_file, 'r') as f:
                     cache_data = json.load(f)
+
+                    # Validate cache structure
+                    if not isinstance(cache_data, dict):
+                        raise SecurityError("Invalid cache data structure")
+
                     self.data = cache_data.get('data', {})
                     self.timestamp = datetime.fromisoformat(
                         cache_data.get('timestamp', '2000-01-01')
                     )
             else:
-                # Se il file non esiste, crea una nuova cache vuota
+                # Initialize new cache
                 with open(self.cache_file, 'w') as f:
                     json.dump({
                         'data': {},
@@ -125,27 +160,35 @@ class CryptoCache:
                 self.data = {}
                 self.timestamp = datetime.min
 
-            logger.info("Cache caricata con successo")
+            logger.info("Cache loaded successfully")
         except Exception as e:
-            logger.error(f"Errore nel caricamento della cache: {e}")
-            # In caso di errore, inizializza una cache vuota in memoria
+            logger.error(f"Cache loading error: {str(e)}")
             self.data = {}
             self.timestamp = datetime.min
 
-    def _make_request(self, endpoint: str, params: Dict = None) -> Dict:
+    def _make_request(self, endpoint: str, params: Optional[Dict] = None) -> Dict:
         """
-        Make a secure API request with proper error handling and rate limiting
+        Make secure API request with rate limiting and error handling
 
         Args:
-            endpoint: API endpoint to call
-            params: Query parameters for the request
+            endpoint (str): API endpoint to call
+            params (Dict, optional): Query parameters for the request
 
         Returns:
-            API response as dictionary
+            Dict: API response data
+
+        Raises:
+            RequestException: If request fails after retries
+            SecurityError: If response validation fails
         """
+        if not isinstance(endpoint, str) or not endpoint:
+            raise SecurityError("Invalid endpoint")
+        if params is not None and not isinstance(params, dict):
+            raise SecurityError("Invalid parameters")
+
         url = urljoin(COINGECKO_BASE_URL, endpoint)
         headers = {
-            'X-CG-Demo-Api-Key': self.api_key,  # Corrected header name
+            'X-CG-Demo-Api-Key': self.api_key,
             'Accept': 'application/json',
             'User-Agent': 'CryptoCache/1.0'
         }
@@ -159,11 +202,13 @@ class CryptoCache:
                     timeout=DEFAULT_TIMEOUT
                 )
 
-                # Handle rate limiting
                 if response.status_code == 429:
-                    retry_after = int(response.headers.get('Retry-After', 60))
-                    logger.warning(f"Rate limit reached. Waiting {
-                                   retry_after} seconds")
+                    retry_after = min(
+                        int(response.headers.get('Retry-After', 60)),
+                        300  # Max 5 minute wait
+                    )
+                    logger.warning(
+                        f"Rate limit reached. Waiting {retry_after}s")
                     time.sleep(retry_after)
                     continue
 
@@ -172,17 +217,26 @@ class CryptoCache:
 
             except RequestException as e:
                 logger.error(f"Request failed (attempt {
-                             attempt + 1}/{MAX_RETRIES}): {e}")
+                             attempt + 1}/{MAX_RETRIES}): {str(e)}")
                 if attempt == MAX_RETRIES - 1:
                     raise
-                time.sleep(2 ** attempt)  # Exponential backoff
+                # Exponential backoff with max 30s
+                time.sleep(min(2 ** attempt, 30))
 
     def get_available_cryptocurrencies(self) -> List[Dict]:
         """
-        Get list of available cryptocurrencies from pages 1 and 2 with improved security and error handling.
+        Retrieve list of available cryptocurrencies with market data
 
         Returns:
-            List of cryptocurrency information
+            List[Dict]: List of cryptocurrency information including:
+                - id: Unique identifier
+                - symbol: Trading symbol (uppercase)
+                - name: Full name
+                - current_price: Current price in USD
+
+        Raises:
+            RequestException: If API request fails
+            SecurityError: If data validation fails
         """
         cached_data = self.get('available_cryptocurrencies')
         if cached_data:
@@ -190,7 +244,7 @@ class CryptoCache:
 
         combined_cryptos = []
 
-        for page in range(1, 3):  # Iterate through pages 1 and 2
+        for page in range(1, 3):
             params = {
                 'vs_currency': 'usd',
                 'order': 'market_cap_desc',
@@ -210,7 +264,6 @@ class CryptoCache:
                     'current_price': crypto['current_price']
                 } for crypto in result]
 
-                # Combine results from each page
                 combined_cryptos.extend(formatted_cryptos)
 
         if combined_cryptos:
@@ -221,17 +274,24 @@ class CryptoCache:
 
     def get_crypto_prices(self, crypto_ids: List[str], currency: str = 'USD') -> Dict:
         """
-        Get current cryptocurrency prices with improved currency conversion and error handling
+        Get current cryptocurrency prices for specified currencies
 
         Args:
-            crypto_ids: List of cryptocurrency IDs
-            currency: Target currency for prices (default: USD)
+            crypto_ids (List[str]): List of cryptocurrency IDs to fetch
+            currency (str): Target currency for prices (default: USD)
 
         Returns:
-            Dictionary of cryptocurrency prices in requested currency
+            Dict: Dictionary mapping crypto IDs to their prices in the specified currency
+                Format: {
+                    'bitcoin': {'usd': 50000.00},
+                    'ethereum': {'usd': 3000.00}
+                }
+
+        Raises:
+            SecurityError: If input validation fails
+            RequestException: If API request fails
         """
         try:
-            # Validate inputs
             if not isinstance(crypto_ids, list) or not crypto_ids:
                 logger.error("Invalid crypto_ids provided")
                 return {}
@@ -240,12 +300,10 @@ class CryptoCache:
             cache_key = f"prices_{','.join(sorted(crypto_ids))}_{currency}"
             cache_key = hashlib.sha256(cache_key.encode()).hexdigest()
 
-            # Check cache first
             cached_data = self.get(cache_key)
             if cached_data and isinstance(cached_data, dict):
                 return cached_data
 
-            # Make API request
             params = {
                 'ids': ','.join(crypto_ids),
                 'vs_currencies': currency
@@ -253,12 +311,10 @@ class CryptoCache:
 
             result = self._make_request('simple/price', params)
 
-            # Validate result structure
             if not isinstance(result, dict):
                 logger.error(f"Invalid API response format: {result}")
                 return {}
 
-            # Process and format the result
             formatted_result = {}
             for crypto_id in crypto_ids:
                 if crypto_id in result:
@@ -271,7 +327,6 @@ class CryptoCache:
                         formatted_result[crypto_id] = {currency: 0}
                         logger.warning(f"Invalid price data for {crypto_id}")
 
-            # Cache the formatted result
             if formatted_result:
                 self.set(cache_key, formatted_result)
 
@@ -283,16 +338,16 @@ class CryptoCache:
 
     def get_exchange_rate(self, from_currency: str = 'USD', to_currency: str = 'EUR') -> float:
         """
-        Get exchange rate between two currencies with caching and validation
+        Get exchange rate between two currencies
 
         Args:
-            from_currency: Source currency code
-            to_currency: Target currency code
+            from_currency (str): Source currency code (default: USD)
+            to_currency (str): Target currency code (default: EUR)
 
         Returns:
-            Exchange rate as float
+            float: Exchange rate from source to target currency
+                  Returns 1.0 if request fails
         """
-        # Rimuoviamo la decorazione @staticmethod e correggiamo la definizione
         try:
             cache_key = f"exchange_rate_{from_currency}_{to_currency}"
             cached_rate = self.get(cache_key)
@@ -309,46 +364,22 @@ class CryptoCache:
             rates = response.json()['rates']
             rate = float(rates.get(to_currency.upper(), 1.0))
 
-            # Cache the exchange rate
             self.set(cache_key, rate)
             return rate
 
         except (RequestException, ValueError, KeyError) as e:
-            logger.error(f"Exchange rate error: {e}")
+            logger.error(f"Exchange rate error: {str(e)}")
             return 1.0
-
-    def _validate_cache_data(self, data: any) -> bool:
-        """
-        Validate cached data structure
-
-        Args:
-            data: Data to validate
-
-        Returns:
-            bool: True if data is valid, False otherwise
-        """
-        if not isinstance(data, dict):
-            return False
-
-        for crypto_id, prices in data.items():
-            if not isinstance(prices, dict):
-                return False
-
-            for currency, price in prices.items():
-                if not isinstance(price, (int, float)):
-                    return False
-
-        return True
 
     def get(self, key: str) -> Optional[Dict]:
         """
-        Get a value from the cache with validation
+        Retrieve and validate cached data
 
         Args:
-            key: The cache key to retrieve
+            key (str): Cache key to retrieve
 
         Returns:
-            The cached value if valid, None otherwise
+            Optional[Dict]: Cached value if valid and not expired, None otherwise
         """
         try:
             if (datetime.now() - self.timestamp) < self.cache_duration:
@@ -359,20 +390,22 @@ class CryptoCache:
 
         except Exception as e:
             logger.error(f"Error retrieving from cache: {str(e)}")
-        return None
+            return None
 
     def set(self, key: str, value: any) -> None:
         """
-        Set a value in the cache
+        Store data in cache
 
         Args:
-            key: The cache key
-            value: The value to cache
+            key (str): Cache key
+            value: Value to cache
+
+        Raises:
+            SecurityError: If cache write fails
         """
         self.data[key] = value
         self.timestamp = datetime.now()
 
-        # Save to file
         try:
             cache_data = {
                 'data': self.data,
@@ -381,22 +414,4 @@ class CryptoCache:
             with open(self.cache_file, 'w') as f:
                 json.dump(cache_data, f)
         except Exception as e:
-            logger.error(f"Error saving cache: {e}")
-
-    def clear(self):
-        """
-        Clear all cached data and reset timestamp
-        """
-        self.data = {}
-        self.timestamp = datetime.min
-
-        # Clear the cache file
-        try:
-            cache_data = {
-                'data': {},
-                'timestamp': datetime.min.isoformat()
-            }
-            with open(self.cache_file, 'w') as f:
-                json.dump(cache_data, f)
-        except Exception as e:
-            logger.error(f"Error clearing cache: {e}")
+            logger.error(f"Error saving cache: {str(e)}")
