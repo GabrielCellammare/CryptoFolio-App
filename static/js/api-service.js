@@ -154,7 +154,7 @@ export const ApiService = {
             await this.handleResponse(response, url, requestId);
 
             // Se la richiesta modifica dati, aggiorna il nonce
-            if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method)) {
+            if (['POST', 'PUT', 'DELETE'].includes(options.method)) {
                 await this.csrfManager.refreshNonce();
             }
 
@@ -173,7 +173,7 @@ export const ApiService = {
             'Content-Type': 'application/json',
         };
 
-        if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+        if (['POST', 'PUT', 'DELETE'].includes(method)) {
             const token = this.csrfManager.getToken();
             const nonce = this.csrfManager.getNonce();
 

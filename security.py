@@ -205,7 +205,7 @@ class CSRFProtection:
         """
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
+            if request.method in ['POST', 'PUT', 'DELETE']:
                 token = request.headers.get('X-CSRF-Token')
                 nonce = request.headers.get('X-CSRF-Nonce')
 
