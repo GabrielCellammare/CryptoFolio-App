@@ -77,3 +77,40 @@ body {
         margin-bottom: 1rem;
     }
 }
+
+
+.brand-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.brand-logo {
+    display: inline-flex;
+    align-items: center;
+}
+
+
+.brand-logo {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+}
+
+.brand-text {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(45deg, #3498db, #2ecc71);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Dark mode adjustments */
+.navbar-dark .brand-text {
+    background: linear-gradient(45deg, #60a5fa, #34d399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}

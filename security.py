@@ -107,7 +107,15 @@ class CSRFProtection:
                 'X-Frame-Options': 'DENY',  # Prevent clickjacking
                 'X-XSS-Protection': '1; mode=block',  # Enable XSS filtering
                 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',  # Require HTTPS
-                'Content-Security-Policy': "default-src 'self'",  # Restrict resource loading
+                'Content-Security-Policy': (
+                    "default-src 'self'; "
+                    "img-src 'self' data:; "  # Permette immagini dal proprio dominio e data URLs
+                    # Permette gli stili necessari
+                    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+                    # Permette gli script necessari
+                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com; "
+                    "font-src 'self' https://cdnjs.cloudflare.com"  # Permette i font necessari
+                ),
                 'Cache-Control': 'no-store, must-revalidate'  # Prevent caching
             })
             return response
