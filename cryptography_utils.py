@@ -71,6 +71,29 @@ class AESCipher:
             raise CryptographicError(
                 "Unable to initialize the cipher") from e
 
+    def _convert_to_secure_bytes(self, data: Union[str, bytes, SecureByteArray]) -> SecureByteArray:
+        """
+        Safely converts various input types to SecureByteArray.
+
+        Args:
+            data: Input data to convert
+
+        Returns:
+            SecureByteArray: Secure byte representation of input
+        """
+        try:
+            if isinstance(data, SecureByteArray):
+                return data
+            elif isinstance(data, str):
+                return SecureByteArray(data.encode())
+            elif isinstance(data, bytes):
+                return SecureByteArray(data)
+            else:
+                raise ValueError(f"Unsupported data type: {type(data)}")
+        except Exception as e:
+            self.logger.error(f"Error converting data: {e}")
+            raise CryptographicError("Data conversion failed") from e
+
     def _ensure_secure_bytes(self, data: Union[bytes, str, SecureByteArray]) -> SecureByteArray:
         """
         Converts data to SecureByteArray securely.
@@ -177,8 +200,10 @@ class AESCipher:
         key = iv = padded_data = ciphertext = result = None
 
         try:
-            # Data preparation
-            if not isinstance(data, bytes):
+            # Data preparation - Convert SecureByteArray to bytes before JSON serialization
+            if isinstance(data, SecureByteArray):
+                data = data.to_bytes()
+            elif not isinstance(data, bytes):
                 data = json.dumps(data).encode()
 
             # IV generation and key derivation
@@ -218,57 +243,62 @@ class AESCipher:
                 if secure_data is not None:
                     secure_data.secure_zero()
 
-    def decrypt(self, encrypted_data: Union[str, bytes], user_id: str,
+    def decrypt(self, encrypted_data: Union[str, bytes, SecureByteArray], user_id: str,
                 salt: Union[bytes, SecureByteArray]) -> Any:
         """
         Decrypts data with secure memory management.
 
         Args:
-            encrypted_data: Encrypted data encoded in base64
+            encrypted_data: Encrypted data (can be string, bytes, or SecureByteArray)
             user_id: User identifier
             salt: Salt used for encryption
 
         Returns:
             Any: Decrypted data (JSON object or string)
-
-        Raises:
-            CryptographicError: If decryption fails
         """
         key = encrypted = iv = ciphertext = padded_data = decrypted_data = None
 
         try:
-            # Preparation of encrypted data
-            if isinstance(encrypted_data, str):
-                encrypted_data = encrypted_data.encode()
+            # Convert input to SecureByteArray if needed
+            if isinstance(encrypted_data, (str, bytes)):
+                if isinstance(encrypted_data, str):
+                    encrypted_data = encrypted_data.encode()
+                encrypted_data = SecureByteArray(
+                    base64.b64decode(encrypted_data))
+            elif isinstance(encrypted_data, SecureByteArray):
+                # If it's already a SecureByteArray, decode its contents
+                encrypted_data = SecureByteArray(
+                    base64.b64decode(encrypted_data.to_bytes())
+                )
 
-            # Base64 decoding and separation of IV/ciphertext
-            encrypted = SecureByteArray(base64.b64decode(encrypted_data))
+            # Process IV and ciphertext
+            encrypted = encrypted_data
             iv = SecureByteArray(encrypted.to_bytes()[:self.IV_LENGTH])
             ciphertext = SecureByteArray(encrypted.to_bytes()[self.IV_LENGTH:])
 
             # Key derivation
             key = self.derive_key(user_id, salt)
 
-            # Cipher creation
+            # Create and initialize cipher
             cipher = Cipher(
                 algorithms.AES(key.to_bytes()),
                 modes.CBC(iv.to_bytes()),
                 backend=default_backend()
             )
 
-            # Decryption
+            # Decrypt data
             decryptor = cipher.decryptor()
             padded_data = SecureByteArray(
                 decryptor.update(ciphertext.to_bytes()) + decryptor.finalize()
             )
 
-            # Padding removal
+            # Remove padding
             unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
             decrypted_data = SecureByteArray(
                 unpadder.update(padded_data.to_bytes()) + unpadder.finalize()
             )
 
-            # JSON or string decoding
+            # Try JSON decoding first
             try:
                 return json.loads(decrypted_data.to_bytes())
             except json.JSONDecodeError:
@@ -279,10 +309,9 @@ class AESCipher:
             raise CryptographicError("Unable to decrypt data") from e
 
         finally:
-            # Secure memory cleanup
-            secure_arrays = [key, encrypted, iv,
-                             ciphertext, padded_data, decrypted_data]
-            for secure_array in secure_arrays:
+            # Secure cleanup of all temporary secure arrays
+            for secure_array in [key, encrypted, iv, ciphertext,
+                                 padded_data, decrypted_data]:
                 if secure_array is not None:
                     try:
                         secure_array.secure_zero()

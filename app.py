@@ -1,5 +1,4 @@
-from flask import current_app, request
-from typing import List, Dict
+
 import base64
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from authlib.integrations.flask_client import OAuth

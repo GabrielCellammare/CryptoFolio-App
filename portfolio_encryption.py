@@ -107,9 +107,8 @@ class PortfolioEncryption:
         """
         for buffer in self._temp_buffers:
             try:
-                # Perform multiple overwrite passes
-                for _ in range(self.SECURE_MEMORY_WIPE_PASSES):
-                    buffer.secure_erase()
+                # Use secure_zero instead of secure_erase
+                buffer.secure_zero()
             except Exception as e:
                 self.logger.warning(f"Cleanup warning: {str(e)}")
         self._temp_buffers.clear()
@@ -152,16 +151,16 @@ class PortfolioEncryption:
                         str(item[field]))
 
                     try:
-                        # Perform encryption in isolated memory
+                        # Convert SecureByteArray to bytes for encryption
                         encrypted_value = self._cipher.encrypt(
-                            secure_value,
+                            secure_value.to_bytes(),  # Convert to bytes explicitly
                             user_id,
                             salt
                         )
                         encrypted_item[field] = encrypted_value.decode('utf-8')
                     finally:
                         # Ensure secure cleanup
-                        secure_value.secure_erase()
+                        secure_value.secure_zero()
 
             return encrypted_item
 
