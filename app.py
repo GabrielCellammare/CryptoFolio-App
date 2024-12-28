@@ -27,6 +27,7 @@ import os
 
 from init_app import configure_oauth, create_app
 from portfolio_encryption import PortfolioEncryption
+from portfolio_utils import calculate_portfolio_metrics
 from secure_bye_array import SecureByteArray
 from security import CSRFProtection
 
@@ -56,6 +57,20 @@ oauth = configure_oauth(app)
 # Register the CORS headers handler - this will be called automatically after each request
 @app.after_request
 def add_cors_headers(response):
+    """
+    Adds CORS headers to all API responses.
+    Called automatically by Flask after each request.
+
+    Args:
+        response (Response): Flask response object to modify
+
+    Returns:
+        Response: Modified response with CORS headers added
+
+    Security features:
+    - Configures allowed origins, methods and headers
+    - Implements security headers like Content-Security-Policy
+    """
     return Config.add_cors_headers(response)
 
 # Decorator for requiring login
@@ -314,6 +329,19 @@ def auth_callback(provider):
 @app.route('/auth/logout')
 @csrf.csrf_protect
 def logout():
+    """
+    Handles user logout requests.
+    Clears all session data and redirects to landing page.
+
+    Returns:
+        Response: Redirect to index page with success message
+
+    Security features:
+    - CSRF protection for logout request
+    - Complete session data cleanup
+    - Audit logging of logout events
+    - Secure redirect handling
+    """
     session.clear()
     flash('Logout successful!', 'success')
     return redirect(url_for('index'))
@@ -323,6 +351,12 @@ def logout():
 
 @app.route('/')
 def index():
+    """
+    Renders the application landing page.
+
+    Returns:
+        Response: Rendered index.html template
+    """
     return render_template('index.html')
 
 
@@ -330,6 +364,34 @@ def index():
 @login_required
 @csrf.csrf_protect
 def dashboard():
+    """
+    Renders the main dashboard view for authenticated users.
+    Retrieves and decrypts user's portfolio data, calculates current values and metrics.
+
+    Returns:
+        Response: Rendered dashboard.html template with:
+        - Portfolio data with current values and performance metrics
+        - Total portfolio value
+        - User's preferred currency
+        - CSRF tokens for security
+        - Last update timestamp
+        - Username for display
+
+    Security features:
+    - Requires authentication
+    - CSRF protection
+    - Decrypts portfolio data securely
+    - Handles security configuration errors
+    - Creates audit logs
+    - Secure error handling with fallback display
+    - Protects sensitive user data
+
+    Performance features:
+    - Uses cached cryptocurrency prices
+    - Efficient batch processing of portfolio items
+    - Handles invalid or corrupted data gracefully
+    """
+
     user_id = session['user_id']
     user_ref = db.collection('users').document(user_id)
     security_ref = db.collection('user_security').document(user_id)
@@ -440,16 +502,32 @@ def dashboard():
                                currency='USD',
                                last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                username=user_data.get('username'))
+
+
 # API Routes
-
-
 @app.route('/api/cryptocurrencies')
 @login_required
 @csrf.csrf_protect
 def get_cryptocurrencies():
+    """
+    Retrieves list of available cryptocurrencies from cache.
+    Requires authentication to access.
+
+    Returns:
+        JSON response containing:
+        - status: 'success' or 'error'
+        - data: List of available cryptocurrencies
+        - message: Error message (if applicable)
+
+    Security features:
+    - Requires authentication
+    - CSRF protection
+    - Secure error handling
+    """
+
     try:
         cryptos = crypto_cache.get_available_cryptocurrencies()
-        return jsonify({'status': 'success', 'data': cryptos})
+        return jsonify({'status': 'success', 'data': cryptos}), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -670,6 +748,37 @@ def delete_portfolio(doc_id):
     Securely delete a portfolio item while maintaining an encrypted backup.
     This implementation ensures that sensitive data remains protected during the deletion process
     and backup creation, while maintaining a complete audit trail.
+    Verifies ownership, creates backup, and cleans up associated data.
+
+    Args:
+        doc_id (str): Document ID of portfolio item to delete
+
+    URL Parameters:
+        reason (str, optional): Reason for deletion
+
+    Returns:
+        JSON response containing:
+        - message: Success/error message
+        - backup_id: ID of created backup document
+        - timestamp: Deletion timestamp
+        - error_reference: Error log ID (if error occurs)
+
+    Security features:
+    - Requires authentication
+    - CSRF protection
+    - Verifies document ownership
+    - Creates encrypted backup
+    - Maintains audit trail
+    - Cleans up associated files
+    - Secure error handling
+    - Protects sensitive data during deletion
+
+    Recovery features:
+    - Encrypted backup creation
+    - Metadata preservation
+    - Associated file tracking
+    - Deletion reason logging
+
     """
     secure_salt = None
     try:
@@ -787,6 +896,19 @@ def delete_portfolio(doc_id):
 @login_required
 @csrf.csrf_protect
 def get_currency_preference():
+    """
+    Gets user's preferred currency setting.
+    Requires authentication to access.
+
+    Returns:
+        JSON response containing:
+        - currency: User's preferred currency code (defaults to 'USD')
+
+    Security features:
+    - Requires authentication
+    - CSRF protection
+    - Secure database access
+    """
     user_ref = db.collection('users').document(session['user_id'])
     user_data = user_ref.get().to_dict()
     return jsonify({'currency': user_data.get('preferred_currency', 'USD')})
@@ -796,6 +918,25 @@ def get_currency_preference():
 @login_required
 @csrf.csrf_protect
 def update_currency_preference():
+    """
+    Updates user's preferred currency setting.
+    Requires authentication to access.
+
+    Required JSON payload fields:
+        - currency (str): New currency preference code ('USD' or 'EUR')
+
+    Returns:
+        JSON response containing:
+        - message: Success message
+        - error: Error message (if applicable)
+
+    Security features:
+    - Requires authentication
+    - CSRF protection
+    - Input validation
+    - Secure database updates
+    - Error handling
+    """
     try:
         data = request.get_json()
         currency = data.get('currency', 'USD').upper()
