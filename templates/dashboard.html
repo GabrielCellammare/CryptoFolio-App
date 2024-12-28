@@ -23,14 +23,18 @@
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
             display: none;
-            justify-content:
-            justify-content: center;
+            justify-content: center !important;
             align-items: center;
             z-index: 1000;
         }
+
         .loading-spinner {
             color: white;
             font-size: 24px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
         }
         .edit-input.d-none {
             display: none !important;
@@ -115,7 +119,7 @@
     </div>
 
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="#">
                 <div class="brand-container">
@@ -125,29 +129,16 @@
                     <span class="brand-text">CryptoFolio</span>
                 </div>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <span class="nav-link text-light">Last update: <span id="lastUpdate">{{ last_update }}</span></span>
-                    </li>
-                    <li class="nav-item">
-                        <span class="nav-link text-light">Welcome, {{ username }}</span>
-                    </li>
-                    <li class="nav-item">
-                        <div class="d-flex align-items-center">
-                            <select id="currencySelect" class="form-select form-select-sm">
-                                <option value="USD">USD</option>
-                                <option value="EUR">EUR</option>
-                            </select>
-                        </div>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/auth/logout">Logout</a>
-                    </li>
-                </ul>
+            <div class="navbar-nav ms-auto">
+                <span class="nav-item nav-link text-light">Last update: <span id="lastUpdate">{{ last_update }}</span></span>
+                <span class="nav-item nav-link text-light">Welcome, {{ username }}</span>
+                <div class="nav-item">
+                    <select id="currencySelect" class="form-select form-select-sm">
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                    </select>
+                </div>
+                <a class="nav-item nav-link" href="/auth/logout">Logout</a>
             </div>
         </div>
     </nav>
