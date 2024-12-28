@@ -7,7 +7,9 @@ import os
 import base64
 import json
 import logging
-from typing import Union, Any
+import hmac
+import hashlib
+from typing import Union, Any, Optional
 from secure_bye_array import SecureByteArray
 
 
@@ -18,13 +20,14 @@ class CryptographicError(Exception):
 
 class AESCipher:
     """
-    Secure implementation of AES encryption with protected memory management.
+    Secure implementation of AES encryption with protected memory management and user ID hashing.
 
     This class provides:
     - AES-256-CBC encryption with secure key derivation
     - Secure memory management using SecureByteArray
     - Protection against timing and side-channel attacks
     - Automatic PKCS7 padding management
+    - Secure user ID hashing with HMAC-SHA256 and base64 encoding
 
     Attributes:
         BLOCK_SIZE (int): AES block size in bytes
@@ -43,7 +46,7 @@ class AESCipher:
 
     def __init__(self, master_key: Union[str, bytes, SecureByteArray]):
         """
-        Initializes the AES cipher with a master key.
+        Initializes the AES cipher with a master key and optional app secret for user ID hashing.
 
         Args:
             master_key: Master key as string, bytes, or SecureByteArray
@@ -65,11 +68,86 @@ class AESCipher:
             if len(self.master_key.to_bytes()) < self.KEY_LENGTH:
                 raise CryptographicError("The master key is too short")
 
+            # Initialize app secret for user ID hashing
+            self.app_secret = os.environ.get(
+                'HASH_SECRET_KEY')
+            self.app_secret = self._ensure_secure_bytes(self.app_secret)
+
         except Exception as e:
-            self.logger.error(
-                f"Error initializing the cipher: {e}")
-            raise CryptographicError(
-                "Unable to initialize the cipher") from e
+            self.logger.error(f"Error initializing the cipher: {e}")
+            raise CryptographicError("Unable to initialize the cipher") from e
+
+    def hash_user_id(self, provider: str, original_id: str) -> str:
+        """
+        Generates a secure and consistent hash of the user ID using HMAC-SHA256,
+        encoded in URL-safe base64 format.
+
+        Args:
+            provider: OAuth provider identifier (e.g., 'google', 'github')
+            original_id: Original user ID from the provider
+
+        Returns:
+            str: Base64 encoded hash, URL-safe without padding
+
+        Raises:
+            ValueError: If provider or original_id is empty
+            CryptographicError: If hashing fails
+        """
+        if not provider or not original_id:
+            raise ValueError("Provider and user ID are required")
+
+        try:
+            # Combine provider and ID in a consistent format
+            combined = f"{provider}:{original_id}"
+
+            # Use HMAC-SHA256 to generate a secure hash
+            hmac_obj = hmac.new(
+                key=self.app_secret.to_bytes(),
+                msg=combined.encode(),
+                digestmod=hashlib.sha256
+            )
+
+            # Convert to URL-safe base64 without padding
+            hash_bytes = hmac_obj.digest()  # Get raw bytes instead of hexadecimal
+            return base64.urlsafe_b64encode(hash_bytes).rstrip(b'=').decode('ascii')
+
+        except Exception as e:
+            self.logger.error(f"Error hashing user ID: {e}")
+            raise CryptographicError("Unable to hash user ID") from e
+
+    def verify_user_id_hash(self, provider: str, original_id: str, hashed_id: str) -> bool:
+        """
+        Verifies if a base64 encoded hash matches a given user ID using constant-time comparison.
+
+        Args:
+            provider: OAuth provider identifier
+            original_id: Original user ID
+            hashed_id: Base64 encoded hash to verify
+
+        Returns:
+            bool: True if the hash matches, False otherwise
+
+        Raises:
+            CryptographicError: If verification fails
+        """
+        try:
+            # Add padding back if necessary
+            padding_length = (4 - len(hashed_id) % 4) % 4
+            padded_hash = hashed_id + '=' * padding_length
+
+            # Convert base64 hash back to bytes for comparison
+            hash_bytes = base64.urlsafe_b64decode(padded_hash)
+
+            # Generate expected hash and compare in constant time
+            expected_hash = self.hash_user_id(provider, original_id)
+            expected_padded = expected_hash + '=' * padding_length
+            expected_bytes = base64.urlsafe_b64decode(expected_padded)
+
+            return hmac.compare_digest(hash_bytes, expected_bytes)
+
+        except Exception as e:
+            self.logger.error(f"Error verifying user ID hash: {e}")
+            raise CryptographicError("Unable to verify user ID hash") from e
 
     def _convert_to_secure_bytes(self, data: Union[str, bytes, SecureByteArray]) -> SecureByteArray:
         """

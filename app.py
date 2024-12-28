@@ -1,69 +1,41 @@
+"""
+Cryptocurrency Portfolio Management Application
+
+This Flask application provides a secure platform for managing cryptocurrency portfolios.
+It includes OAuth authentication, encrypted data storage, CSRF protection, and real-time
+cryptocurrency price tracking.
+
+Main features:
+- User authentication via Google and GitHub OAuth
+- Encrypted portfolio data storage using AES
+- Real-time cryptocurrency price tracking
+- CSRF protection for all forms and API endpoints
+- Audit logging for security events
+- Error handling and logging
+"""
+
 import base64
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
-from authlib.integrations.flask_client import OAuth
-from firebase_admin import credentials, firestore, initialize_app
+from flask import render_template, request, jsonify, session, redirect, url_for, flash
+from firebase_admin import firestore
 from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
-from config import Config, ConfigurationError
+from config import Config
 from cryptography_utils import AESCipher
 from cryptocache import CryptoCache
 import os
 
+from init_app import configure_oauth, create_app
 from portfolio_encryption import PortfolioEncryption
 from secure_bye_array import SecureByteArray
 from security import CSRFProtection
+
 
 # Application initialization
 
 
 # First, load environment variables before any initialization
 load_dotenv()
-
-
-def create_app():
-    """
-    Creates and configures the Flask application.
-
-    Returns:
-        Flask: A properly initialized Flask application instance.
-
-    Raises:
-        ValueError: If required environment variables are missing
-        ConfigurationError: If CORS configuration fails
-        FirebaseError: If Firebase initialization fails
-    """
-    # Create Flask application instance
-    app = Flask(__name__)
-
-    # Initialize CORS configuration - this sets up all CORS-related settings
-    try:
-        Config.initialize_cors_config(app)
-    except ConfigurationError as e:
-        app.logger.error(f"Failed to initialize CORS configuration: {e}")
-        raise
-
-    # Set secret key
-    app.secret_key = os.environ.get('FLASK_SECRET_KEY')
-    if not app.secret_key:
-        raise ValueError(
-            "FLASK_SECRET_KEY must be set in environment variables")
-
-    # Initialize Firebase
-    try:
-        cred = credentials.Certificate('firebase_config.json')
-        initialize_app(cred)
-    except Exception as e:
-        app.logger.error(f"Firebase initialization error: {e}")
-        raise
-
-    # Verify master encryption key
-    master_key = os.environ.get('MASTER_ENCRYPTION_KEY')
-    if not master_key:
-        raise ValueError(
-            "MASTER_ENCRYPTION_KEY must be set in environment variables")
-
-    return app
 
 
 # Create the Flask application
@@ -75,47 +47,6 @@ db = firestore.client()
 crypto_cache = CryptoCache()
 cipher = AESCipher(os.environ.get('MASTER_ENCRYPTION_KEY'))
 portfolio_encryption = PortfolioEncryption(cipher)
-
-# OAuth Configuration
-
-
-def configure_oauth(app):
-    # Verify required environment variables
-    required_vars = [
-        'GOOGLE_CLIENT_ID',
-        'GOOGLE_CLIENT_SECRET',
-        'SERVER_METADATA_URL_GOOGLE',
-        'GITHUB_CLIENT_ID',
-        'GITHUB_CLIENT_SECRET'
-    ]
-
-    for var in required_vars:
-        if not os.getenv(var):
-            raise ValueError(f"Missing required environment variable: {var}")
-
-    oauth = OAuth(app)
-
-    # Configure Google OAuth
-    oauth.register(
-        name='google',
-        client_id=os.getenv('GOOGLE_CLIENT_ID'),
-        client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),
-        server_metadata_url=os.getenv('SERVER_METADATA_URL_GOOGLE'),
-        client_kwargs={'scope': 'openid email profile'}
-    )
-
-    # Configure GitHub OAuth
-    oauth.register(
-        name='github',
-        client_id=os.getenv('GITHUB_CLIENT_ID'),
-        client_secret=os.getenv('GITHUB_CLIENT_SECRET'),
-        access_token_url='https://github.com/login/oauth/access_token',
-        authorize_url='https://github.com/login/oauth/authorize',
-        client_kwargs={'scope': 'read:user user:email'}
-    )
-
-    return oauth
-
 
 # Initialize OAuth after app creation
 oauth = configure_oauth(app)
@@ -131,10 +62,21 @@ def add_cors_headers(response):
 
 
 def login_required(f):
+    """
+    Decorator to protect routes that require user authentication.
+    Redirects to login page if user is not authenticated.
+
+    Args:
+        f (function): Route handler function to protect
+
+    Returns:
+        function: Decorated function that checks for authentication
+    """
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            return redirect(url_for('login'))
+            return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -144,10 +86,17 @@ def login_required(f):
 @app.route('/auth/login/<provider>')
 def login(provider):
     """
-    Handle login requests for different OAuth providers
+    Handles login requests for different OAuth providers.
+    Generates and stores CSRF token before OAuth redirect.
 
     Args:
-        provider (str): The OAuth provider ('google' or 'github')
+        provider (str): OAuth provider name ('google' or 'github')
+
+    Returns:
+        Response: Redirect to OAuth provider's authorization page
+
+    Raises:
+        ValueError: If invalid provider specified
     """
     if provider not in ['google', 'github']:
         flash('Invalid authentication provider', 'error')
@@ -168,16 +117,42 @@ def login(provider):
 @app.route('/auth/callback/<provider>')
 def auth_callback(provider):
     """
-    Handle OAuth callback for different providers (Google and GitHub)
-    Implements secure user creation with proper email handling and encryption
+    Handles OAuth callback for authentication providers.
+    Processes user data, creates/updates user records, and manages session.
+
+    Args:
+        provider (str): OAuth provider name ('google' or 'github')
+
+    Returns:
+        Response: Redirect to dashboard on success or error page on failure
+
+    Security:
+    - Validates CSRF state
+    - Validates and stores OAuth tokens
+    - Encrypts sensitive user data
+    - Creates audit logs
+    - Implements secure error handling
     """
+
     try:
         if request.args.get('state') != session.get('oauth_csrf'):
             raise ValueError("Invalid CSRF state")
 
         # Create OAuth client for the specified provider
         client = oauth.create_client(provider)
+
+        # Get and validate the token
         token = client.authorize_access_token()
+        if not token or 'access_token' not in token:
+            raise ValueError("Invalid token received from provider")
+
+        # Store token metadata securely
+        token_metadata = {
+            'token_type': token.get('token_type'),
+            'expires_at': token.get('expires_at'),
+            'scope': token.get('scope', ''),
+            'last_refreshed': firestore.SERVER_TIMESTAMP
+        }
 
         # Initialize variables we'll need for both providers
         user_id = None
@@ -197,22 +172,31 @@ def auth_callback(provider):
         # Handle Google authentication
         if provider == 'google':
             user_info = client.get(
-                'https://www.googleapis.com/oauth2/v3/userinfo').json()
-            user_id = user_info.get('sub')
+                'https://www.googleapis.com/oauth2/v3/userinfo',
+                token=token  # Pass token explicitly
+            ).json()
+            original_id = user_info.get('sub')
+            user_id = cipher.hash_user_id(provider, original_id)
             user_email = user_info.get('email')
             username = user_info.get('name')
 
         # Handle GitHub authentication
         elif provider == 'github':
-            # Get basic user info
-            user_info = client.get('https://api.github.com/user').json()
-            user_id = str(user_info.get('id'))
+            # Get basic user info with explicit token
+            user_info = client.get(
+                'https://api.github.com/user',
+                token=token  # Pass token explicitly
+            ).json()
+            original_id = str(user_info.get('id'))
+            user_id = cipher.hash_user_id(provider, original_id)
             username = user_info.get('name') or user_info.get('login')
 
             # Explicitly fetch email from GitHub's email endpoint
             try:
                 email_response = client.get(
-                    'https://api.github.com/user/emails')
+                    'https://api.github.com/user/emails',
+                    token=token  # Pass token explicitly
+                )
                 if email_response.status_code == 200:
                     email_data = email_response.json()
                     primary_email = next(
@@ -244,37 +228,37 @@ def auth_callback(provider):
                              ', '.join(missing_fields)}")
 
         # Generate salt and store user security info
-        secure_salt = cipher.generate_salt()  # Returns SecureByteArray
+        secure_salt = cipher.generate_salt()
         security_ref = db.collection('user_security').document(user_id)
 
         # Convert SecureByteArray to bytes before encoding
         salt_bytes = secure_salt.to_bytes()
         encoded_salt = base64.b64encode(salt_bytes).decode()
 
-        # Store or update security information
+        # Store or update security information with token metadata
         if not security_ref.get().exists:
             security_ref.set({
-                'salt': encoded_salt,  # Now using properly encoded salt
+                'salt': encoded_salt,
                 'created_at': firestore.SERVER_TIMESTAMP,
-                'last_login': firestore.SERVER_TIMESTAMP
+                'last_login': firestore.SERVER_TIMESTAMP,
+                'oauth_token_metadata': token_metadata  # Store token metadata
             })
         else:
             security_ref.update({
-                'last_login': firestore.SERVER_TIMESTAMP
+                'last_login': firestore.SERVER_TIMESTAMP,
+                'oauth_token_metadata': token_metadata  # Update token metadata
             })
 
         # Create or update user in Firebase
         user_ref = db.collection('users').document(user_id)
 
         if not user_ref.get().exists:
-            # Encrypt sensitive information using the original SecureByteArray salt
             encrypted_email = cipher.encrypt(
                 user_email,
                 user_id,
-                secure_salt  # Use the SecureByteArray directly here
+                secure_salt
             ).decode()
 
-            # Create new user document
             user_ref.set({
                 'username': username,
                 'email': encrypted_email,
@@ -284,7 +268,6 @@ def auth_callback(provider):
                 'provider': provider
             })
         else:
-            # Update existing user's last login
             user_ref.update({
                 'last_login': firestore.SERVER_TIMESTAMP
             })
@@ -293,21 +276,22 @@ def auth_callback(provider):
         session['user_id'] = user_id
         session['provider'] = provider
 
-        # Create audit log for successful login
+        # Create audit log for successful login with token metadata
         db.collection('audit_logs').add({
             'user_id': user_id,
             'action': 'login',
             'provider': provider,
             'timestamp': firestore.SERVER_TIMESTAMP,
             'ip_address': request.remote_addr,
-            'user_agent': request.user_agent.string
+            'user_agent': request.user_agent.string,
+            'token_type': token_metadata['token_type'],
+            'token_scope': token_metadata['scope']
         })
 
         flash('Login successful!', 'success')
         return redirect(url_for('dashboard'))
 
     except Exception as e:
-
         # Log the error securely
         error_ref = db.collection('error_logs').add({
             'error_type': 'authentication_error',
@@ -333,61 +317,6 @@ def logout():
     session.clear()
     flash('Logout successful!', 'success')
     return redirect(url_for('index'))
-
-# Portfolio Management
-
-
-def calculate_portfolio_metrics(portfolio_item, current_price, currency='USD'):
-    """
-    Calculate various metrics for a portfolio item with currency conversion
-
-    Args:
-        portfolio_item: Dictionary containing portfolio item data
-        current_price: Current price of the cryptocurrency
-        currency: Target currency (default: USD)
-
-    Returns:
-        Dictionary containing calculated metrics
-    """
-    try:
-        # Assicuriamoci che i valori siano numerici
-        amount = float(portfolio_item.get('amount', 0))
-        purchase_price = float(portfolio_item.get('purchase_price', 0))
-
-        # Assicuriamoci che current_price sia numerico
-        current_price = float(current_price) if current_price else 0.0
-
-        # Non abbiamo più bisogno della conversione di valuta qui perché
-        # i prezzi arrivano già nella valuta corretta da get_crypto_prices
-
-        current_value = amount * current_price
-        purchase_value = amount * purchase_price
-
-        # Evitiamo la divisione per zero
-        profit_loss = current_value - purchase_value
-        if purchase_value > 0:
-            profit_loss_percentage = (current_value / purchase_value - 1) * 100
-        else:
-            profit_loss_percentage = 0
-
-        return {
-            'current_price': current_price,
-            'current_value': current_value,
-            'profit_loss': profit_loss,
-            'profit_loss_percentage': profit_loss_percentage,
-            'currency': currency
-        }
-
-    except Exception as e:
-        print(f"Error in calculate_portfolio_metrics: {e}")
-        # Ritorniamo valori di default in caso di errore
-        return {
-            'current_price': 0,
-            'current_value': 0,
-            'profit_loss': 0,
-            'profit_loss_percentage': 0,
-            'currency': currency
-        }
 
 # Main routes
 
@@ -530,8 +459,27 @@ def get_cryptocurrencies():
 @csrf.csrf_protect
 def add_portfolio():
     """
-    Add a new portfolio item with secure encryption handling.
-    Ensures proper conversion between SecureByteArray and bytes for all encrypted fields.
+    Adds a new portfolio item with encrypted data storage.
+
+    Required JSON payload fields:
+        - crypto_id (str): Cryptocurrency identifier
+        - symbol (str): Cryptocurrency symbol
+        - amount (float): Quantity purchased
+        - purchase_price (float): Price at purchase
+        - purchase_date (str): Date of purchase
+
+    Returns:
+        JSON response with:
+        - status: 'success' or 'error'
+        - message: Description of result
+        - document_id: ID of created document (on success)
+
+    Security features:
+    - Requires authentication
+    - CSRF protection
+    - Encrypts sensitive data
+    - Creates audit logs
+    - Secure error handling
     """
     secure_salt = None
     try:
@@ -613,8 +561,27 @@ def add_portfolio():
 @csrf.csrf_protect
 def update_portfolio(doc_id):
     """
-    Update an existing portfolio item with secure encryption handling.
-    Maintains encryption security while allowing partial updates of sensitive fields.
+    Updates an existing portfolio item while maintaining encryption.
+
+    Args:
+        doc_id (str): Document ID of portfolio item to update
+
+    Required JSON payload fields:
+        - amount (float): New quantity
+        - purchase_price (float): New purchase price
+        - purchase_date (str): New purchase date
+
+    Returns:
+        JSON response with:
+        - message: Success/error message
+        - timestamp: Update timestamp
+
+    Security features:
+    - Requires authentication
+    - CSRF protection
+    - Maintains encryption
+    - Verifies document ownership
+    - Creates audit logs
     """
     secure_salt = None
     try:
@@ -848,14 +815,20 @@ def update_currency_preference():
 @login_required
 def refresh_csrf_nonce():
     """
-    Generate and return a new CSRF nonce.
-    This route is called by the frontend to get a fresh nonce for each request that modifies data.
+    Generates and returns a new CSRF nonce for frontend requests.
 
     Returns:
         JSON response containing:
-        - new nonce value
-        - expiration timestamp
-        - status message
+        - status: 'success' or 'error'
+        - nonce: New CSRF nonce value
+        - expires: Nonce expiration timestamp
+        - message: Error message (if applicable)
+
+    Security features:
+    - Requires authentication
+    - Generates cryptographically secure nonce
+    - Sets expiration time
+    - Creates audit logs
     """
     try:
         # Generate a new nonce using the CSRF protection instance
