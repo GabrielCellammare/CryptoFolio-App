@@ -1,3 +1,4 @@
+from typing import Optional
 from flask import Flask
 from authlib.integrations.flask_client import OAuth
 from firebase_admin import credentials, initialize_app

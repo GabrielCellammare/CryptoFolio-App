@@ -9,7 +9,7 @@ import json
 import logging
 import hmac
 import hashlib
-from typing import Union, Any, Optional
+from typing import Union, Any
 from secure_bye_array import SecureByteArray
 
 
