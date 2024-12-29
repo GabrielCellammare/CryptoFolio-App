@@ -954,6 +954,7 @@ def update_currency_preference():
 
 @app.route('/api/csrf/nonce', methods=['GET'])
 @login_required
+@csrf.csrf_protect
 def refresh_csrf_nonce():
     """
     Generates and returns a new CSRF nonce for frontend requests.
@@ -1013,6 +1014,51 @@ def refresh_csrf_nonce():
             'status': 'error',
             'message': 'Failed to generate security token'
         }), 500
+
+
+@app.route('/navigate-home', methods=['POST'])
+@csrf.csrf_protect
+def navigate_home():
+    """
+    Handles secure navigation to home page.
+
+    This route:
+    1. Verifies the user's session state
+    2. Performs any necessary cleanup
+    3. Redirects to the appropriate page based on authentication status
+
+    Returns:
+        Response: Redirect to appropriate page with proper session handling
+    """
+    try:
+        if 'user_id' in session:
+            # If user is logged in, we might want to do some session cleanup
+            # or state management before redirecting
+
+            # Create audit log for navigation
+            db.collection('audit_logs').add({
+                'user_id': session.get('user_id'),
+                'action': 'navigate_home',
+                'timestamp': firestore.SERVER_TIMESTAMP,
+                'ip_address': request.remote_addr,
+                'user_agent': request.user_agent.string
+            })
+
+        # Use Flask's redirect function to properly handle the navigation
+        return redirect(url_for('index'))
+
+    except Exception as e:
+        # Log the error
+        db.collection('error_logs').add({
+            'error_type': 'navigation_error',
+            'user_id': session.get('user_id'),
+            'error_message': str(e),
+            'timestamp': firestore.SERVER_TIMESTAMP
+        })
+
+        # Return to dashboard with error message
+        flash('Navigation failed. Please try again.', 'error')
+        return redirect(url_for('dashboard'))
 
 
 if __name__ == '__main__':
