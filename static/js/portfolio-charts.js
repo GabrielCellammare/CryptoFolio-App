@@ -124,7 +124,9 @@ function createBarChartConfig(data) {
                         zeroLineWidth: 2
                     },
                     ticks: {
-                        callback: value => formatCurrency(value, currency)
+                        callback: function (value) {
+                            return formatCurrency(value, currency);
+                        }
                     }
                 },
                 x: {
@@ -136,7 +138,7 @@ function createBarChartConfig(data) {
             plugins: {
                 tooltip: {
                     callbacks: {
-                        label: context => {
+                        label: function (context) {
                             const value = context.raw;
                             const formattedValue = formatCurrency(value, currency);
                             const percentageChange = ((value / data[context.dataIndex].currentValue) * 100).toFixed(2);
@@ -187,11 +189,12 @@ function createPieChartConfig(data) {
             plugins: {
                 tooltip: {
                     callbacks: {
-                        label: context => {
+                        label: function (context) {
                             const value = context.raw;
+                            const formattedValue = formatCurrency(value, currency);
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
                             const percentage = ((value / total) * 100).toFixed(1);
-                            return `${context.label}: ${formatCurrency(value, currency)} (${percentage}%)`;
+                            return `${context.label}: ${formattedValue} (${percentage}%)`;
                         }
                     }
                 }
