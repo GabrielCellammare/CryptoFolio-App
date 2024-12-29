@@ -1,5 +1,4 @@
 /.env
 /firebase_config.json
 /_pycache_/
-/cache/crypto_cache.json
-cache/
+/cache/

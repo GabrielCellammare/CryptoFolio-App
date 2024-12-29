@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 import requests
 from requests.exceptions import RequestException
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any, Union
 import hashlib
 from urllib.parse import urljoin
 
@@ -114,6 +114,49 @@ class CryptoCache:
         except Exception as e:
             logger.error(f"Failed to initialize CryptoCache: {str(e)}")
             raise
+
+    def _validate_cache_data(self, data: Any) -> bool:
+        """
+        Validate cached data for security and integrity
+
+        Args:
+            data: Data to validate
+
+        Returns:
+            bool: True if data is valid, False otherwise
+        """
+        try:
+            # Verifica che i dati non siano None
+            if data is None:
+                return False
+
+            # Verifica il tipo di dato basandosi sui possibili valori di ritorno dei metodi
+            if isinstance(data, list):
+                # Validazione per get_available_cryptocurrencies
+                return all(
+                    isinstance(item, dict) and
+                    all(key in item for key in [
+                        'id', 'symbol', 'name', 'current_price'])
+                    for item in data
+                )
+            elif isinstance(data, dict):
+                # Validazione per get_crypto_prices
+                return all(
+                    isinstance(k, str) and
+                    isinstance(v, dict) and
+                    all(isinstance(price, (int, float))
+                        for price in v.values())
+                    for k, v in data.items()
+                )
+            elif isinstance(data, (int, float)):
+                # Validazione per get_exchange_rate
+                return data > 0
+
+            return False
+
+        except Exception as e:
+            logger.error(f"Cache validation error: {str(e)}")
+            return False
 
     def _secure_cache_directory(self) -> None:
         """

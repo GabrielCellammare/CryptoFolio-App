@@ -7,6 +7,7 @@ import { showError, showSuccess, showLoading, hideLoading } from './utils.js';
 export function setupUIHandlers() {
     setupAddCryptoForm();
     setupEditHandlers();
+    setupDeleteHandlers();
 }
 
 /**
@@ -149,24 +150,60 @@ function setupEditHandlers() {
         toggleEditMode(row, false);
     };
 
-    // Delete handler
-    window.removeCrypto = async function (cryptoId) {
-        if (!confirm('Are you sure you want to remove this cryptocurrency?')) {
-            return;
-        }
 
-        showLoading();
-        try {
-            await ApiService.deleteCrypto(cryptoId);
-            showSuccess('Cryptocurrency removed successfully');
-            window.location.reload();
-        } catch (error) {
-            console.error('Error:', error);
-            showError(error.message);
-        } finally {
-            hideLoading();
+}
+
+// Delete handler
+let currentCryptoId = null;
+
+// Replace the original removeCrypto function
+window.removeCrypto = function (cryptoId) {
+    currentCryptoId = cryptoId;
+    const modal = document.getElementById('deleteConfirmationModal');
+    modal.classList.add('active');
+};
+
+function setupDeleteHandlers() {
+    const modal = document.getElementById('deleteConfirmationModal');
+    const cancelBtn = document.getElementById('cancelDelete');
+    const confirmBtn = document.getElementById('confirmDelete');
+
+    // Close modal on cancel
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function () {
+            modal.classList.remove('active');
+            currentCryptoId = null;
+        });
+    }
+
+    // Close modal on clicking outside
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) {
+            modal.classList.remove('active');
+            currentCryptoId = null;
         }
-    };
+    });
+
+    // Handle delete confirmation
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', async function () {
+            if (!currentCryptoId) return;
+
+            showLoading();
+            try {
+                await ApiService.deleteCrypto(currentCryptoId);
+                showSuccess('Cryptocurrency removed successfully');
+                window.location.reload();
+            } catch (error) {
+                console.error('Error:', error);
+                showError(error.message);
+            } finally {
+                hideLoading();
+                modal.classList.remove('active');
+                currentCryptoId = null;
+            }
+        });
+    }
 }
 
 /**
