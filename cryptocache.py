@@ -8,6 +8,7 @@ Security features:
 - Secure API request handling
 - Rate limiting and request throttling
 - Cache data validation
+
 """
 
 from datetime import datetime, time, timedelta
