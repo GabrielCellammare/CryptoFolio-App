@@ -1,93 +1,138 @@
 /**
- * Service for handling all API communications with enhanced security features
+ * ApiService.js
+ * A secure service module for handling API communications with comprehensive security features
+ * including CSRF protection, rate limiting, and request retry logic.
  */
-export const ApiService = {
-    // Configurazione di base
-    config: {
-        MAX_REQUESTS_PER_MINUTE: 60,
-        REQUEST_TIMEOUT: 30000, // 30 secondi
-        MAX_RETRIES: 3,
-        BACKOFF_FACTOR: 1.5, // Per exponential backoff
-        API_VERSION: '1.0',
-        ENVIRONMENT: document.querySelector('meta[name="environment"]')?.content || 'development'
-    },
 
-    // Contatore per il rate limiting lato client
-    requestCounter: {
-        count: 0,
-        resetTime: Date.now() + 60000
-    },
+// SecurityManager handles all security-related operations
+class SecurityManager {
+    constructor() {
+        this.tokenEndpoint = '/api/csrf/token';
+        this.nonceEndpoint = '/api/csrf/nonce';
+        this.credentials = { token: null, nonce: null };
+        this.lastRefresh = 0;
+        this.REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    }
 
-    /**
-     * Gestione centralizzata dei token CSRF
-     */
-    csrfManager: {
-        getToken() {
-            const token = document.querySelector('meta[name="csrf-token"]')?.content;
-            if (!token) {
-                throw new Error('CSRF token not found');
+    async getToken() {
+        try {
+            const response = await fetch(this.tokenEndpoint, {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Token fetch failed: ${response.status}`);
             }
-            return token;
-        },
 
-        getNonce() {
-            const nonce = document.querySelector('meta[name="csrf-nonce"]')?.content;
-            if (!nonce) {
-                throw new Error('CSRF nonce not found');
-            }
-            return nonce;
-        },
-
-        async refreshNonce() {
-            try {
-                const response = await fetch('/api/csrf/nonce', {
-                    headers: {
-                        'X-CSRF-Token': this.getToken()
-                    }
-                });
-                const data = await response.json();
-                const metaTag = document.querySelector('meta[name="csrf-nonce"]');
-                if (metaTag) {
-                    metaTag.content = data.nonce;
-                }
-            } catch (error) {
-                console.error('Failed to refresh nonce:', error);
-                throw new Error('Unable to refresh security token');
-            }
+            const data = await response.json();
+            this.credentials.token = data.token;
+            return data.token;
+        } catch (error) {
+            console.error('Failed to fetch CSRF token:', error);
+            throw new Error('Security token fetch failed');
         }
-    },
+    }
 
-    /**
-     * Implementa il rate limiting lato client
-     * @throws {Error} Se il limite di richieste è superato
-     */
+    async getNonce() {
+        try {
+            if (!this.credentials.token) {
+                await this.getToken();
+            }
+
+            const response = await fetch(this.nonceEndpoint, {
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': this.credentials.token
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Nonce fetch failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            this.credentials.nonce = data.nonce;
+            return data.nonce;
+        } catch (error) {
+            console.error('Failed to fetch nonce:', error);
+            throw new Error('Security nonce fetch failed');
+        }
+    }
+
+    async getSecurityCredentials() {
+        const now = Date.now();
+        if (now - this.lastRefresh > this.REFRESH_INTERVAL ||
+            !this.credentials.token ||
+            !this.credentials.nonce) {
+            // Get token first
+            await this.getToken();
+            // Then get nonce
+            await this.getNonce();
+            this.lastRefresh = now;
+        }
+        return { ...this.credentials };
+    }
+}
+
+// RateLimiter handles request rate limiting
+class RateLimiter {
+    constructor(maxRequestsPerMinute) {
+        this.maxRequests = maxRequestsPerMinute;
+        this.requests = [];
+    }
+
     checkRateLimit() {
         const now = Date.now();
-        if (now > this.requestCounter.resetTime) {
-            this.requestCounter.count = 0;
-            this.requestCounter.resetTime = now + 60000;
-        }
-        if (this.requestCounter.count >= this.config.MAX_REQUESTS_PER_MINUTE) {
-            throw new Error('Too many requests. Please try again later.');
-        }
-        this.requestCounter.count++;
-    },
+        const oneMinuteAgo = now - 60000;
+        this.requests = this.requests.filter(timestamp => timestamp > oneMinuteAgo);
 
-    /**
-     * Verifica che l'URL sia HTTPS in produzione
-     * @param {string} url - URL da verificare
-     */
+        if (this.requests.length >= this.maxRequests) {
+            throw new Error('Rate limit exceeded. Please try again later.');
+        }
+
+        this.requests.push(now);
+    }
+}
+
+// Main API Service implementation
+class ApiServiceImpl {
+    constructor() {
+        this.config = {
+            MAX_REQUESTS_PER_MINUTE: 60,
+            REQUEST_TIMEOUT: 30000,
+            MAX_RETRIES: 3,
+            BACKOFF_FACTOR: 1.5,
+            API_VERSION: '1.0',
+            ENVIRONMENT: document.querySelector('meta[name="environment"]')?.content || 'development'
+        };
+
+        this.securityManager = new SecurityManager();
+        this.rateLimiter = new RateLimiter(this.config.MAX_REQUESTS_PER_MINUTE);
+        this.initialized = false;
+    }
+
+    async initialize() {
+        if (this.initialized) return;
+
+        try {
+            await this.securityManager.getSecurityCredentials();
+            this.initialized = true;
+            console.log('API Service initialized successfully');
+        } catch (error) {
+            console.error('Failed to initialize API Service:', error);
+            throw error;
+        }
+    }
+
     validateHttps(url) {
         const fullUrl = new URL(url, window.location.origin);
         if (this.config.ENVIRONMENT === 'production' && !fullUrl.protocol.startsWith('https')) {
-            throw new Error('HTTPS required in production');
+            throw new Error('HTTPS required in production environment');
         }
-    },
+    }
 
-    /**
-     * Implementa retry logic con exponential backoff
-     * @param {Function} operation - Funzione da riprovare
-     */
     async withRetry(operation) {
         let lastError;
         for (let attempt = 0; attempt < this.config.MAX_RETRIES; attempt++) {
@@ -95,208 +140,115 @@ export const ApiService = {
                 return await operation();
             } catch (error) {
                 lastError = error;
-                if (!this.shouldRetry(error)) {
-                    throw error;
-                }
+                if (!this.shouldRetry(error)) throw error;
                 const delay = Math.pow(this.config.BACKOFF_FACTOR, attempt) * 1000;
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
         throw lastError;
-    },
+    }
 
-    /**
-     * Determina se un errore dovrebbe attivare un retry
-     * @param {Error} error - L'errore da valutare
-     */
     shouldRetry(error) {
-        // Non ritentare per errori di validazione o autenticazione
         const nonRetryableStatus = [400, 401, 403, 422];
         return !(error.status && nonRetryableStatus.includes(error.status));
-    },
+    }
 
-    /**
-     * Wrapper sicuro per le chiamate fetch con tutte le misure di sicurezza
-     * @param {string} url - URL della richiesta
-     * @param {Object} options - Opzioni della richiesta
-     */
     async safeFetch(url, options = {}) {
-        // Verifica HTTPS
+        if (!this.initialized) {
+            await this.initialize();
+        }
+
         this.validateHttps(url);
+        this.rateLimiter.checkRateLimit();
 
-        // Rate limiting
-        this.checkRateLimit();
+        const credentials = await this.securityManager.getSecurityCredentials();
+        const requestId = crypto.randomUUID();
 
-        // Preparazione headers di sicurezza
-        const securityHeaders = this.prepareSecurityHeaders(options.method);
-
-        // Configurazione di base della sicurezza
         const secureOptions = {
             ...options,
-            headers: {
-                ...securityHeaders,
-                ...options.headers
-            },
             credentials: 'same-origin',
+            headers: {
+                ...options.headers,
+                'X-CSRF-Token': credentials.token,
+                'X-CSRF-Nonce': credentials.nonce,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json',
+                'X-Request-ID': requestId
+            },
             timeout: this.config.REQUEST_TIMEOUT,
             mode: 'same-origin',
             referrerPolicy: 'same-origin'
         };
 
-        // Logging della richiesta
-        const requestId = crypto.randomUUID();
-        await this.logRequest(url, secureOptions, requestId);
-
         return this.withRetry(async () => {
-            const response = await fetch(url, secureOptions);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), this.config.REQUEST_TIMEOUT);
 
-            // Gestione risposta
-            await this.handleResponse(response, url, requestId);
-
-            // Se la richiesta modifica dati, aggiorna il nonce
-            if (['POST', 'PUT', 'DELETE'].includes(options.method)) {
-                await this.csrfManager.refreshNonce();
-            }
-
-            return response.json();
-        });
-    },
-
-    /**
-     * Prepara gli headers di sicurezza per la richiesta
-     * @param {string} method - Metodo HTTP della richiesta
-     */
-    prepareSecurityHeaders(method) {
-        const headers = {
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-Client-Version': this.config.API_VERSION,
-            'Content-Type': 'application/json',
-        };
-
-        if (['POST', 'PUT', 'DELETE'].includes(method)) {
-            const token = this.csrfManager.getToken();
-            const nonce = this.csrfManager.getNonce();
-
-            console.log('CSRF Token:', token);
-            console.log('CSRF Nonce:', nonce);
-
-            headers['X-CSRF-Token'] = token;
-            headers['X-CSRF-Nonce'] = nonce;
-        }
-
-        return headers;
-    },
-
-    /**
-     * Gestisce la risposta della richiesta
-     * @param {Response} response - Risposta fetch
-     * @param {string} url - URL della richiesta
-     * @param {string} requestId - ID della richiesta per il logging
-     */
-    async handleResponse(response, url, requestId) {
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            await this.logError(url, response.status, error, requestId);
-            throw new Error(
-                error.message ||
-                `HTTP error! status: ${response.status} - ${response.statusText}`
-            );
-        }
-    },
-
-    /**
-     * Logger centralizzato per monitoraggio
-     */
-    async logRequest(url, options, requestId) {
-        const logData = {
-            timestamp: new Date().toISOString(),
-            requestId,
-            url,
-            method: options.method || 'GET',
-            userAgent: navigator.userAgent,
-            environment: this.config.ENVIRONMENT
-        };
-
-        console.log('API Request:', logData);
-
-        if (this.config.ENVIRONMENT === 'production') {
             try {
-                await fetch('/api/logs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(logData)
+                const response = await fetch(url, {
+                    ...secureOptions,
+                    signal: controller.signal
                 });
-            } catch (error) {
-                console.error('Logging error:', error);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                return data;
+            } finally {
+                clearTimeout(timeoutId);
             }
-        }
-    },
+        });
+    }
 
-    async logResponse(url, response, requestId) {
-        const logData = {
-            timestamp: new Date().toISOString(),
-            requestId,
-            url,
-            status: response.status,
-            success: true
-        };
-
-        console.log('API Response:', logData);
-    },
-
-    async logError(url, status, error, requestId) {
-        const logData = {
-            timestamp: new Date().toISOString(),
-            requestId,
-            url,
-            status,
-            error: error.message || 'Unknown error',
-            success: false
-        };
-
-        console.error('API Error:', logData);
-    },
-
-    // Metodi API esistenti modificati per utilizzare safeFetch
+    // API Methods
     async fetchCryptocurrencies() {
         return this.safeFetch('/api/cryptocurrencies');
-    },
+    }
 
-    async addCrypto(cryptoData) {
-        return this.safeFetch('/api/portfolio/add', {
-            method: 'POST',
-            body: JSON.stringify(cryptoData)
-        });
-    },
-
-    async updateCrypto(cryptoId, updateData) {
-        return this.safeFetch(`/api/portfolio/update/${encodeURIComponent(cryptoId)}`, {
-            method: 'PUT',
-            body: JSON.stringify(updateData)
-        });
-    },
+    async getCurrentCurrency() {
+        return this.safeFetch('/api/preferences/currency');
+    }
 
     async updateCurrencyPreference(currency) {
         return this.safeFetch('/api/preferences/currency', {
             method: 'PUT',
             body: JSON.stringify({ currency })
         });
-    },
+    }
+
+    async addCrypto(cryptoData) {
+        return this.safeFetch('/api/portfolio/add', {
+            method: 'POST',
+            body: JSON.stringify(cryptoData)
+        });
+    }
+
+    async updateCrypto(cryptoId, updateData) {
+        return this.safeFetch(`/api/portfolio/update/${encodeURIComponent(cryptoId)}`, {
+            method: 'PUT',
+            body: JSON.stringify(updateData)
+        });
+    }
 
     async deleteCrypto(cryptoId) {
         return this.safeFetch(`/api/portfolio/delete/${encodeURIComponent(cryptoId)}`, {
             method: 'DELETE'
         });
-    },
+    }
+}
 
-    async getCurrentCurrency() {
-        try {
-            const data = await this.safeFetch('/api/preferences/currency');
-            console.log('Currency data received:', data);
-            return data;
-        } catch (error) {
-            console.error('Error in getCurrentCurrency:', error);
-            throw error;
-        }
+// Create and export the singleton instance
+export const ApiService = new ApiServiceImpl();
+
+// Export the initialization function for global access
+window.initializeSecureTokens = async function () {
+    try {
+        await ApiService.initialize();
+        console.log('Security tokens initialized successfully');
+    } catch (error) {
+        console.error('Failed to initialize security tokens:', error);
+        throw error;
     }
 };

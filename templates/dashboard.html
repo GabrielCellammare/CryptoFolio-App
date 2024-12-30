@@ -3,8 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token }}">
-    <meta name="csrf-nonce" content="{{ csrf_nonce }}">
     <meta name="environment" content="{{ environment }}">
     <title>CryptoFolio - Dashboard</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.ico') }}">
@@ -199,32 +197,11 @@
         }
     </style>
         <script>
-            // Utility per gestire CSRF
-            const CSRFManager = {
-                getToken() {
-                    return document.querySelector('meta[name="csrf-token"]').content;
-                },
-                
-                getNonce() {
-                    return document.querySelector('meta[name="csrf-nonce"]').content;
-                },
-                
-                // Aggiorna il nonce dopo ogni utilizzo
-                async refreshNonce() {
-                    try {
-                        const response = await fetch('/api/csrf/nonce', {
-                            headers: {
-                                'X-CSRF-Token': this.getToken()
-                            }
-                        });
-                        const data = await response.json();
-                        document.querySelector('meta[name="csrf-nonce"]').content = data.nonce;
-                    } catch (error) {
-                        console.error('Failed to refresh nonce:', error);
-                    }
-                }
-            };
-   
+            document.addEventListener('DOMContentLoaded', function() {
+                // Request new nonce immediately
+                initializeSecureTokens();
+            });
+            
             // Prevent navigation using browser back/forward buttons
             window.addEventListener('load', function() {
                 window.history.pushState({ page: 'dashboard' }, '', '');

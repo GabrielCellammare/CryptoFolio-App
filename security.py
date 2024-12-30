@@ -12,14 +12,15 @@ Security features:
 - Session security hardening
 """
 
-from flask import Flask
+import logging
+from flask import Flask, make_response
 from functools import wraps
 from flask import session, request, abort
 import secrets
 import time
 from datetime import timedelta
 from typing import Optional, Dict, Callable
-import logging
+from cryptography.fernet import Fernet
 
 # Configure logging for security events
 logging.basicConfig(
@@ -52,11 +53,17 @@ class CSRFProtection:
         # Nonce validity duration (5 minutes)
         self.NONCE_EXPIRATION = 300
 
+        # Token validity duration (1 hour)
+        self.TOKEN_EXPIRATION = 3600
+
         # Minimum token length for security
-        self.MIN_TOKEN_LENGTH = 32
+        self.MIN_TOKEN_LENGTH = 64
 
         # Maximum number of stored nonces to prevent memory exhaustion
         self.MAX_NONCES = 10000
+
+        self.encryption_key = Fernet.generate_key()
+        self.fernet = Fernet(self.encryption_key)
 
         if app:
             self.init_app(app)
@@ -120,6 +127,19 @@ class CSRFProtection:
             })
             return response
 
+            @wraps(f)
+            def decorated_function(*args, **kwargs):
+                if request.method in ['POST', 'PUT', 'DELETE']:
+                    token = request.cookies.get('csrf_token')
+                    client_token = request.headers.get('X-CSRF-Token')
+                    nonce = request.headers.get('X-CSRF-Nonce')
+
+                    # Add debug logging
+                    logger.debug(f"Cookie token: {token}")
+                    logger.debug(f"Header token: {client_token}")
+                    logger.debug(f"Session token: {session.get('csrf_token')}")
+                    logger.debug(f"Nonce: {nonce}")
+
     def generate_token(self) -> str:
         """
         Generate a new CSRF token or return existing one.
@@ -127,14 +147,29 @@ class CSRFProtection:
         Returns:
             str: A secure random token of sufficient length
 
-        Note: 
+        Note:
             Tokens are stored in the session and remain valid for the session duration
         """
-        if 'csrf_token' not in session:
-            token = secrets.token_urlsafe(self.MIN_TOKEN_LENGTH)
-            session['csrf_token'] = token
-            logger.info("Generated new CSRF token")
-        return session['csrf_token']
+
+        """Generate an encrypted CSRF token"""
+
+        raw_token = secrets.token_urlsafe(self.MIN_TOKEN_LENGTH)
+        timestamp = str(int(time.time()))
+        token_data = f"{raw_token}:{timestamp}"
+        encrypted_token = self.fernet.encrypt(token_data.encode()).decode()
+
+        # Store in both cookie and session for OAuth flow
+        session['csrf_token'] = encrypted_token
+        response = make_response()
+        response.set_cookie(
+            'csrf_token',
+            encrypted_token,
+            secure=True,
+            httponly=True,
+            samesite='Lax',
+            max_age=self.TOKEN_EXPIRATION
+        )
+        return encrypted_token
 
     def generate_nonce(self) -> str:
         """
@@ -151,10 +186,11 @@ class CSRFProtection:
             self._cleanup_oldest_nonces()
 
         nonce = secrets.token_urlsafe(16)
-        self.used_nonces[nonce] = time.time() + self.NONCE_EXPIRATION
-        return nonce
+        encrypted_nonce = self.fernet.encrypt(nonce.encode()).decode()
+        self.used_nonces[encrypted_nonce] = time.time() + self.NONCE_EXPIRATION
+        return encrypted_nonce
 
-    def validate_token(self, token: Optional[str]) -> bool:
+    def validate_token(self, encrypted_token: Optional[str]) -> bool:
         """
         Validate a CSRF token against the stored session token.
 
@@ -164,15 +200,33 @@ class CSRFProtection:
         Returns:
             bool: True if token is valid, False otherwise
         """
-        stored_token = session.get('csrf_token')
-        if not token or not stored_token:
-            logger.warning("Missing CSRF token")
+        """Validate the encrypted CSRF token"""
+        if not encrypted_token:
             return False
 
-        # Constant-time comparison to prevent timing attacks
-        return secrets.compare_digest(token, stored_token)
+        # Check against session token
+        session_token = session.get('csrf_token')
+        if not session_token or session_token != encrypted_token:
+            return False
 
-    def validate_nonce(self, nonce: Optional[str]) -> bool:
+        try:
+            decrypted_data = self.fernet.decrypt(
+                encrypted_token.encode()).decode()
+            token, timestamp = decrypted_data.split(':')
+            token_age = time.time() - float(timestamp)
+
+            if token_age >= self.TOKEN_EXPIRATION:
+                # Clear expired token
+                session.pop('csrf_token', None)
+                return False
+
+            return True
+        except Exception:
+            return False
+
+    # In security.py decorated_function:
+
+    def validate_nonce(self, encrypted_nonce: Optional[str]) -> bool:
         """
         Validate a nonce and mark it as used.
 
@@ -182,21 +236,26 @@ class CSRFProtection:
         Returns:
             bool: True if nonce is valid and unused, False otherwise
         """
-        if not nonce or nonce not in self.used_nonces:
+        if not encrypted_nonce or encrypted_nonce not in self.used_nonces:
             logger.warning("Invalid or missing nonce")
             return False
 
-        current_time = time.time()
-        expiration_time = self.used_nonces.get(nonce, 0)
+        try:
+            self.fernet.decrypt(encrypted_nonce.encode())
+            current_time = time.time()
+            expiration_time = self.used_nonces.get(encrypted_nonce, 0)
 
-        if current_time > expiration_time:
-            logger.warning("Expired nonce used")
-            del self.used_nonces[nonce]
+            if current_time > expiration_time:
+                logger.warning("Expired nonce used")
+                del self.used_nonces[encrypted_nonce]
+                return False
+
+            # Remove nonce after successful validation (one-time use)
+            del self.used_nonces[encrypted_nonce]
+            return True
+
+        except Exception:
             return False
-
-        # Remove nonce after successful validation (one-time use)
-        del self.used_nonces[nonce]
-        return True
 
     def csrf_protect(self, f: Callable) -> Callable:
         """
@@ -214,8 +273,13 @@ class CSRFProtection:
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if request.method in ['POST', 'PUT', 'DELETE']:
-                token = request.headers.get('X-CSRF-Token')
+                token = request.cookies.get('csrf_token')
+                client_token = request.headers.get('X-CSRF-Token')
                 nonce = request.headers.get('X-CSRF-Nonce')
+
+                if not token or not client_token or token != client_token:
+                    logger.warning("CSRF token validation failed")
+                    abort(403, description="Invalid CSRF token")
 
                 if not self.validate_token(token):
                     logger.warning("CSRF token validation failed")

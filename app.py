@@ -15,7 +15,7 @@ Main features:
 """
 
 import base64
-from flask import render_template, request, jsonify, session, redirect, url_for, flash
+from flask import make_response, render_template, request, jsonify, session, redirect, url_for, flash
 from firebase_admin import firestore
 from functools import wraps
 from datetime import datetime
@@ -119,7 +119,6 @@ def login(provider):
 
     # Store the CSRF token in session before OAuth redirect
     csrf_token = csrf.generate_token()
-    session['oauth_csrf'] = csrf_token
 
     return oauth.create_client(provider).authorize_redirect(
         url_for('auth_callback', provider=provider, _external=True), state=csrf_token
@@ -150,7 +149,7 @@ def auth_callback(provider):
     """
 
     try:
-        if request.args.get('state') != session.get('oauth_csrf'):
+        if request.args.get('state') != session.get('csrf_token'):
             raise ValueError("Invalid CSRF state")
 
         # Create OAuth client for the specified provider
@@ -175,7 +174,7 @@ def auth_callback(provider):
         username = None
 
         state = request.args.get('state')
-        stored_state = session.get('oauth_csrf')
+        stored_state = session.get('csrf_token')
 
         print(f"Received state: {state}")
         print(f"Stored state: {stored_state}")
@@ -403,16 +402,12 @@ def dashboard():
         if not security_data or 'salt' not in security_data:
             flash('Security configuration error. Please contact support.', 'error')
             # Genera token e nonce per il template
-            csrf_token = csrf.generate_token()
-            csrf_nonce = csrf.generate_nonce()
 
             return render_template('dashboard.html',
                                    portfolio=[],
                                    environment="development",
                                    total_value=0,
                                    currency='USD',
-                                   csrf_token=csrf_token,
-                                   csrf_nonce=csrf_nonce,
                                    last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                    username=user_data.get('username'))
 
@@ -476,15 +471,11 @@ def dashboard():
                 })
                 continue
 
-        csrf_token = csrf.generate_token()
-        csrf_nonce = csrf.generate_nonce()
         return render_template('dashboard.html',
                                portfolio=portfolio,
                                total_value=total_value,
                                environment="development",
                                currency=currency,
-                               csrf_token=csrf_token,
-                               csrf_nonce=csrf_nonce,
                                last_update=current_time,
                                username=user_data.get('username'))
 
@@ -1059,6 +1050,15 @@ def navigate_home():
         # Return to dashboard with error message
         flash('Navigation failed. Please try again.', 'error')
         return redirect(url_for('dashboard'))
+
+
+@app.route('/api/csrf/token', methods=['GET'])
+def get_csrf_token():
+    token = csrf.generate_token()
+    response = make_response(jsonify({'token': token}))
+    response.set_cookie('csrf_token', token, secure=True,
+                        httponly=True, samesite='Lax')
+    return response
 
 
 if __name__ == '__main__':
