@@ -195,6 +195,30 @@
             font-size: 1.5rem;
             margin-bottom: 1rem;
         }
+
+            /* Add this to your CSS */
+            .input-group {
+                flex-wrap: nowrap;
+            }
+            
+            #alertContainer {
+                margin-top: 1rem;
+            }
+            
+            .alert {
+                margin-bottom: 0.5rem;
+            }
+            
+            /* For better button spacing */
+            .input-group > .btn {
+                margin-left: -1px;
+            }
+            
+            /* For better visibility of the current state */
+            .input-group > .btn.active {
+                background-color: #e9ecef;
+            }
+        
     </style>
     <script>
     
@@ -426,6 +450,45 @@
                             </button>
                         </form>
                     </div>
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">API Access</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="apiKey" class="form-label">Your API Key</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="apiKey" readonly 
+                                           value="{{ api_key if api_key else 'No API key generated' }}">
+                                    <button class="btn btn-outline-secondary" type="button" id="toggleApiKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-outline-secondary" type="button" id="copyApiKey">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                    <button class="btn btn-outline-primary" type="button" id="regenerateApiKey">
+                                        <i class="fas fa-sync-alt"></i> Generate New Key
+                                    </button>
+                                </div>
+                                <small class="text-muted mt-2">
+                                    Use this key to authenticate your API requests. Keep it secure and never share it.
+                                </small>
+                            </div>
+                            
+                            <div id="alertContainer"></div>
+                            
+                            <div class="mt-4">
+                                <h6>Quick Start Guide</h6>
+                                <pre class="bg-light p-3 rounded"><code>curl -H "X-API-Key: YOUR_API_KEY" \
+                         -X POST https://your-domain.com/api/token</code></pre>
+                                <small class="text-muted">
+                                    This will return a JWT token valid for 1 hour. Use this token in subsequent requests.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
                 </div>
             </div>
         </div>
@@ -493,6 +556,15 @@
     <script type="module" src="/static/js/portfolio-value-init.js"></script>
     <script type="module" src="/static/js/currency-manager.js"></script>
     <script type="module" src="/static/js/portfolio-charts.js"></script>
+    <script type="module">
+        import ApiKeyManager from '/static/js/api-key-manager.js';
+        document.addEventListener('DOMContentLoaded', () => {
+            const apiKeyManager = new ApiKeyManager();
+            apiKeyManager.initialize().catch(error => {
+                console.error('Failed to initialize API Key Manager:', error);
+            });
+        });
+    </script>
 
 </body>
 </html>

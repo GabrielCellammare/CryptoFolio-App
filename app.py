@@ -15,11 +15,12 @@ Main features:
 """
 
 import base64
-from flask import make_response, render_template, request, jsonify, session, redirect, url_for, flash
+from flask import Blueprint, make_response, render_template, request, jsonify, session, redirect, url_for, flash
 from firebase_admin import firestore
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
+import jwt
 from config import Config
 from cryptography_utils import AESCipher
 from cryptocache import CryptoCache
@@ -1065,6 +1066,160 @@ def get_csrf_token():
     response.set_cookie('csrf_token', token, secure=True,
                         httponly=True, samesite='Lax')
     return response
+
+
+portfolio_api = Blueprint('portfolio_api', __name__)
+
+# Configuration
+JWT_SECRET_KEY = os.environ.get(
+    'JWT_SECRET_KEY')
+JWT_EXPIRATION = timedelta(hours=1)
+RATE_LIMIT_REQUESTS = 100
+RATE_LIMIT_WINDOW = 3600  # 1 hour in seconds
+
+
+def generate_jwt(user_id):
+    """Generate JWT token with user_id claim"""
+    expiration = datetime.now(timezone.utc) + JWT_EXPIRATION
+    token = jwt.encode({
+        'exp': expiration,
+        'user_id': user_id,
+        'iat': datetime.now(timezone.utc)
+    }, JWT_SECRET_KEY, algorithm='HS256')
+
+    # Store token in Firebase
+    db.collection('user_tokens').add({
+        'user_id': user_id,
+        'token': token,
+        'created_at': datetime.now(timezone.utc),
+        'expires_at': expiration
+    })
+
+    return token
+
+
+def jwt_required(f):
+    """JWT verification decorator"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Missing or invalid token format'}), 401
+
+        token = auth_header.split(' ')[1]
+
+        try:
+            # Verify token validity
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
+
+            # Check if token exists in Firebase
+            token_query = db.collection('user_tokens').where(
+                'token', '==', token).limit(1).get()
+            if not token_query:
+                return jsonify({'error': 'Invalid token'}), 401
+
+            request.user_id = payload['user_id']
+            return f(*args, **kwargs)
+
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
+
+    return decorated
+
+# Routes
+
+
+@app.route('/api/token', methods=['POST'])
+@login_required
+@csrf.csrf_protect
+def get_token():
+    """Generate JWT token for authenticated users"""
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'User not authenticated'}), 401
+
+    token = generate_jwt(user_id)
+    return jsonify({
+        'token': token,
+        'expires_in': JWT_EXPIRATION.total_seconds()
+    })
+
+
+@portfolio_api.route('/portfolio', methods=['GET'])
+@jwt_required
+def get_portfolio():
+    """Get user's portfolio"""
+    try:
+        portfolio_ref = db.collection('users').document(
+            request.user_id).collection('portfolio')
+        portfolio = []
+
+        for doc in portfolio_ref.stream():
+            item = doc.to_dict()
+            item['id'] = doc.id
+            portfolio.append(item)
+
+        return jsonify({'data': portfolio})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@portfolio_api.route('/portfolio', methods=['POST'])
+@jwt_required
+def add_crypto():
+    """Add cryptocurrency to portfolio"""
+    try:
+        data = request.get_json()
+
+        # Validate required fields
+        required = ['crypto_id', 'symbol', 'amount',
+                    'purchase_price', 'purchase_date']
+        if not all(field in data for field in required):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Add to database
+        portfolio_ref = db.collection('users').document(
+            request.user_id).collection('portfolio')
+        doc_ref = portfolio_ref.add({
+            'crypto_id': data['crypto_id'],
+            'symbol': data['symbol'].upper(),
+            'amount': float(data['amount']),
+            'purchase_price': float(data['purchase_price']),
+            'purchase_date': data['purchase_date'],
+            'created_at': datetime.now(timezone.utc)
+        })
+
+        return jsonify({
+            'message': 'Cryptocurrency added successfully',
+            'id': doc_ref[1].id
+        }), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Error handlers
+
+
+@portfolio_api.errorhandler(400)
+def bad_request_error(error):
+    return jsonify({'error': 'Bad request'}), 400
+
+
+@portfolio_api.errorhandler(401)
+def unauthorized_error(error):
+    return jsonify({'error': 'Unauthorized'}), 401
+
+
+@portfolio_api.errorhandler(429)
+def rate_limit_error(error):
+    return jsonify({'error': 'Too many requests'}), 429
+
+
+@portfolio_api.errorhandler(500)
+def internal_server_error(error):
+    return jsonify({'error': 'Internal server error'}), 500
 
 
 if __name__ == '__main__':
