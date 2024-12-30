@@ -196,74 +196,59 @@
             margin-bottom: 1rem;
         }
     </style>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                // Request new nonce immediately
-                initializeSecureTokens();
-            });
-            
-            // Prevent navigation using browser back/forward buttons
-            window.addEventListener('load', function() {
+    <script>
+    
+        // Prevent navigation using browser back/forward buttons
+        window.addEventListener('load', function() {
+            window.history.pushState({ page: 'dashboard' }, '', '');
+    
+            window.addEventListener('popstate', function(event) {
                 window.history.pushState({ page: 'dashboard' }, '', '');
-    
-                window.addEventListener('popstate', function(event) {
-                    // Push the state again to prevent navigation
-                    window.history.pushState({ page: 'dashboard' }, '', '');
-                    
-                    // Show a warning modal or message
-                    showNavigationWarning();
-                });
+                showNavigationWarning();
             });
+        });
     
-            function showNavigationWarning() {
-                // Create and show a Bootstrap alert
-                const alertHtml = `
-                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-                        Please use the navigation buttons provided instead of browser controls.
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                `;
-                
-                const flashMessages = document.getElementById('flashMessages');
-                flashMessages.innerHTML = alertHtml;
-            }
-    
-            // Safe navigation to home
-            function navigateToHome() {
-                // Show loading overlay for user feedback
+        function showNavigationWarning() {
+            const alertHtml = `
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    Please use the navigation buttons provided instead of browser controls.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            const flashMessages = document.getElementById('flashMessages');
+            flashMessages.innerHTML = alertHtml;
+        }
+    </script>
+        <script type="module">
+            import { ApiService } from '/static/js/api-service.js';
+            
+            // Make navigateToHome available globally
+            window.navigateToHome = async function() {
+                // Show loading overlay
                 document.querySelector('.loading-overlay').style.display = 'flex';
                 
-                // Get CSRF tokens from meta tags
-                const metaToken = document.querySelector('meta[name="csrf-token"]').content;
-                const metaNonce = document.querySelector('meta[name="csrf-nonce"]').content;
-                
-                // Create the form data
-                const formData = new FormData();
-                formData.append('csrf_token', metaToken);
-                formData.append('csrf_nonce', metaNonce);
-                
-                // Use fetch API to make the POST request with proper headers
-                fetch('/navigate-home', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-Token': metaToken,  // Send token in header as expected by decorator
-                        'X-CSRF-Nonce': metaNonce   // Send nonce in header
-                    },
-                    body: formData
-                })
-                .then(response => {
-                    if (response.redirected) {
-                        // Follow the redirect from the server
-                        window.location.href = response.url;
+                try {
+                    // First ensure API service is initialized
+                    await ApiService.initialize();
+                    
+                    // Make the secure navigation request
+                    const response = await ApiService.navigateToHome();
+                    
+                    // Check if we received a redirect URL
+                    if (response.redirect_url) {
+                        window.location.href = response.redirect_url;
                     } else {
-                        // Handle non-redirect response
+                        // Default to home if no specific redirect provided
                         window.location.href = '/';
                     }
-                })
-                .catch(error => {
+                    
+                } catch (error) {
                     console.error('Navigation failed:', error);
-                    // Hide loading overlay and show error message
+                    // Hide loading overlay
                     document.querySelector('.loading-overlay').style.display = 'none';
+                    
+                    // Show error message
                     const flashMessages = document.getElementById('flashMessages');
                     flashMessages.innerHTML = `
                         <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -271,10 +256,9 @@
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
                     `;
-                });
-            }
+                }
+            };
         </script>
-    
 </head>
 <body>
     <!-- Loading Overlay -->

@@ -326,6 +326,7 @@ def auth_callback(provider):
 
 
 @app.route('/auth/logout')
+@login_required
 @csrf.csrf_protect
 def logout():
     """
@@ -1008,6 +1009,7 @@ def refresh_csrf_nonce():
 
 
 @app.route('/navigate-home', methods=['POST'])
+@login_required
 @csrf.csrf_protect
 def navigate_home():
     """
@@ -1023,9 +1025,6 @@ def navigate_home():
     """
     try:
         if 'user_id' in session:
-            # If user is logged in, we might want to do some session cleanup
-            # or state management before redirecting
-
             # Create audit log for navigation
             db.collection('audit_logs').add({
                 'user_id': session.get('user_id'),
@@ -1035,8 +1034,11 @@ def navigate_home():
                 'user_agent': request.user_agent.string
             })
 
-        # Use Flask's redirect function to properly handle the navigation
-        return redirect(url_for('index'))
+            # Return JSON response with redirect URL
+            return jsonify({
+                'status': 'success',
+                'redirect_url': url_for('index')
+            })
 
     except Exception as e:
         # Log the error
@@ -1047,12 +1049,16 @@ def navigate_home():
             'timestamp': firestore.SERVER_TIMESTAMP
         })
 
-        # Return to dashboard with error message
-        flash('Navigation failed. Please try again.', 'error')
-        return redirect(url_for('dashboard'))
+        # Return error response
+        return jsonify({
+            'status': 'error',
+            'message': 'Navigation failed. Please try again.'
+        }), 500
 
 
 @app.route('/api/csrf/token', methods=['GET'])
+@login_required
+@csrf.csrf_protect
 def get_csrf_token():
     token = csrf.generate_token()
     response = make_response(jsonify({'token': token}))

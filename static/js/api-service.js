@@ -232,6 +232,16 @@ class ApiServiceImpl {
         });
     }
 
+    async navigateToHome() {
+        // We want to ensure we have fresh security credentials before navigation
+        await this.initialize();  // This refreshes our security tokens
+
+        return this.safeFetch('/navigate-home', {
+            method: 'POST',
+            // No need to specify headers or credentials as safeFetch handles these
+        });
+    }
+
     async deleteCrypto(cryptoId) {
         return this.safeFetch(`/api/portfolio/delete/${encodeURIComponent(cryptoId)}`, {
             method: 'DELETE'
