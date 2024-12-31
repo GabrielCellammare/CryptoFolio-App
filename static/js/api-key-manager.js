@@ -23,7 +23,7 @@ export default class ApiKeyManager {
             displayTimeout: 30000, // Auto-hide after 30 seconds
             copyTimeout: 3000,     // Copy message display duration
             maxDisplayAttempts: 3,// Maximum consecutive display attempts
-            tokenEndpoint: '/api/token'
+            tokenEndpoint: '/api/token' // Endpoint for token generation
         };
 
         // State management
@@ -119,14 +119,18 @@ export default class ApiKeyManager {
                 }
             });
 
-            // Validate response
-            if (!response || !response.token) {
-                throw new Error('Invalid token response from server');
+            if (!response) {
+                throw new Error('No response received from server');
             }
 
+            if (!response.access_token) {
+                throw new Error('Token missing from server response');
+            }
+
+
             // Update UI with new token
-            this.state.currentToken = response.token;
-            this.elements.apiKeyInput.value = response.token;
+            this.state.currentToken = response.access_token;
+            this.elements.apiKeyInput.value = response.access_token;
             this.elements.apiKeyInput.type = 'password';
 
             // Enable controls
@@ -140,7 +144,7 @@ export default class ApiKeyManager {
 
         } catch (error) {
             console.error('Token generation failed:', error);
-            this.showError('Failed to generate new API token');
+            this.showError(`Failed to generate new API token: ${error.message}`);
         } finally {
             this.elements.regenerateButton.disabled = false;
         }

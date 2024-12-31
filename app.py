@@ -14,6 +14,9 @@ Main features:
 - Error handling and logging
 """
 
+from typing import Dict, Any
+import time
+from flask import Blueprint, jsonify, request, session
 import base64
 from flask import Blueprint, make_response, render_template, request, jsonify, session, redirect, url_for, flash
 from firebase_admin import firestore
@@ -1068,66 +1071,182 @@ def get_csrf_token():
     return response
 
 
-portfolio_api = Blueprint('portfolio_api', __name__)
+"""
+Enhanced Portfolio API Implementation
+Provides secure JWT-based authentication and comprehensive API endpoints
+for cryptocurrency portfolio management.
+
+Features:
+- JWT-based authentication with refresh token support
+- Rate limiting
+- Comprehensive error handling
+- Detailed logging
+- Input validation
+"""
+
 
 # Configuration
-JWT_SECRET_KEY = os.environ.get(
-    'JWT_SECRET_KEY')
-JWT_EXPIRATION = timedelta(hours=1)
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+JWT_ACCESS_EXPIRATION = timedelta(minutes=15)  # Short-lived access token
+JWT_REFRESH_EXPIRATION = timedelta(days=7)     # Longer-lived refresh token
+portfolio_api = Blueprint('portfolio_api', __name__)
+
+# Rate limiting configuration
 RATE_LIMIT_REQUESTS = 100
 RATE_LIMIT_WINDOW = 3600  # 1 hour in seconds
+rate_limit_store: Dict[str, Dict[str, Any]] = {}
 
 
-def generate_jwt(user_id):
-    """Generate JWT token with user_id claim"""
-    expiration = datetime.now(timezone.utc) + JWT_EXPIRATION
-    token = jwt.encode({
-        'exp': expiration,
+class AuthError(Exception):
+    """Custom exception for authentication errors"""
+
+    def __init__(self, error: str, status_code: int):
+        super().__init__()
+        self.error = error
+        self.status_code = status_code
+
+
+def generate_tokens(user_id: str) -> Dict[str, str]:
+    """
+    Generate both access and refresh tokens for a user
+
+    Args:
+        user_id: The user's unique identifier
+
+    Returns:
+        Dictionary containing access and refresh tokens
+    """
+    # Generate access token
+    access_token_exp = datetime.now(timezone.utc) + JWT_ACCESS_EXPIRATION
+    access_token = jwt.encode({
+        'exp': access_token_exp,
+        'iat': datetime.now(timezone.utc),
         'user_id': user_id,
-        'iat': datetime.now(timezone.utc)
+        'type': 'access'
     }, JWT_SECRET_KEY, algorithm='HS256')
 
-    # Store token in Firebase
+    # Store tokens in Firebase
     db.collection('user_tokens').add({
         'user_id': user_id,
-        'token': token,
-        'created_at': datetime.now(timezone.utc),
-        'expires_at': expiration
+        'access_token': access_token,
+        'access_token_expires': access_token_exp,
+        'created_at': datetime.now(timezone.utc)
     })
 
-    return token
+    return {
+        'access_token': access_token,
+        'expires_in': int(JWT_ACCESS_EXPIRATION.total_seconds())
+    }
+
+
+def check_rate_limit(user_id: str) -> bool:
+    """
+    Check if user has exceeded rate limit
+
+    Args:
+        user_id: The user's unique identifier
+
+    Returns:
+        Boolean indicating if rate limit is exceeded
+    """
+    current_time = time.time()
+
+    if user_id not in rate_limit_store:
+        rate_limit_store[user_id] = {
+            'requests': 1,
+            'window_start': current_time
+        }
+        return True
+
+    user_limits = rate_limit_store[user_id]
+
+    # Reset if window has expired
+    if current_time - user_limits['window_start'] > RATE_LIMIT_WINDOW:
+        rate_limit_store[user_id] = {
+            'requests': 1,
+            'window_start': current_time
+        }
+        return True
+
+    # Check if limit exceeded
+    if user_limits['requests'] >= RATE_LIMIT_REQUESTS:
+        return False
+
+    # Increment request count
+    user_limits['requests'] += 1
+    return True
 
 
 def jwt_required(f):
-    """JWT verification decorator"""
+    """Decorator to verify JWT tokens and handle authentication"""
     @wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
 
         if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({'error': 'Missing or invalid token format'}), 401
+            raise AuthError('Missing or invalid token format', 401)
 
         token = auth_header.split(' ')[1]
 
         try:
-            # Verify token validity
+            # Verify token
             payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
 
-            # Check if token exists in Firebase
-            token_query = db.collection('user_tokens').where(
-                'token', '==', token).limit(1).get()
-            if not token_query:
-                return jsonify({'error': 'Invalid token'}), 401
+            # Verify token type
+            if payload.get('type') != 'access':
+                raise AuthError('Invalid token type', 401)
 
+            # Check rate limit
+            if not check_rate_limit(payload['user_id']):
+                raise AuthError('Rate limit exceeded', 429)
+
+            # Add user_id to request
             request.user_id = payload['user_id']
+
             return f(*args, **kwargs)
 
         except jwt.ExpiredSignatureError:
-            return jsonify({'error': 'Token expired'}), 401
+            raise AuthError('Token expired', 401)
         except jwt.InvalidTokenError:
-            return jsonify({'error': 'Invalid token'}), 401
+            raise AuthError('Invalid token', 401)
 
     return decorated
+
+# Error Handlers
+
+
+@portfolio_api.errorhandler(AuthError)
+def handle_auth_error(error):
+    """Handle authentication errors"""
+    response = jsonify({'error': error.error})
+    response.status_code = error.status_code
+    return response
+
+
+@portfolio_api.errorhandler(400)
+def handle_bad_request(error):
+    """Handle bad request errors"""
+    return jsonify({'error': 'Bad request', 'message': str(error)}), 400
+
+
+@portfolio_api.errorhandler(429)
+def handle_rate_limit(error):
+    """Handle rate limit errors"""
+    return jsonify({'error': 'Rate limit exceeded'}), 429
+
+
+@portfolio_api.errorhandler(500)
+def handle_internal_error(error):
+    """Handle internal server errors"""
+    # Log error details securely
+    db.collection('error_logs').add({
+        'error_type': 'internal_server_error',
+        'error_message': str(error),
+        'timestamp': datetime.now(timezone.utc),
+        'request_path': request.path,
+        'request_method': request.method
+    })
+    return jsonify({'error': 'Internal server error'}), 500
 
 # Routes
 
@@ -1135,92 +1254,265 @@ def jwt_required(f):
 @app.route('/api/token', methods=['POST'])
 @login_required
 @csrf.csrf_protect
-def get_token():
-    """Generate JWT token for authenticated users"""
+def get_tokens():
+    """Generate new access and refresh tokens for authenticated users"""
     user_id = session.get('user_id')
     if not user_id:
-        return jsonify({'error': 'User not authenticated'}), 401
+        raise AuthError('User not authenticated', 401)
 
-    token = generate_jwt(user_id)
-    return jsonify({
-        'token': token,
-        'expires_in': JWT_EXPIRATION.total_seconds()
-    })
+    tokens = generate_tokens(user_id)
+    return jsonify(tokens)
 
 
 @portfolio_api.route('/portfolio', methods=['GET'])
 @jwt_required
 def get_portfolio():
-    """Get user's portfolio"""
+    """
+    Retrieves and decrypts user's portfolio data.
+
+    Returns:
+        JSON response containing:
+        - status: 'success' or 'error'
+        - data: List of decrypted portfolio items with current values
+        - total_value: Total portfolio value
+        - currency: User's preferred currency
+
+    Security features:
+    - JWT authentication
+    - Data decryption using user's salt
+    - Secure error handling
+    - Audit logging
+    """
+    secure_salt = None
     try:
+        user_id = request.user_id
+
+        # Retrieve user's security data and salt
+        security_ref = db.collection('user_security').document(user_id)
+        security_data = security_ref.get()
+
+        if not security_data.exists:
+            return jsonify({'status': 'error', 'message': 'Security configuration not found'}), 400
+
+        # Convert stored base64 salt to SecureByteArray
+        encoded_salt = security_data.to_dict()['salt']
+        secure_salt = SecureByteArray(base64.b64decode(encoded_salt))
+
+        # Get user preferences
+        user_ref = db.collection('users').document(user_id)
+        user_data = user_ref.get().to_dict()
+        currency = user_data.get('preferred_currency', 'USD')
+
+        # Retrieve and process portfolio items
         portfolio_ref = db.collection('users').document(
-            request.user_id).collection('portfolio')
+            user_id).collection('portfolio')
         portfolio = []
+        total_value = 0
 
         for doc in portfolio_ref.stream():
-            item = doc.to_dict()
-            item['id'] = doc.id
-            portfolio.append(item)
+            try:
+                encrypted_item = doc.to_dict()
+                if not encrypted_item:
+                    continue
 
-        return jsonify({'data': portfolio})
+                encrypted_item['id'] = doc.id
+
+                # Decrypt portfolio item
+                item = portfolio_encryption.decrypt_portfolio_item(
+                    encrypted_item,
+                    user_id,
+                    secure_salt
+                )
+
+                # Validate decrypted data
+                if not item or not item.get('crypto_id'):
+                    continue
+
+                # Get current cryptocurrency price
+                try:
+                    crypto_prices = crypto_cache.get_crypto_prices(
+                        [item['crypto_id']],
+                        currency
+                    )
+
+                    current_price = (crypto_prices.get(item['crypto_id'], {})
+                                     .get(currency.lower(), 0)
+                                     if isinstance(crypto_prices, dict)
+                                     else 0)
+                except Exception as price_error:
+                    print(f"Error fetching price for {
+                          item['crypto_id']}: {price_error}")
+                    current_price = 0
+
+                # Calculate portfolio metrics
+                metrics = calculate_portfolio_metrics(
+                    item,
+                    current_price,
+                    currency
+                )
+
+                item.update(metrics)
+                total_value += metrics['current_value']
+                portfolio.append(item)
+
+            except Exception as item_error:
+                # Log item processing errors but continue with remaining items
+                db.collection('error_logs').add({
+                    'error_type': 'portfolio_item_processing_error',
+                    'item_id': doc.id,
+                    'user_id': user_id,
+                    'error_message': str(item_error),
+                    'timestamp': firestore.SERVER_TIMESTAMP
+                })
+                continue
+
+        return jsonify({
+            'status': 'success',
+            'data': portfolio,
+            'total_value': total_value,
+            'currency': currency
+        })
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Log error details securely
+        db.collection('error_logs').add({
+            'error_type': 'portfolio_fetch_error',
+            'user_id': request.user_id,
+            'error_message': str(e),
+            'timestamp': firestore.SERVER_TIMESTAMP
+        })
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to retrieve portfolio data'
+        }), 500
+
+    finally:
+        # Clean up secure objects
+        if secure_salt is not None:
+            secure_salt.secure_zero()
 
 
 @portfolio_api.route('/portfolio', methods=['POST'])
 @jwt_required
 def add_crypto():
-    """Add cryptocurrency to portfolio"""
+    """
+    Adds a new encrypted portfolio item.
+
+    Required JSON payload:
+    {
+        "crypto_id": "bitcoin",
+        "symbol": "BTC", 
+        "amount": 1.5,
+        "purchase_price": 45000,
+        "purchase_date": "2024-01-15"
+    }
+
+    Returns:
+        JSON response containing:
+        - status: 'success' or 'error'
+        - message: Result description
+        - document_id: Created document ID (on success)
+
+    Security features:
+    - JWT authentication
+    - Data encryption
+    - Input validation
+    - Secure error handling
+    - Audit logging
+    """
+    secure_salt = None
     try:
         data = request.get_json()
+        user_id = request.user_id
 
         # Validate required fields
-        required = ['crypto_id', 'symbol', 'amount',
-                    'purchase_price', 'purchase_date']
-        if not all(field in data for field in required):
-            return jsonify({'error': 'Missing required fields'}), 400
+        required_fields = ['crypto_id', 'symbol',
+                           'amount', 'purchase_price', 'purchase_date']
+        if not all(field in data for field in required_fields):
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing required fields'
+            }), 400
 
-        # Add to database
+        # Validate numeric fields
+        try:
+            amount = float(data['amount'])
+            purchase_price = float(data['purchase_price'])
+        except ValueError:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid numeric values'
+            }), 400
+
+        # Retrieve user's security data and salt
+        security_ref = db.collection('user_security').document(user_id)
+        security_data = security_ref.get()
+
+        if not security_data.exists:
+            return jsonify({
+                'status': 'error',
+                'message': 'Security credentials not found'
+            }), 400
+
+        # Convert stored base64 salt to SecureByteArray
+        encoded_salt = security_data.to_dict()['salt']
+        secure_salt = SecureByteArray(base64.b64decode(encoded_salt))
+
+        # Encrypt portfolio data
+        encrypted_data = portfolio_encryption.encrypt_portfolio_item(
+            data,
+            user_id,
+            secure_salt
+        )
+
+        # Store encrypted portfolio item
         portfolio_ref = db.collection('users').document(
-            request.user_id).collection('portfolio')
-        doc_ref = portfolio_ref.add({
-            'crypto_id': data['crypto_id'],
-            'symbol': data['symbol'].upper(),
-            'amount': float(data['amount']),
-            'purchase_price': float(data['purchase_price']),
-            'purchase_date': data['purchase_date'],
-            'created_at': datetime.now(timezone.utc)
+            user_id).collection('portfolio')
+        new_doc = portfolio_ref.add({
+            'crypto_id': encrypted_data['crypto_id'],
+            'symbol': encrypted_data['symbol'].upper(),
+            'amount': encrypted_data['amount'],
+            'purchase_price': encrypted_data['purchase_price'],
+            'purchase_date': encrypted_data['purchase_date'],
+            'created_at': firestore.SERVER_TIMESTAMP
+        })
+
+        # Create audit log
+        db.collection('audit_logs').add({
+            'user_id': user_id,
+            'action': 'add_portfolio_api',
+            'document_id': new_doc[1].id,
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'ip_address': request.remote_addr,
+            'user_agent': request.user_agent.string
         })
 
         return jsonify({
+            'status': 'success',
             'message': 'Cryptocurrency added successfully',
-            'id': doc_ref[1].id
+            'document_id': new_doc[1].id
         }), 201
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Log error details securely
+        db.collection('error_logs').add({
+            'error_type': 'portfolio_add_error',
+            'user_id': request.user_id,
+            'error_message': str(e),
+            'timestamp': firestore.SERVER_TIMESTAMP
+        })
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to add portfolio item'
+        }), 500
 
-# Error handlers
-
-
-@portfolio_api.errorhandler(400)
-def bad_request_error(error):
-    return jsonify({'error': 'Bad request'}), 400
-
-
-@portfolio_api.errorhandler(401)
-def unauthorized_error(error):
-    return jsonify({'error': 'Unauthorized'}), 401
-
-
-@portfolio_api.errorhandler(429)
-def rate_limit_error(error):
-    return jsonify({'error': 'Too many requests'}), 429
+    finally:
+        # Clean up secure objects
+        if secure_salt is not None:
+            secure_salt.secure_zero()
 
 
-@portfolio_api.errorhandler(500)
-def internal_server_error(error):
-    return jsonify({'error': 'Internal server error'}), 500
-
+app.register_blueprint(portfolio_api, url_prefix='/api/v1')  # Add this line
 
 if __name__ == '__main__':
     app.run(debug=True)

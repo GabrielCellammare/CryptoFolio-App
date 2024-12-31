@@ -11,7 +11,8 @@ class SecurityManager {
         this.nonceEndpoint = '/api/csrf/nonce';
         this.credentials = { token: null, nonce: null };
         this.lastRefresh = 0;
-        this.REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+        this.REFRESH_INTERVAL = 5 * 60 * 1000; //Intervallo Nonce
+        this.TOKEN_EXPIRATION_BUFFER = 30 * 1000; // 30 seconds buffer
     }
 
     async getToken() {
@@ -63,15 +64,16 @@ class SecurityManager {
 
     async getSecurityCredentials() {
         const now = Date.now();
-        if (now - this.lastRefresh > this.REFRESH_INTERVAL ||
+        if (now - this.lastRefresh > (this.REFRESH_INTERVAL - this.TOKEN_EXPIRATION_BUFFER) ||
             !this.credentials.token ||
             !this.credentials.nonce) {
             // Get token first
             await this.getToken();
             // Then get nonce
-            await this.getNonce();
+
             this.lastRefresh = now;
         }
+        await this.getNonce();
         return { ...this.credentials };
     }
 }
@@ -154,52 +156,108 @@ class ApiServiceImpl {
     }
 
     async safeFetch(url, options = {}) {
-        if (!this.initialized) {
-            await this.initialize();
-        }
 
-        this.validateHttps(url);
-        this.rateLimiter.checkRateLimit();
+        try {
+            if (!this.initialized) {
+                await this.initialize();
+            }
 
-        const credentials = await this.securityManager.getSecurityCredentials();
-        const requestId = crypto.randomUUID();
+            this.validateHttps(url);
+            this.rateLimiter.checkRateLimit();
 
-        const secureOptions = {
-            ...options,
-            credentials: 'same-origin',
-            headers: {
-                ...options.headers,
-                'X-CSRF-Token': credentials.token,
-                'X-CSRF-Nonce': credentials.nonce,
-                'X-Requested-With': 'XMLHttpRequest',
-                'Content-Type': 'application/json',
-                'X-Request-ID': requestId
-            },
-            timeout: this.config.REQUEST_TIMEOUT,
-            mode: 'same-origin',
-            referrerPolicy: 'same-origin'
-        };
+            const credentials = await this.securityManager.getSecurityCredentials();
+            const requestId = crypto.randomUUID();
 
-        return this.withRetry(async () => {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), this.config.REQUEST_TIMEOUT);
+            const secureOptions = {
+                ...options,
+                credentials: 'same-origin',
+                headers: {
+                    ...options.headers,
+                    'X-CSRF-Token': credentials.token,
+                    'X-CSRF-Nonce': credentials.nonce,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                    'X-Request-ID': requestId
+                },
+                timeout: this.config.REQUEST_TIMEOUT,
+                mode: 'same-origin',
+                referrerPolicy: 'same-origin'
+            };
 
-            try {
-                const response = await fetch(url, {
-                    ...secureOptions,
-                    signal: controller.signal
-                });
+            return this.withRetry(async () => {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), this.config.REQUEST_TIMEOUT);
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                try {
+                    const response = await fetch(url, {
+                        ...secureOptions,
+                        signal: controller.signal
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    return data;
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+            });
+        } catch {
+            if (error.status === 403 && error.description?.includes('Invalid CSRF token')) {
+                // Force token refresh
+                await this.securityManager.getToken();
+                await this.securityManager.getNonce();
+                if (!this.initialized) {
+                    await this.initialize();
                 }
 
-                const data = await response.json();
-                return data;
-            } finally {
-                clearTimeout(timeoutId);
+                this.validateHttps(url);
+                this.rateLimiter.checkRateLimit();
+
+                const credentials = await this.securityManager.getSecurityCredentials();
+                const requestId = crypto.randomUUID();
+
+                const secureOptions = {
+                    ...options,
+                    credentials: 'same-origin',
+                    headers: {
+                        ...options.headers,
+                        'X-CSRF-Token': credentials.token,
+                        'X-CSRF-Nonce': credentials.nonce,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json',
+                        'X-Request-ID': requestId
+                    },
+                    timeout: this.config.REQUEST_TIMEOUT,
+                    mode: 'same-origin',
+                    referrerPolicy: 'same-origin'
+                };
+
+                return this.withRetry(async () => {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), this.config.REQUEST_TIMEOUT);
+
+                    try {
+                        const response = await fetch(url, {
+                            ...secureOptions,
+                            signal: controller.signal
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        return data;
+                    } finally {
+                        clearTimeout(timeoutId);
+                    }
+                });
             }
-        });
+
+        }
     }
 
     // API Methods

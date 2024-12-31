@@ -190,24 +190,16 @@ class CSRFProtection:
         self.used_nonces[encrypted_nonce] = time.time() + self.NONCE_EXPIRATION
         return encrypted_nonce
 
-    def validate_token(self, encrypted_token: Optional[str]) -> bool:
+    def validate_and_refresh_token(self, encrypted_token):
         """
-        Validate a CSRF token against the stored session token.
-
-        Args:
-            token: The token to validate
-
-        Returns:
-            bool: True if token is valid, False otherwise
+        Proposed implementation that combines validation and regeneration
         """
-        """Validate the encrypted CSRF token"""
         if not encrypted_token:
-            return False
+            return self.generate_token(), False
 
-        # Check against session token
         session_token = session.get('csrf_token')
         if not session_token or session_token != encrypted_token:
-            return False
+            return self.generate_token(), False
 
         try:
             decrypted_data = self.fernet.decrypt(
@@ -216,13 +208,12 @@ class CSRFProtection:
             token_age = time.time() - float(timestamp)
 
             if token_age >= self.TOKEN_EXPIRATION:
-                # Clear expired token
-                session.pop('csrf_token', None)
-                return False
+                # Generate new token when expired
+                return self.generate_token(), False
 
-            return True
+            return encrypted_token, True
         except Exception:
-            return False
+            return self.generate_token(), False
 
     # In security.py decorated_function:
 
@@ -281,9 +272,20 @@ class CSRFProtection:
                     logger.warning("CSRF token validation failed")
                     abort(403, description="Invalid CSRF token")
 
-                if not self.validate_token(token):
+                # Validazione con potenziale refresh
+                new_token, is_valid = self.validate_and_refresh_token(token)
+                if not is_valid:
                     logger.warning("CSRF token validation failed")
                     abort(403, description="Invalid CSRF token")
+
+                # Se il token è stato rigenerato, aggiorna il cookie
+                if new_token != token:
+                    response = make_response(f(*args, **kwargs))
+                    response.set_cookie('csrf_token', new_token,
+                                        secure=True, httponly=True,
+                                        samesite='Lax',
+                                        max_age=self.TOKEN_EXPIRATION)
+                    return response
 
                 if not self.validate_nonce(nonce):
                     logger.warning("CSRF nonce validation failed")
