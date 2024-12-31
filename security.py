@@ -264,34 +264,31 @@ class CSRFProtection:
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if request.method in ['POST', 'PUT', 'DELETE']:
+                # Raccogliamo tutti i token necessari
                 token = request.cookies.get('csrf_token')
                 client_token = request.headers.get('X-CSRF-Token')
                 nonce = request.headers.get('X-CSRF-Nonce')
 
-                if not token or not client_token or token != client_token:
-                    logger.warning("CSRF token validation failed")
-                    abort(403, description="Invalid CSRF token")
+                # Verifichiamo prima che tutti i token necessari siano presenti
+                if not all([token, client_token, nonce]):
+                    logger.warning("Missing security credentials")
+                    abort(403, description="Missing security credentials")
 
-                # Validazione con potenziale refresh
+                # Verifichiamo prima il nonce
+                if not self.validate_nonce(nonce):
+                    # Messaggio generico per sicurezza
+                    logger.warning("Security validation failed")
+                    abort(403, description="Security validation failed")
+
+                # Solo se il nonce è valido, procediamo con la validazione del token CSRF
+                if token != client_token:
+                    logger.warning("Security validation failed")
+                    abort(403, description="Security validation failed")
+
                 new_token, is_valid = self.validate_and_refresh_token(token)
                 if not is_valid:
-                    logger.warning("CSRF token validation failed")
-                    abort(403, description="Invalid CSRF token")
-
-                # Se il token è stato rigenerato, aggiorna il cookie
-                if new_token != token:
-                    response = make_response(f(*args, **kwargs))
-                    response.set_cookie('csrf_token', new_token,
-                                        secure=True, httponly=True,
-                                        samesite='Lax',
-                                        max_age=self.TOKEN_EXPIRATION)
-                    return response
-
-                if not self.validate_nonce(nonce):
-                    logger.warning("CSRF nonce validation failed")
-                    abort(403, description="Invalid or expired nonce")
-
-                logger.info("CSRF validation successful")
+                    logger.warning("Security validation failed")
+                    abort(403, description="Security validation failed")
 
             return f(*args, **kwargs)
         return decorated_function
