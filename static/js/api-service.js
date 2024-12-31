@@ -11,8 +11,8 @@ class SecurityManager {
         this.nonceEndpoint = '/api/csrf/nonce';
         this.credentials = { token: null, nonce: null };
         this.lastRefresh = 0;
-        this.REFRESH_INTERVAL = 5 * 60 * 1000; //Intervallo Nonce
-        this.TOKEN_EXPIRATION_BUFFER = 30 * 1000; // 30 seconds buffer
+        this.REFRESH_INTERVAL = 55 * 60 * 1000; //Intervallo CSRF token refresh
+        this.TOKEN_EXPIRATION_BUFFER = 5 * 60 * 1000; // 5 minutes buffer
     }
 
     async getToken() {
@@ -207,8 +207,10 @@ class ApiServiceImpl {
         } catch {
             if (error.status === 403 && error.description?.includes('Invalid CSRF token')) {
                 // Force token refresh
-                await this.securityManager.getToken();
-                await this.securityManager.getNonce();
+                this.credentials = { token: null, nonce: null };
+                this.initialized = false;
+
+
                 if (!this.initialized) {
                     await this.initialize();
                 }
