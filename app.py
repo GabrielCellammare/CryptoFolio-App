@@ -14,7 +14,7 @@ Main features:
 - Error handling and logging
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import time
 from flask import Blueprint, jsonify, request, session
 import base64
@@ -56,9 +56,36 @@ portfolio_encryption = PortfolioEncryption(cipher)
 # Initialize OAuth after app creation
 oauth = configure_oauth(app)
 
+# First, let's modify app.py to include the cleanup function on startup
 
+
+def init_token_cleanup(app):
+    """
+    Initializes token cleanup task when the app starts.
+    Uses Flask's before_first_request decorator to ensure it runs once on startup.
+    """
+    @app.before_request
+    def setup_token_cleanup():
+        cleanup_expired_tokens()
+        # You could also set up a periodic task here using APScheduler if needed
+        print("Token cleanup initialized")
+
+    def cleanup_expired_tokens():
+        """ Periodically mark expired tokens as inactive """
+        current_time = datetime.now(timezone.utc)
+        expired_tokens = (db.collection('user_tokens') .where(
+            'status', '==', 'active') .where('expires_at', '<', current_time) .get())
+        for token in expired_tokens:
+            token.reference.update(
+                {'status': 'expired'})
+        print(f"Cleaned up {len(expired_tokens)} expired tokens")  # Debug log
+
+
+init_token_cleanup(app)
 # Middleware
 # Register the CORS headers handler - this will be called automatically after each request
+
+
 @app.after_request
 def add_cors_headers(response):
     """
@@ -1087,8 +1114,9 @@ Features:
 
 # Configuration
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
-JWT_ACCESS_EXPIRATION = timedelta(minutes=15)  # Short-lived access token
-JWT_REFRESH_EXPIRATION = timedelta(days=7)     # Longer-lived refresh token
+JWT_TOKEN_EXPIRATION = timedelta(days=7)
+JWT_REQUEST_COOLDOWN = timedelta(hours=12)
+MAX_DAILY_TOKENS = 2
 portfolio_api = Blueprint('portfolio_api', __name__)
 
 # Rate limiting configuration
@@ -1106,36 +1134,112 @@ class AuthError(Exception):
         self.status_code = status_code
 
 
-def generate_tokens(user_id: str) -> Dict[str, str]:
+def check_token_request_eligibility(user_id: str) -> tuple[bool, Optional[datetime], Optional[str]]:
     """
-    Generate both access and refresh tokens for a user
+    Verifica se l'utente può richiedere un nuovo token
 
     Args:
-        user_id: The user's unique identifier
+        user_id: L'identificatore univoco dell'utente
 
     Returns:
-        Dictionary containing access and refresh tokens
+        Tupla di (is_eligible, next_eligible_time, error_message)
     """
-    # Generate access token
-    access_token_exp = datetime.now(timezone.utc) + JWT_ACCESS_EXPIRATION
+    current_time = datetime.now(timezone.utc)
+    day_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    print(f"Checking eligibility for user: {user_id}")  # Debug log
+    print(f"Day start time: {day_start}")  # Debug log
+
+    # Get tokens generated today
+    token_docs = (db.collection('user_tokens')
+                  .where('user_id', '==', user_id)
+                  .where('created_at', '>=', day_start)
+                  .order_by('created_at', direction='DESCENDING')
+                  .get())
+
+    print(f"Found {len(list(token_docs))} tokens for today")  # Debug log
+
+    if not token_docs:
+        print("No tokens found - user is eligible")  # Debug log
+        return True, None, None
+
+    # Check daily token count
+    daily_tokens = len(list(token_docs))
+    if daily_tokens >= MAX_DAILY_TOKENS:
+        next_day = day_start + timedelta(days=1)
+        print(f"Daily limit reached. Next eligible: {next_day}")  # Debug log
+        return False, next_day, f'Daily limit reached. Try again after {next_day.strftime("%Y-%m-%d %H:%M:%S")} UTC'
+
+    # Check time since last request
+    latest_token = list(token_docs)[0].to_dict()
+    last_request_time = latest_token['created_at']
+    next_eligible_time = last_request_time + JWT_REQUEST_COOLDOWN
+
+    if current_time < next_eligible_time:
+        print(f"Cooldown period not elapsed. Next eligible: {
+              next_eligible_time}")  # Debug log
+        return False, next_eligible_time, f'Please wait until {next_eligible_time.strftime("%Y-%m-%d %H:%M:%S")} UTC'
+
+    print("User is eligible for new token")  # Debug log
+    return True, None, None
+
+
+def generate_tokens(user_id: str) -> Dict[str, Any]:
+    """
+    Genera un nuovo token JWT per l'utente
+
+    Args:
+        user_id: L'identificatore univoco dell'utente
+
+    Returns:
+        Dizionario contenente le informazioni del token
+    """
+    # Verifica l'eleggibilità
+    is_eligible, next_eligible_time, error_message = check_token_request_eligibility(
+        user_id)
+
+    if not is_eligible:
+        raise AuthError(error_message, 429)
+
+    # Genera il token JWT
+    token_exp = datetime.now(timezone.utc) + JWT_TOKEN_EXPIRATION
     access_token = jwt.encode({
-        'exp': access_token_exp,
+        'exp': token_exp,
         'iat': datetime.now(timezone.utc),
         'user_id': user_id,
         'type': 'access'
     }, JWT_SECRET_KEY, algorithm='HS256')
 
-    # Store tokens in Firebase
-    db.collection('user_tokens').add({
+    # Memorizza le informazioni del token
+    token_doc = {
         'user_id': user_id,
         'access_token': access_token,
-        'access_token_expires': access_token_exp,
-        'created_at': datetime.now(timezone.utc)
+        'created_at': datetime.now(timezone.utc),
+        'expires_at': token_exp,
+        'status': 'active'
+    }
+
+    # Aggiunge il documento del token
+    db.collection('user_tokens').add(token_doc)
+
+    # Aggiunge il log di audit
+    db.collection('audit_logs').add({
+        'user_id': user_id,
+        'action': 'token_generated',
+        'timestamp': datetime.now(timezone.utc),
+        'expires_at': token_exp,
+        'ip_address': request.remote_addr,
+        'user_agent': request.user_agent.string
     })
+
+    # Calcola quando sarà possibile richiedere il prossimo token
+    next_token_time = datetime.now(timezone.utc) + JWT_REQUEST_COOLDOWN
 
     return {
         'access_token': access_token,
-        'expires_in': int(JWT_ACCESS_EXPIRATION.total_seconds())
+        'expires_in': int(JWT_TOKEN_EXPIRATION.total_seconds()),
+        'expires_at': token_exp.isoformat(),
+        'next_token_request': next_token_time.isoformat()
     }
 
 
@@ -1178,7 +1282,7 @@ def check_rate_limit(user_id: str) -> bool:
 
 
 def jwt_required(f):
-    """Decorator to verify JWT tokens and handle authentication"""
+    """Enhanced decorator to verify JWT tokens with Firebase check"""
     @wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
@@ -1189,19 +1293,41 @@ def jwt_required(f):
         token = auth_header.split(' ')[1]
 
         try:
-            # Verify token
+            # Verify JWT signature and expiration
             payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
 
             # Verify token type
             if payload.get('type') != 'access':
                 raise AuthError('Invalid token type', 401)
 
+            user_id = payload['user_id']
+
+            # Check token in Firebase
+            token_docs = (db.collection('user_tokens')
+                          .where('user_id', '==', user_id)
+                          .where('access_token', '==', token)
+                          .where('status', '==', 'active')
+                          .limit(1)
+                          .get())
+
+            if not token_docs:
+                raise AuthError('Token not found in database', 401)
+
+            token_doc = list(token_docs)[0].to_dict()
+            expiry = token_doc.get('expires_at')
+
+            if not expiry or datetime.now(timezone.utc) > expiry:
+                # Update token status to expired
+                doc_ref = list(token_docs)[0].reference
+                doc_ref.update({'status': 'expired'})
+                raise AuthError('Token expired', 401)
+
             # Check rate limit
-            if not check_rate_limit(payload['user_id']):
+            if not check_rate_limit(user_id):
                 raise AuthError('Rate limit exceeded', 429)
 
             # Add user_id to request
-            request.user_id = payload['user_id']
+            request.user_id = user_id
 
             return f(*args, **kwargs)
 
@@ -1209,6 +1335,16 @@ def jwt_required(f):
             raise AuthError('Token expired', 401)
         except jwt.InvalidTokenError:
             raise AuthError('Invalid token', 401)
+        except Exception as e:
+            # Log error securely
+            db.collection('error_logs').add({
+                'error_type': 'token_verification_error',
+                'error_message': str(e),
+                'timestamp': datetime.now(timezone.utc),
+                'request_path': request.path,
+                'request_method': request.method
+            })
+            raise AuthError('Token verification failed', 401)
 
     return decorated
 
@@ -1255,13 +1391,33 @@ def handle_internal_error(error):
 @login_required
 @csrf.csrf_protect
 def get_tokens():
-    """Generate new access and refresh tokens for authenticated users"""
+    """Generate a new JWT token for authenticated users with request limits"""
     user_id = session.get('user_id')
+    print(f"Attempting token generation for user: {user_id}")  # Debug log
+
     if not user_id:
+        print("No user_id found in session")  # Debug log
         raise AuthError('User not authenticated', 401)
 
-    tokens = generate_tokens(user_id)
-    return jsonify(tokens)
+    try:
+        print("Checking token eligibility")  # Debug log
+        is_eligible, next_eligible_time, error_message = check_token_request_eligibility(
+            user_id)
+        print(f"Eligibility result: {is_eligible}")  # Debug log
+
+        if not is_eligible:
+            print(f"User not eligible: {error_message}")  # Debug log
+            raise AuthError(error_message, 429)
+
+        tokens = generate_tokens(user_id)
+        print("Token generated successfully")  # Debug log
+        return jsonify(tokens)
+    except AuthError as e:
+        print(f"AuthError occurred: {e.error}")  # Debug log
+        return jsonify({
+            'error': e.error,
+            'status_code': e.status_code
+        }), e.status_code
 
 
 @portfolio_api.route('/portfolio', methods=['GET'])

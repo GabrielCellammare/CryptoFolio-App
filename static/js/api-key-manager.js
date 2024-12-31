@@ -15,15 +15,32 @@ export default class ApiKeyManager {
             apiKeyInput: null,
             toggleButton: null,
             copyButton: null,
-            container: null
+            container: null,
+            regenerateButton: null,
+            tokenStatus: null,
+            isVisible: false,
+            displayAttempts: 0,
+            lastToggleTime: 0,
+            currentToken: null,
+            nextTokenTime: null,
+            isGenerating: false
         };
 
         // Configuration for security and display
         this.config = {
-            displayTimeout: 30000, // Auto-hide after 30 seconds
-            copyTimeout: 3000,     // Copy message display duration
-            maxDisplayAttempts: 3,// Maximum consecutive display attempts
-            tokenEndpoint: '/api/token' // Endpoint for token generation
+            displayTimeout: 30000,
+            copyTimeout: 3000,
+            maxDisplayAttempts: 3,
+            tokenEndpoint: '/api/token',
+            warningThreshold: 86400000 * 3, // 3 days in milliseconds
+            TOKEN_CHECK_INTERVAL: 60000,
+            TOKEN_REFRESH_THRESHOLD: 300000,
+            messages: {
+                TOKEN_EXPIRING: 'Il tuo token scadrà tra {days} giorni',
+                TOKEN_GENERATED: 'Nuovo token generato con successo. Valido per 7 giorni.',
+                WAIT_MESSAGE: 'Potrai generare un nuovo token tra {time}',
+                DAILY_LIMIT: 'Hai raggiunto il limite di 2 token per oggi'
+            }
         };
 
         // State management
@@ -33,13 +50,75 @@ export default class ApiKeyManager {
             lastToggleTime: 0,
             currentToken: null
         };
-
         // Bind methods to preserve context
-        this.initializeElements = this.initializeElements.bind(this);
-        this.setupEventListeners = this.setupEventListeners.bind(this);
         this.handleToggleDisplay = this.handleToggleDisplay.bind(this);
         this.handleCopy = this.handleCopy.bind(this);
-        this.updateToggleButton = this.updateToggleButton.bind(this);
+        this.handleTokenGeneration = this.handleTokenGeneration.bind(this);
+        this.updateTokenStatus = this.updateTokenStatus.bind(this);
+        this.showApiKey = this.showApiKey.bind(this);
+        this.hideApiKey = this.hideApiKey.bind(this);
+        this.showAlert = this.showAlert.bind(this);
+        this.showError = this.showError.bind(this);
+        this.showSuccess = this.showSuccess.bind(this);
+        this.showInfo = this.showInfo.bind(this);
+        this.showWarning = this.showWarning.bind(this);
+
+    }
+
+    async updateTokenStatus() {
+        const expiryStr = localStorage.getItem(this.apiService.config.TOKEN_EXPIRY_KEY);
+        const nextRequestStr = localStorage.getItem(this.apiService.config.NEXT_TOKEN_REQUEST_KEY);
+
+        if (!expiryStr) {
+            this.showWarning('Nessun token attivo. Generane uno nuovo.');
+            return;
+        }
+
+        const expiry = new Date(expiryStr);
+        const now = new Date();
+        const timeLeft = expiry.getTime() - now.getTime();
+        const daysLeft = Math.ceil(timeLeft / (1000 * 60 * 60 * 24));
+
+        // Mostra avviso se il token sta per scadere
+        if (timeLeft < this.config.warningThreshold) {
+            this.showWarning(this.config.messages.TOKEN_EXPIRING.replace('{days}', daysLeft));
+        }
+
+        // Mostra tempo di attesa per il prossimo token se applicabile
+        if (nextRequestStr) {
+            const nextRequest = new Date(nextRequestStr);
+            if (now < nextRequest) {
+                const waitTime = this.formatWaitTime(nextRequest.getTime() - now.getTime());
+                this.showInfo(this.config.messages.WAIT_MESSAGE.replace('{time}', waitTime));
+            }
+        }
+    }
+
+    startTokenCheck() {
+        // Clear any existing interval
+        if (this.tokenCheckInterval) {
+            clearInterval(this.tokenCheckInterval);
+        }
+        this.tokenCheckInterval = setInterval(() => this.checkTokenStatus(), this.config.TOKEN_CHECK_INTERVAL);
+    }
+    // Add destroy method for cleanup
+    destroy() {
+        if (this.tokenCheckInterval) {
+            clearInterval(this.tokenCheckInterval);
+            this.tokenCheckInterval = null;
+        }
+    }
+
+    async checkTokenStatus() {
+        const tokenStatus = await this.apiService.checkTokenStatus();
+
+        if (tokenStatus.needsRefresh) {
+            try {
+                await this.handleTokenGeneration();
+            } catch (error) {
+                this.showError(`Token refresh failed: ${error.message}`);
+            }
+        }
     }
 
     /**
@@ -50,7 +129,17 @@ export default class ApiKeyManager {
             await this.apiService.initialize();
             this.initializeElements();
             this.setupEventListeners();
+            const token = localStorage.getItem(this.apiService.config.TOKEN_STORAGE_KEY);
+            if (token) {
+                this.elements.apiKeyInput.value = token;
+                this.elements.apiKeyInput.classList.remove('text-muted');
+            }
+            await this.updateRegenerateButtonState();
+            this.startTokenCheck();
             await this.validateCurrentKey();
+
+            // Carica il token esistente dal localStorage
+
             console.log('API Key Manager initialized successfully');
         } catch (error) {
             console.error('Failed to initialize API Key Manager:', error);
@@ -58,35 +147,82 @@ export default class ApiKeyManager {
         }
     }
 
+    async updateRegenerateButtonState() {
+        const nextRequestStr = localStorage.getItem(this.apiService.config.NEXT_TOKEN_REQUEST_KEY);
+        if (nextRequestStr) {
+            const nextRequest = new Date(nextRequestStr);
+            const now = new Date();
+
+            if (now < nextRequest) {
+                this.elements.regenerateButton.disabled = true;
+                this.state.nextTokenTime = nextRequest;
+                this.updateNextTokenTimer();
+            } else {
+                this.elements.regenerateButton.disabled = false;
+                this.state.nextTokenTime = null;
+            }
+        }
+    }
+
+
+    startNextTokenTimer() {
+        // Aggiorna il timer ogni secondo
+        setInterval(() => this.updateNextTokenTimer(), 1000);
+    }
+
+    updateNextTokenTimer() {
+        if (this.state.nextTokenTime) {
+            const now = new Date();
+            const timeLeft = this.state.nextTokenTime.getTime() - now.getTime();
+
+            if (timeLeft > 0) {
+                const waitTime = this.formatWaitTime(timeLeft);
+                this.showInfo(this.config.messages.WAIT_MESSAGE.replace('{time}', waitTime));
+            } else {
+                this.elements.regenerateButton.disabled = false;
+                this.state.nextTokenTime = null;
+                const alerts = this.elements.container.querySelectorAll('.alert-info');
+                alerts.forEach(alert => alert.remove());
+            }
+        }
+    }
+
     /**
      * Initialize references to DOM elements
      */
     initializeElements() {
-        this.elements.apiKeyInput = document.getElementById('apiKey');
-        this.elements.toggleButton = document.getElementById('toggleApiKey');
-        this.elements.copyButton = document.getElementById('copyApiKey');
-        this.elements.container = this.elements.apiKeyInput?.closest('.card-body');
+        // Initialize all required DOM elements
+        const elements = {
+            apiKeyInput: document.getElementById('apiKey'),
+            toggleButton: document.getElementById('toggleApiKey'),
+            copyButton: document.getElementById('copyApiKey'),
+            regenerateButton: document.getElementById('regenerateApiKey'),
+            tokenStatus: document.getElementById('tokenStatus')
+        };
+        // Check if all elements exist
+        const missingElements = Object.entries(elements)
+            .filter(([, element]) => !element)
+            .map(([key]) => key);
 
-        if (!this.elements.apiKeyInput || !this.elements.toggleButton || !this.elements.copyButton) {
-            throw new Error('Required API key elements not found in DOM');
+        if (missingElements.length > 0) {
+            throw new Error(`Missing required elements: ${missingElements.join(', ')}`);
         }
+
+        this.elements = elements;
+        this.elements.container = this.elements.apiKeyInput.closest('.card-body');
     }
 
     /**
      * Set up event listeners for key management interactions
      */
     setupEventListeners() {
-        // Make sure we're using the correct button ID
-        this.elements.regenerateButton = document.getElementById('regenerateApiKey');
 
-        // Add event listener for regenerate button
-        this.elements.regenerateButton?.addEventListener('click', () => this.handleTokenGeneration());
-
-        // Other existing event listeners...
+        // Set up click handlers with bound context
         this.elements.toggleButton.addEventListener('click', this.handleToggleDisplay);
         this.elements.copyButton.addEventListener('click', this.handleCopy);
+        this.elements.regenerateButton.addEventListener('click', this.handleTokenGeneration);
 
-        // Auto-hide on document click outside
+        // Document-level click handler for auto-hide
         document.addEventListener('click', (event) => {
             if (this.state.isVisible &&
                 !event.target.closest('.input-group') &&
@@ -95,7 +231,7 @@ export default class ApiKeyManager {
             }
         });
 
-        // Reset visibility on tab change
+        // Visibility change handler
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && this.state.isVisible) {
                 this.hideApiKey();
@@ -106,70 +242,91 @@ export default class ApiKeyManager {
      * Handle API token generation using SafeFetch
      */
     async handleTokenGeneration() {
+
+        if (this.state.isGenerating) return;
+
         try {
-            // Show loading state
+            this.state.isGenerating = true;
             this.elements.regenerateButton.disabled = true;
             this.showInfo('Generating new API token...');
 
-            // Use ApiService's safeFetch for secure communication
-            const response = await this.apiService.safeFetch(this.config.tokenEndpoint, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json'
+            const success = await this.apiService.handleTokenGeneration();
+
+            if (success) {
+                // Get the token from localStorage
+                const token = localStorage.getItem(this.apiService.config.TOKEN_STORAGE_KEY);
+                const nextRequestStr = localStorage.getItem(this.apiService.config.NEXT_TOKEN_REQUEST_KEY);
+
+                // Update the input field with the new token
+                if (token) {
+                    this.elements.apiKeyInput.value = token;
+                    this.elements.apiKeyInput.classList.remove('text-muted');
+                    this.showSuccess(this.config.messages.TOKEN_GENERATED);
+                    if (nextRequestStr) {
+                        this.state.nextTokenTime = new Date(nextRequestStr);
+                    }
+                } else {
+                    this.showError('Token generated but not found in storage');
+                    this.elements.apiKeyInput.value = 'No API key generated';
+                    this.elements.apiKeyInput.classList.add('text-muted');
                 }
-            });
 
-            if (!response) {
-                throw new Error('No response received from server');
+                await this.updateTokenStatus();
+
+                // Enable controls
+                this.elements.toggleButton.disabled = false;
+                this.elements.copyButton.disabled = false;
             }
-
-            if (!response.access_token) {
-                throw new Error('Token missing from server response');
-            }
-
-
-            // Update UI with new token
-            this.state.currentToken = response.access_token;
-            this.elements.apiKeyInput.value = response.access_token;
-            this.elements.apiKeyInput.type = 'password';
-
-            // Enable controls
-            this.elements.toggleButton.disabled = false;
-            this.elements.copyButton.disabled = false;
-
-            this.showSuccess('New API token generated successfully');
-
-            // Store token generation timestamp for expiration tracking
-            localStorage.setItem('token_generated_at', Date.now().toString());
 
         } catch (error) {
             console.error('Token generation failed:', error);
             this.showError(`Failed to generate new API token: ${error.message}`);
+            this.elements.apiKeyInput.value = 'No API key generated';
+            this.elements.apiKeyInput.classList.add('text-muted');
         } finally {
-            this.elements.regenerateButton.disabled = false;
+            this.state.isGenerating = false;
+            await this.updateRegenerateButtonState();
         }
+    }
+
+    formatWaitTime(milliseconds) {
+        const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+        const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (hours > 0) {
+            return `${hours} ore e ${minutes} minuti`;
+        }
+        return `${minutes} minuti`;
     }
 
     /**
      * Validate the current API key format and presence
      */
     async validateCurrentKey() {
-        const currentKey = this.elements.apiKeyInput.value;
+        const tokenStatus = await this.apiService.checkTokenStatus();
 
-        if (currentKey === 'No API key generated') {
+        if (tokenStatus.needsRefresh) {
             this.elements.apiKeyInput.classList.add('text-muted');
             this.elements.toggleButton.disabled = true;
             this.elements.copyButton.disabled = true;
+
+            // Show appropriate message
+            if (tokenStatus.error) {
+                this.showWarning(tokenStatus.error);
+            } else {
+                this.showWarning('Your API token needs to be regenerated');
+            }
             return;
         }
 
-        // Validate token expiration
-        const generatedAt = localStorage.getItem('token_generated_at');
-        if (generatedAt) {
-            const expirationTime = parseInt(generatedAt) + (60 * 60 * 1000); // 1 hour
-            if (Date.now() > expirationTime) {
-                this.showWarning('Your API token has expired. Please generate a new one.');
-                return;
+        const expiryStr = localStorage.getItem(this.apiService.config.TOKEN_EXPIRY_KEY);
+        if (expiryStr) {
+            const expiry = new Date(expiryStr);
+            const now = new Date();
+            const timeLeft = expiry.getTime() - now.getTime();
+
+            if (timeLeft < this.config.warningThreshold) {
+                this.showWarning(`Token will expire in ${Math.ceil(timeLeft / (1000 * 60 * 60 * 24))} days`);
             }
         }
 

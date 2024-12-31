@@ -6,9 +6,9 @@
 
 // SecurityManager handles all security-related operations
 class SecurityManager {
-    constructor() {
-        this.tokenEndpoint = '/api/csrf/token';
-        this.nonceEndpoint = '/api/csrf/nonce';
+    constructor(tokenEndpoint, nonceEndpoint) {
+        this.tokenEndpoint = tokenEndpoint;
+        this.nonceEndpoint = nonceEndpoint;
         this.credentials = { token: null, nonce: null };
         this.lastRefresh = 0;
         this.REFRESH_INTERVAL = 55 * 60 * 1000; //Intervallo CSRF token refresh
@@ -102,15 +102,40 @@ class RateLimiter {
 class ApiServiceImpl {
     constructor() {
         this.config = {
+            endpoints: {
+                token: '/api/token',                // For JWT access token generation
+                csrfToken: '/api/csrf/token',       // For CSRF token
+                csrfNonce: '/api/csrf/nonce'        // For CSRF nonce
+            },
             MAX_REQUESTS_PER_MINUTE: 60,
             REQUEST_TIMEOUT: 30000,
+
             MAX_RETRIES: 3,
             BACKOFF_FACTOR: 1.5,
             API_VERSION: '1.0',
-            ENVIRONMENT: document.querySelector('meta[name="environment"]')?.content || 'development'
-        };
+            ENVIRONMENT: document.querySelector('meta[name="environment"]')?.content || 'development',
+            TOKEN_STORAGE_KEY: 'access_token',
+            TOKEN_EXPIRY_KEY: 'token_expiry',
+            NEXT_TOKEN_REQUEST_KEY: 'next_token_request',
+            TOKEN_REFRESH_THRESHOLD: 24 * 60 * 60 * 1000, // 24 ore prima della scadenza
+            TOKEN_CHECK_INTERVAL: 60000, // Controlla ogni minuto
 
-        this.securityManager = new SecurityManager();
+
+            // Costanti per i messaggi
+            MESSAGES: {
+                RATE_LIMIT: 'Hai raggiunto il limite di richieste token per oggi. ',
+                TOKEN_EXPIRED: 'Il tuo token è scaduto. Generane uno nuovo.',
+                COOLDOWN: 'Devi attendere prima di richiedere un nuovo token. '
+            }
+
+
+        };
+        this.rateLimitResetTime = null;
+        // Initialize SecurityManager with updated endpoints
+        this.securityManager = new SecurityManager(
+            this.config.endpoints.csrfToken,
+            this.config.endpoints.csrfNonce
+        );
         this.rateLimiter = new RateLimiter(this.config.MAX_REQUESTS_PER_MINUTE);
         this.initialized = false;
     }
@@ -127,6 +152,88 @@ class ApiServiceImpl {
             throw error;
         }
     }
+    async checkTokenStatus() {
+        const token = localStorage.getItem(this.config.TOKEN_STORAGE_KEY);
+        const expiryStr = localStorage.getItem(this.config.TOKEN_EXPIRY_KEY);
+        const nextRequestStr = localStorage.getItem(this.config.NEXT_TOKEN_REQUEST_KEY);
+
+        if (!token || !expiryStr) {
+            return { needsRefresh: true };
+        }
+
+        const expiry = new Date(expiryStr);
+        const now = new Date();
+
+        // Check if token is expired or will expire in the next hour
+        // Verifica se il token sta per scadere nelle prossime 24 ore
+        if (expiry.getTime() - now.getTime() < this.config.TOKEN_REFRESH_THRESHOLD) {
+            // Controlla se possiamo richiedere un nuovo token
+            if (nextRequestStr) {
+                const nextRequest = new Date(nextRequestStr);
+                if (now < nextRequest) {
+                    // Calcola il tempo rimanente in un formato leggibile
+                    const waitTime = this.formatWaitTime(nextRequest.getTime() - now.getTime());
+                    return {
+                        needsRefresh: false,
+                        error: `${this.config.MESSAGES.COOLDOWN}Riprova tra ${waitTime}`
+                    };
+                }
+            }
+            return { needsRefresh: true };
+        }
+
+        return { needsRefresh: false };
+    }
+
+    formatWaitTime(milliseconds) {
+        const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+        const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (hours > 0) {
+            return `${hours} ore e ${minutes} minuti`;
+        }
+        return `${minutes} minuti`;
+    }
+
+    async handleTokenGeneration() {
+        try {
+            const tokenStatus = await this.checkTokenStatus();
+
+            if (!tokenStatus.needsRefresh) {
+                if (tokenStatus.error) {
+                    throw new Error(tokenStatus.error);
+                }
+                return false;
+            }
+
+            const response = await this.safeFetch(this.config.endpoints.token, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response || !response.access_token) {
+                throw new Error('Invalid token response');
+            }
+
+
+            // Salva le informazioni del token
+            localStorage.setItem(this.config.TOKEN_STORAGE_KEY, response.access_token);
+            localStorage.setItem(this.config.TOKEN_EXPIRY_KEY, response.expires_at);
+
+            if (response.next_token_request) {
+                localStorage.setItem(this.config.NEXT_TOKEN_REQUEST_KEY, response.next_token_request);
+            }
+
+            return true;
+
+        } catch (error) {
+            console.error('Token generation failed:', error);
+            throw error;
+        }
+    }
+
 
     validateHttps(url) {
         const fullUrl = new URL(url, window.location.origin);
@@ -194,72 +301,43 @@ class ApiServiceImpl {
                         signal: controller.signal
                     });
 
+                    const remainingRequests = response.headers.get('X-RateLimit-Remaining');
+                    const resetTime = response.headers.get('X-RateLimit-Reset');
+
+                    if (remainingRequests && resetTime) {
+                        this.rateLimitResetTime = new Date(resetTime);
+                        if (parseInt(remainingRequests) < 10) {
+                            console.warn(`Rate limit warning: ${remainingRequests} requests remaining`);
+                        }
+                    }
+
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
 
                     const data = await response.json();
                     return data;
-                } finally {
+                } catch (error) {
+                    if (error.status === 429) {
+                        const retryAfter = error.headers.get('Retry-After');
+                        throw new Error(`Rate limit exceeded. Please try again in ${retryAfter} seconds`);
+                    }
+                    throw error;
+                }
+                finally {
                     clearTimeout(timeoutId);
                 }
             });
-        } catch {
+        } catch (error) {
             if (error.status === 403 && error.description?.includes('Invalid CSRF token')) {
                 // Force token refresh
                 this.credentials = { token: null, nonce: null };
                 this.initialized = false;
+                return this.safeFetch(url, options);
 
-
-                if (!this.initialized) {
-                    await this.initialize();
-                }
-
-                this.validateHttps(url);
-                this.rateLimiter.checkRateLimit();
-
-                const credentials = await this.securityManager.getSecurityCredentials();
-                const requestId = crypto.randomUUID();
-
-                const secureOptions = {
-                    ...options,
-                    credentials: 'same-origin',
-                    headers: {
-                        ...options.headers,
-                        'X-CSRF-Token': credentials.token,
-                        'X-CSRF-Nonce': credentials.nonce,
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Content-Type': 'application/json',
-                        'X-Request-ID': requestId
-                    },
-                    timeout: this.config.REQUEST_TIMEOUT,
-                    mode: 'same-origin',
-                    referrerPolicy: 'same-origin'
-                };
-
-                return this.withRetry(async () => {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), this.config.REQUEST_TIMEOUT);
-
-                    try {
-                        const response = await fetch(url, {
-                            ...secureOptions,
-                            signal: controller.signal
-                        });
-
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-
-                        const data = await response.json();
-                        return data;
-                    } finally {
-                        clearTimeout(timeoutId);
-                    }
-                });
             }
 
-        }
+        } throw error;
     }
 
     // API Methods
