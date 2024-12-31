@@ -56,32 +56,6 @@ portfolio_encryption = PortfolioEncryption(cipher)
 # Initialize OAuth after app creation
 oauth = configure_oauth(app)
 
-# First, let's modify app.py to include the cleanup function on startup
-
-
-def init_token_cleanup(app):
-    """
-    Initializes token cleanup task when the app starts.
-    Uses Flask's before_first_request decorator to ensure it runs once on startup.
-    """
-    @app.before_request
-    def setup_token_cleanup():
-        cleanup_expired_tokens()
-        # You could also set up a periodic task here using APScheduler if needed
-        print("Token cleanup initialized")
-
-    def cleanup_expired_tokens():
-        """ Periodically mark expired tokens as inactive """
-        current_time = datetime.now(timezone.utc)
-        expired_tokens = (db.collection('user_tokens') .where(
-            'status', '==', 'active') .where('expires_at', '<', current_time) .get())
-        for token in expired_tokens:
-            token.reference.update(
-                {'status': 'expired'})
-        print(f"Cleaned up {len(expired_tokens)} expired tokens")  # Debug log
-
-
-init_token_cleanup(app)
 # Middleware
 # Register the CORS headers handler - this will be called automatically after each request
 
