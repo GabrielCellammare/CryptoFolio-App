@@ -29,7 +29,13 @@
             opacity: 0.7;
             pointer-events: none;
         }
-
+        #persistentAlertContainer {
+            margin-bottom: 1rem;
+        }
+        
+        #persistentAlertContainer .alert {
+            margin-bottom: 0.5rem;
+        }
         .loading-spinner {
             color: white;
             font-size: 24px;
@@ -479,19 +485,23 @@
                                 <small class="text-muted mt-2">
                                     Use this key to authenticate your API requests. Keep it secure and never share it.
                                 </small>
-                                
                             </div>
-                        
+                            
+                            <!-- Nuovo contenitore per gli avvisi permanenti -->
+                            <div id="persistentAlertContainer" class="mb-3"></div>
+                            
+                            <!-- Contenitore esistente per gli avvisi temporanei -->
                             <div id="alertContainer"></div>    
-                                <div class="mt-4">
-                                    <h6>Quick Start Guide</h6>
-                                    <pre class="bg-light p-3 rounded"><code>curl -H "X-API-Key: YOUR_API_KEY" \
-                            -X POST https://your-domain.com/api/token</code></pre>
-                                    <small class="text-muted">
-                                        This will return a JWT token valid for 1 hour. Use this token in subsequent requests.
-                                    </small>
-                                </div>
+                            
+                            <div class="mt-4">
+                                <h6>Quick Start Guide</h6>
+                                <pre class="bg-light p-3 rounded"><code>curl -H "X-API-Key: YOUR_API_KEY" \
+                        -X POST https://your-domain.com/api/token</code></pre>
+                                <small class="text-muted">
+                                    This will return a JWT token valid for 1 hour. Use this token in subsequent requests.
+                                </small>
                             </div>
+                        </div>
                     </div>
                     
                 </div>

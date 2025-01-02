@@ -1152,27 +1152,49 @@ def check_token_request_eligibility(user_id: str) -> Tuple[bool, Optional[dateti
     return True, None, None
 
 
-def cleanup_expired_tokens():
+@app.route('/api/token/cleanup', methods=['POST'])
+@login_required
+@csrf.csrf_protect
+def cleanup_tokens():
     """
-    Clean up expired tokens by marking them as expired in the database
+    Endpoint to clean up expired tokens and return the number of tokens cleaned
     """
-    current_time = datetime.now(timezone.utc)
+    try:
+        current_time = datetime.now(timezone.utc)
 
-    # Query for active tokens that have expired
-    expired_tokens = (db.collection('user_tokens')
-                      .where('status', '==', 'active')
-                      .where('expires_at', '<=', current_time)
-                      .stream())
+        # Query for active tokens that have expired
+        expired_tokens = (db.collection('user_tokens')
+                          .where('status', '==', 'active')
+                          .where('expires_at', '<=', current_time)
+                          .stream())
 
-    batch = db.batch()
-    for token_doc in expired_tokens:
-        # Update token status to expired
-        doc_ref = db.collection('user_tokens').document(token_doc.id)
-        batch.update(doc_ref, {'status': 'expired'})
+        # Conta i token da pulire
+        cleaned_count = 0
+        batch = db.batch()
 
-    # Commit all updates in a single batch
-    if batch:
-        batch.commit()
+        for token_doc in expired_tokens:
+            # Aggiorna lo stato del token a scaduto
+            doc_ref = db.collection('user_tokens').document(token_doc.id)
+            batch.update(doc_ref, {
+                'status': 'expired',
+                'cleaned_at': current_time
+            })
+            cleaned_count += 1
+
+        # Esegui tutti gli aggiornamenti in un'unica operazione batch
+        if cleaned_count > 0:
+            batch.commit()
+
+        return jsonify({
+            'success': True,
+            'cleaned_tokens': cleaned_count
+        })
+
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'cleaned_tokens': 0
+        }), 500
 
 
 def get_active_token(user_id: str) -> Optional[Dict[str, Any]]:
@@ -1192,6 +1214,57 @@ def get_active_token(user_id: str) -> Optional[Dict[str, Any]]:
 
     token_list = list(tokens)
     return token_list[0].to_dict() if token_list else None
+
+
+def expire_previous_tokens(user_id: str) -> None:
+    """
+    Expires all active tokens for a given user in the database.
+    This ensures only one token is active at a time per user.
+
+    Args:
+        user_id: The unique identifier of the user
+
+    The function uses a batch operation to update all tokens efficiently
+    and maintains an audit trail of token expiration.
+    """
+    current_time = datetime.now(timezone.utc)
+
+    # Query for all active tokens belonging to the user
+    active_tokens = (db.collection('user_tokens')
+                     .where('user_id', '==', user_id)
+                     .where('status', '==', 'active')
+                     .stream())
+
+    # Create a batch operation for efficiency
+    batch = db.batch()
+
+    expired_count = 0
+    for token_doc in active_tokens:
+        doc_ref = db.collection('user_tokens').document(token_doc.id)
+
+        # Update token status to expired
+        batch.update(doc_ref, {
+            'status': 'expired',
+            'expired_at': current_time,
+            'expired_reason': 'new_token_generated'
+        })
+
+        expired_count += 1
+
+    # Only commit if there are tokens to expire
+    if expired_count > 0:
+        batch.commit()
+
+        # Create an audit log entry for the mass expiration
+        db.collection('audit_logs').add({
+            'user_id': user_id,
+            'action': 'expire_tokens',
+            'tokens_expired': expired_count,
+            'reason': 'new_token_generated',
+            'timestamp': current_time,
+            'ip_address': request.remote_addr,
+            'user_agent': request.user_agent.string
+        })
 
 
 @app.route('/api/token/status', methods=['GET'])
@@ -1223,20 +1296,24 @@ def get_token_status():
 
 def generate_tokens(user_id: str) -> Dict[str, Any]:
     """
-    Enhanced token generation with improved storage and tracking
+    Enhanced token generation with improved storage and tracking.
+    Now includes automatic expiration of previous tokens.
     """
-    cleanup_expired_tokens()  # Clean up expired tokens before generating new one
 
+    # Check if user is eligible for a new token
     is_eligible, next_eligible_time, error_message = check_token_request_eligibility(
         user_id)
 
     if not is_eligible:
         raise AuthError(error_message, 429)
 
+    # Expire all previous active tokens before generating a new one
+    expire_previous_tokens(user_id)
+
     current_time = datetime.now(timezone.utc)
     token_exp = current_time + JWT_TOKEN_EXPIRATION
 
-    # Generate JWT with creation timestamp
+    # Generate new JWT with creation timestamp
     access_token = jwt.encode({
         'exp': token_exp,
         'iat': current_time,
@@ -1433,7 +1510,10 @@ def handle_internal_error(error):
 @login_required
 @csrf.csrf_protect
 def get_tokens():
-    """Generate a new JWT token for authenticated users with request limits"""
+    """
+    Generate a new JWT token for authenticated users with request limits.
+    Now includes automatic expiration of previous tokens.
+    """
     user_id = session.get('user_id')
     print(f"Attempting token generation for user: {user_id}")  # Debug log
 
@@ -1454,6 +1534,7 @@ def get_tokens():
         tokens = generate_tokens(user_id)
         print("Token generated successfully")  # Debug log
         return jsonify(tokens)
+
     except AuthError as e:
         print(f"AuthError occurred: {e.error}")  # Debug log
         return jsonify({

@@ -10,16 +10,19 @@ export default class ApiKeyManager {
         this.config = {
             endpoints: {
                 token: '/api/token',
-                status: '/api/token/status'
+                status: '/api/token/status',
+                cleanup: '/api/token/cleanup'
             },
             displayTimeout: 30000, // 30 seconds
             copyTimeout: 3000,     // 3 seconds
+            cooldownPeriod: 12 * 60 * 60 * 1000, // 12 hours in milliseconds
             messages: {
                 tokenExpiring: 'Your token will expire in {days} days',
                 tokenGenerated: 'New token generated successfully',
                 waitMessage: 'You can generate a new token in {time}',
                 tokenCreation: 'Token created on {date} at {time}',
-                noToken: 'No token generated'
+                noToken: 'No token generated',
+                dailyLimitReached: 'Daily token limit reached. Please try again tomorrow.'
             }
         };
 
@@ -27,7 +30,9 @@ export default class ApiKeyManager {
         this.state = {
             isVisible: false,
             isLoading: false,
-            tokenInfo: null
+            tokenInfo: null,
+            waitTimeInterval: null,
+            persistentAlerts: new Set()
         };
 
         // DOM elements - initialized in initialize()
@@ -37,7 +42,8 @@ export default class ApiKeyManager {
             copyButton: null,
             regenerateButton: null,
             tokenStatus: null,
-            alertContainer: null
+            alertContainer: null,
+            persistentAlertContainer: null
         };
 
         // Bind methods
@@ -45,8 +51,51 @@ export default class ApiKeyManager {
         this.handleCopy = this.handleCopy.bind(this);
         this.handleTokenGeneration = this.handleTokenGeneration.bind(this);
         this.updateTokenStatus = this.updateTokenStatus.bind(this);
+        this.startWaitTimeUpdater = this.startWaitTimeUpdater.bind(this);
+        this.stopWaitTimeUpdater = this.stopWaitTimeUpdater.bind(this);
+        this.lastCleanupCheck = null;
     }
 
+    /**
+    * Calculate the exact remaining cooldown time
+    */
+    calculateRemainingCooldown(nextTokenTime) {
+        const now = new Date();
+        const nextTime = new Date(nextTokenTime);
+        const timeDiff = nextTime - now;
+
+        // If time difference is negative or zero, cooldown has expired
+        if (timeDiff <= 0) {
+            return null;
+        }
+
+        // Calculate hours and minutes
+        const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+        const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+
+        return {
+            hours,
+            minutes,
+            totalMilliseconds: timeDiff
+        };
+    }
+
+    /**
+     * Format the cooldown time into a human-readable string
+     */
+    formatCooldownTime(cooldown) {
+        if (!cooldown) return '';
+
+        const parts = [];
+        if (cooldown.hours > 0) {
+            parts.push(`${cooldown.hours} ${cooldown.hours === 1 ? 'hour' : 'hours'}`);
+        }
+        if (cooldown.minutes > 0 || parts.length === 0) {
+            parts.push(`${cooldown.minutes} ${cooldown.minutes === 1 ? 'minute' : 'minutes'}`);
+        }
+
+        return parts.join(' and ');
+    }
     /**
      * Initialize the manager and set up necessary elements and listeners
      */
@@ -59,8 +108,7 @@ export default class ApiKeyManager {
             // Set up event listeners
             this.setupEventListeners();
 
-            // Get initial token status
-            await this.updateTokenStatus();
+            await this.performCleanupAndUpdate();
 
             // Start periodic status checks
             setInterval(() => this.updateTokenStatus(), 60000); // Check every minute
@@ -69,6 +117,51 @@ export default class ApiKeyManager {
         } catch (error) {
             console.error('Initialization failed:', error);
             this.showError('Failed to initialize API key management');
+        }
+    }
+
+    /**
+     * Perform token cleanup and status update in a single operation
+     * This ensures we always have fresh data after cleanup
+     */
+    async performCleanupAndUpdate() {
+        try {
+            // Prima esegui la pulizia dei token
+            await this.cleanupExpiredTokens();
+
+            // Poi aggiorna lo stato del token
+            await this.updateTokenStatus();
+        } catch (error) {
+            console.error('Cleanup and update failed:', error);
+        }
+    }
+
+    /**
+     * Clean up expired tokens by calling the backend endpoint
+     */
+    async cleanupExpiredTokens() {
+        try {
+            // Chiama l'endpoint di pulizia
+            const response = await ApiService.safeFetch(this.config.endpoints.cleanup, {
+                method: 'POST'
+            });
+
+            // Aggiorna il timestamp dell'ultimo controllo
+            this.lastCleanupCheck = new Date();
+
+            if (response.error) {
+                console.warn('Token cleanup warning:', response.error);
+                return;
+            }
+
+            // Se ci sono token scaduti che sono stati puliti, mostra una notifica
+            if (response.cleaned_tokens > 0) {
+                this.showInfo(`${response.cleaned_tokens} expired tokens have been cleaned up`);
+            }
+
+        } catch (error) {
+            console.error('Token cleanup failed:', error);
+            // Non mostriamo l'errore all'utente poiché questa è un'operazione in background
         }
     }
 
@@ -82,7 +175,8 @@ export default class ApiKeyManager {
             copyButton: document.querySelector('#copyApiKey'),
             regenerateButton: document.querySelector('#regenerateApiKey'),
             tokenStatus: document.querySelector('#tokenStatus'),
-            alertContainer: document.querySelector('#alertContainer')
+            alertContainer: document.querySelector('#alertContainer'),
+            persistentAlertContainer: document.querySelector('#persistentAlertContainer') // Nuovo elemento
         };
 
         // Validate all required elements exist
@@ -91,14 +185,56 @@ export default class ApiKeyManager {
                 throw new Error(`Required element not found: ${key}`);
             }
         }
+        // Crea il contenitore per gli avvisi permanenti se non esiste
+        if (!elements.persistentAlertContainer) {
+            elements.persistentAlertContainer = document.createElement('div');
+            elements.persistentAlertContainer.id = 'persistentAlertContainer';
+            elements.alertContainer.parentNode.insertBefore(
+                elements.persistentAlertContainer,
+                elements.alertContainer
+            );
+        }
 
+        // Validate all required elements exist
+        for (const [key, element] of Object.entries(elements)) {
+            if (!element) {
+                throw new Error(`Required element not found: ${key}`);
+            }
+        }
         this.elements = elements;
 
         // Set initial button states
         this.elements.toggleButton.disabled = true;
         this.elements.copyButton.disabled = true;
     }
+    /**
+     * Mostra un avviso permanente con un ID univoco
+     */
+    showPersistentAlert(message, type, id) {
+        // Rimuovi l'avviso esistente con lo stesso ID se presente
+        this.removePersistentAlert(id);
 
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} fade show`;
+        alertDiv.setAttribute('role', 'alert');
+        alertDiv.setAttribute('data-alert-id', id);
+
+        const messageText = document.createTextNode(message);
+        alertDiv.appendChild(messageText);
+
+        this.elements.persistentAlertContainer.appendChild(alertDiv);
+        this.state.persistentAlerts.add(id);
+    }
+    /**
+     * Rimuove un avviso permanente specifico
+     */
+    removePersistentAlert(id) {
+        const existingAlert = this.elements.persistentAlertContainer.querySelector(`[data-alert-id="${id}"]`);
+        if (existingAlert) {
+            existingAlert.remove();
+            this.state.persistentAlerts.delete(id);
+        }
+    }
     /**
      * Set up event listeners with proper cleanup
      */
@@ -124,6 +260,17 @@ export default class ApiKeyManager {
                 method: 'GET'
             });
 
+            // Se il token è scaduto, mostra un avviso permanente
+            if (data.token_status === 'expired') {
+                this.showPersistentAlert(
+                    'Your token has expired. Please generate a new one.',
+                    'warning',
+                    'token-expired'
+                );
+                this.setNoTokenState();
+                return;
+            }
+
             // Update UI based on token status
             if (data.has_active_token && data.token_info) {
                 this.updateUIWithToken(data.token_info);
@@ -137,7 +284,11 @@ export default class ApiKeyManager {
             if (!data.can_generate && data.next_eligible_time) {
                 const nextEligible = new Date(data.next_eligible_time);
                 const waitTime = this.formatTimeRemaining(nextEligible.getTime() - Date.now());
-                this.showInfo(this.config.messages.waitMessage.replace('{time}', waitTime));
+                this.showPersistentAlert(
+                    this.config.messages.waitMessage.replace('{time}', waitTime),
+                    'info',
+                    'cooldown-timer'
+                );
             }
 
         } catch (error) {
@@ -161,6 +312,10 @@ export default class ApiKeyManager {
                 method: 'POST'
             });
 
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
             if (!data.access_token) {
                 throw new Error('Invalid token response');
             }
@@ -183,7 +338,11 @@ export default class ApiKeyManager {
 
         } catch (error) {
             console.error('Token generation failed:', error);
-            this.showError(error.message);
+            if (error.message.includes('Daily limit')) {
+                this.showError(this.config.messages.dailyLimitReached);
+            } else {
+                this.showError(error.message);
+            }
             this.setNoTokenState();
         } finally {
             this.state.isLoading = false;
@@ -191,6 +350,71 @@ export default class ApiKeyManager {
         }
     }
 
+
+    /**
+     * Initialize wait time updater to show countdown until next token generation
+     */
+    /**
+    * Start wait time updater with proper cooldown handling
+    */
+    startWaitTimeUpdater() {
+        // Clear any existing interval
+        this.stopWaitTimeUpdater();
+
+        const nextTokenTime = localStorage.getItem('next_token_request');
+        if (!nextTokenTime) return;
+
+        // Update immediately
+        this.updateWaitTimeMessage(nextTokenTime);
+
+        // Set up interval to update the wait time message
+        this.state.waitTimeInterval = setInterval(() => {
+            this.updateWaitTimeMessage(nextTokenTime);
+        }, 60000); // Update every minute
+    }
+
+    /**
+     * Stop the wait time updater interval
+     */
+    stopWaitTimeUpdater() {
+        if (this.state.waitTimeInterval) {
+            clearInterval(this.state.waitTimeInterval);
+            this.state.waitTimeInterval = null;
+        }
+    }
+
+    /**
+     * Update the wait time message based on next eligible time
+     */
+    updateWaitTimeMessage(nextTokenTime) {
+        const cooldown = this.calculateRemainingCooldown(nextTokenTime);
+
+        if (!cooldown) {
+            // Cooldown period has expired
+            this.elements.regenerateButton.disabled = false;
+            this.removePersistentAlert('cooldown-timer');
+            this.elements.alertContainer.querySelectorAll('.alert-info').forEach(alert => alert.remove());
+            this.stopWaitTimeUpdater();
+            return;
+        }
+
+        // Show remaining cooldown time
+        const formattedTime = this.formatCooldownTime(cooldown);
+        this.showPersistentAlert(
+            this.config.messages.waitMessage.replace('{time}', formattedTime),
+            'info',
+            'cooldown-timer'
+        );
+        this.showInfo(this.config.messages.waitMessage.replace('{time}', formattedTime));
+
+        // If less than a minute remains, update more frequently
+        if (cooldown.totalMilliseconds < 60000) {
+            this.stopWaitTimeUpdater();
+            this.state.waitTimeInterval = setInterval(() => {
+                this.updateWaitTimeMessage(nextTokenTime);
+            }, 1000); // Update every second for the final countdown
+        }
+    }
 
     /**
      * Format a date string into a localized format
@@ -245,6 +469,15 @@ export default class ApiKeyManager {
         const createdAt = tokenInfo.created_at || tokenInfo.token_created_at;
         const { dateFormatted, timeFormatted } = this.formatDate(createdAt);
 
+        // Mostra la data di creazione come avviso permanente
+        this.showPersistentAlert(
+            this.config.messages.tokenCreation
+                .replace('{date}', dateFormatted)
+                .replace('{time}', timeFormatted),
+            'info',
+            'token-creation'
+        );
+
         this.elements.tokenStatus.textContent = this.config.messages.tokenCreation
             .replace('{date}', dateFormatted)
             .replace('{time}', timeFormatted);
@@ -259,6 +492,11 @@ export default class ApiKeyManager {
 
             if (daysLeft > 0) {
                 this.showInfo(this.config.messages.tokenExpiring.replace('{days}', daysLeft));
+                this.showPersistentAlert(
+                    this.config.messages.tokenExpiring.replace('{days}', daysLeft),
+                    'warning',
+                    'token-expiry'
+                );
             }
         }
     }
@@ -272,6 +510,10 @@ export default class ApiKeyManager {
         this.elements.toggleButton.disabled = true;
         this.elements.copyButton.disabled = true;
         this.state.tokenInfo = null;
+
+        // Rimuovi tutti gli avvisi permanenti relativi al token
+        this.removePersistentAlert('token-creation');
+        this.removePersistentAlert('token-expiry');
     }
 
     /**
