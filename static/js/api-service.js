@@ -103,7 +103,8 @@ class ApiServiceImpl {
     constructor() {
         this.config = {
             endpoints: {
-                token: '/api/token',                // For JWT access token generation
+                token: '/api/token',
+                tokenStatus: '/api/token/status',           // For JWT access token generation
                 csrfToken: '/api/csrf/token',       // For CSRF token
                 csrfNonce: '/api/csrf/nonce'        // For CSRF nonce
             },
@@ -185,14 +186,53 @@ class ApiServiceImpl {
         return { needsRefresh: false };
     }
 
+    // Aggiorniamo anche il metodo formatWaitTime per una migliore leggibilità
     formatWaitTime(milliseconds) {
         const hours = Math.floor(milliseconds / (1000 * 60 * 60));
         const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+
+        let formattedTime = '';
 
         if (hours > 0) {
-            return `${hours} ore e ${minutes} minuti`;
+            formattedTime += `${hours} ${hours === 1 ? 'ora' : 'ore'}`;
+            if (minutes > 0) formattedTime += ` e ${minutes} ${minutes === 1 ? 'minuto' : 'minuti'}`;
+        } else if (minutes > 0) {
+            formattedTime += `${minutes} ${minutes === 1 ? 'minuto' : 'minuti'}`;
+            if (seconds > 0) formattedTime += ` e ${seconds} ${seconds === 1 ? 'secondo' : 'secondi'}`;
+        } else {
+            formattedTime += `${seconds} ${seconds === 1 ? 'secondo' : 'secondi'}`;
         }
-        return `${minutes} minuti`;
+
+        return formattedTime;
+    }
+
+    // Aggiungiamo un metodo per aggiornare periodicamente il timer
+    startWaitTimeUpdater() {
+        // Fermiamo eventuali timer esistenti
+        if (this._waitTimeInterval) {
+            clearInterval(this._waitTimeInterval);
+        }
+
+        // Aggiorniamo il timer ogni secondo
+        this._waitTimeInterval = setInterval(() => {
+            const nextRequestStr = localStorage.getItem(this.apiService.config.NEXT_TOKEN_REQUEST_KEY);
+            if (nextRequestStr) {
+                const nextRequest = new Date(nextRequestStr);
+                const now = new Date();
+
+                if (now < nextRequest) {
+                    const waitTime = this.formatWaitTime(nextRequest.getTime() - now.getTime());
+                    this.showInfo(this.config.messages.WAIT_MESSAGE.replace('{time}', waitTime));
+                } else {
+                    // Se il tempo è scaduto, fermiamo l'intervallo e riabilitiamo il pulsante
+                    clearInterval(this._waitTimeInterval);
+                    this.elements.regenerateButton.disabled = false;
+                    const alerts = this.elements.container.querySelectorAll('.alert-info');
+                    alerts.forEach(alert => alert.remove());
+                }
+            }
+        }, 1000);
     }
 
     async handleTokenGeneration() {

@@ -25,6 +25,10 @@
             align-items: center;
             z-index: 1000;
         }
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
 
         .loading-spinner {
             color: white;
@@ -469,22 +473,25 @@
                                         Generate New Token
                                     </button>
                                 </div>
-                                <div id="tokenStatus"></div>
+                                <div id="tokenStatus" class="mt-2">
+                                    <small class="text-muted">Token creation time will appear here</small>
+                                </div>
                                 <small class="text-muted mt-2">
                                     Use this key to authenticate your API requests. Keep it secure and never share it.
                                 </small>
+                                
                             </div>
                         
                             <div id="alertContainer"></div>    
-                            <div class="mt-4">
-                                <h6>Quick Start Guide</h6>
-                                <pre class="bg-light p-3 rounded"><code>curl -H "X-API-Key: YOUR_API_KEY" \
-                         -X POST https://your-domain.com/api/token</code></pre>
-                                <small class="text-muted">
-                                    This will return a JWT token valid for 1 hour. Use this token in subsequent requests.
-                                </small>
+                                <div class="mt-4">
+                                    <h6>Quick Start Guide</h6>
+                                    <pre class="bg-light p-3 rounded"><code>curl -H "X-API-Key: YOUR_API_KEY" \
+                            -X POST https://your-domain.com/api/token</code></pre>
+                                    <small class="text-muted">
+                                        This will return a JWT token valid for 1 hour. Use this token in subsequent requests.
+                                    </small>
+                                </div>
                             </div>
-                        </div>
                     </div>
                     
                 </div>
