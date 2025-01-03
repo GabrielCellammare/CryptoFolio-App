@@ -85,7 +85,7 @@ function setupAddCryptoForm() {
             await ApiService.addCrypto(cryptoData);
             showSuccess('Cryptocurrency added successfully');
             // Instead of full page reload, fetch and update only the portfolio data
-            await updatePortfolioTable();
+            window.location.reload();
             // Reset form
             document.getElementById('addCryptoForm').reset();
             $('#crypto-select').val(null).trigger('change');

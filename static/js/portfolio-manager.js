@@ -61,7 +61,7 @@ function populateCryptoSelect(cryptos) {
         // Add null checks to prevent errors with malformed data
         if (crypto && crypto.id && crypto.name && crypto.symbol && crypto.current_price != null) {
             const option = new Option(
-                `${crypto.name} (${crypto.symbol}) - $${crypto.current_price.toFixed(2)}`,
+                `${crypto.name} (${crypto.symbol}) - $${crypto.current_price.toFixed(6)}`,
                 crypto.id
             );
             $(option).data('symbol', crypto.symbol);
@@ -74,7 +74,7 @@ function populateCryptoSelect(cryptos) {
     $('#crypto-select').on('select2:select', function (e) {
         const selectedCrypto = availableCryptos.find(c => c.id === e.params.data.id);
         if (selectedCrypto) {
-            document.getElementById('purchase-price').value = selectedCrypto.current_price.toFixed(2);
+            document.getElementById('purchase-price').value = selectedCrypto.current_price.toFixed(6);
         }
     });
 }
