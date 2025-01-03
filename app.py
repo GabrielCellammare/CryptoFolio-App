@@ -439,48 +439,37 @@ def index():
 @csrf.csrf_protect
 def dashboard():
     """
-    Renders the main dashboard view for authenticated users.
-    Retrieves and decrypts user's portfolio data, calculates current values and metrics.
-
-    Returns:
-        Response: Rendered dashboard.html template with:
-        - Portfolio data with current values and performance metrics
-        - Total portfolio value
-        - User's preferred currency
-        - CSRF tokens for security
-        - Last update timestamp
-        - Username for display
-
-    Security features:
-    - Requires authentication
-    - CSRF protection
-    - Decrypts portfolio data securely
-    - Handles security configuration errors
-    - Creates audit logs
-    - Secure error handling with fallback display
-    - Protects sensitive user data
-
-    Performance features:
-    - Uses cached cryptocurrency prices
-    - Efficient batch processing of portfolio items
-    - Handles invalid or corrupted data gracefully
+    Enhanced dashboard view that handles large datasets through pagination and chunking.
+    Implements connection retry logic and better error handling.
     """
-
     user_id = session['user_id']
     user_ref = db.collection('users').document(user_id)
     security_ref = db.collection('user_security').document(user_id)
 
+    # Pagination parameters
+    PAGE_SIZE = 50  # Number of items per chunk
+    page = request.args.get('page', 1, type=int)
+
     try:
-        user_data = user_ref.get().to_dict()
-        security_data = security_ref.get().to_dict()
+        # Fetch user and security data with retry logic
+        max_retries = 3
+        retry_count = 0
+
+        while retry_count < max_retries:
+            try:
+                user_data = user_ref.get().to_dict()
+                security_data = security_ref.get().to_dict()
+                break
+            except Exception as e:
+                retry_count += 1
+                if retry_count == max_retries:
+                    raise e
+                time.sleep(1)  # Wait before retrying
 
         if not security_data or 'salt' not in security_data:
             flash('Security configuration error. Please contact support.', 'error')
-            # Genera token e nonce per il template
-
             return render_template('dashboard.html',
                                    portfolio=[],
-                                   environment="development",
                                    total_value=0,
                                    currency='USD',
                                    last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -490,11 +479,22 @@ def dashboard():
         currency = user_data.get('preferred_currency', 'USD')
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        portfolio_ref = db.collection('users').document(
-            user_id).collection('portfolio')
+        # Calculate total documents for pagination
+        total_docs = len(list(db.collection('users').document(user_id)
+                              .collection('portfolio').stream()))
+        total_pages = (total_docs + PAGE_SIZE - 1) // PAGE_SIZE
+
+        # Fetch paginated portfolio data
+        portfolio_ref = (db.collection('users').document(user_id)
+                         .collection('portfolio')
+                         .offset((page - 1) * PAGE_SIZE)
+                         .limit(PAGE_SIZE))
+
         portfolio = []
         total_value = 0
+        crypto_ids = set()
 
+        # First pass: collect all crypto IDs
         for doc in portfolio_ref.stream():
             try:
                 encrypted_item = doc.to_dict()
@@ -502,66 +502,57 @@ def dashboard():
                     continue
 
                 encrypted_item['id'] = doc.id
-
-                # Decrypt portfolio item with enhanced error handling
                 item = portfolio_encryption.decrypt_portfolio_item(
                     encrypted_item, user_id, salt)
 
-                # Verify essential data after decryption
-                if not item or not item.get('crypto_id'):
-                    print(f"Invalid portfolio item data for {doc.id}")
-                    continue
-
-                # Get current price with error handling
-                try:
-                    crypto_prices = crypto_cache.get_crypto_prices(
-                        [item['crypto_id']], currency)
-
-                    current_price = (crypto_prices.get(item['crypto_id'], {})
-                                     .get(currency.lower(), 0)
-                                     if isinstance(crypto_prices, dict)
-                                     else 0)
-                except Exception as price_error:
-                    print(f"Error fetching price for {
-                          item['crypto_id']}: {price_error}")
-                    current_price = 0
-
-                # Calculate metrics with validated data
-                metrics = calculate_portfolio_metrics(
-                    item, current_price, currency)
-
-                item.update(metrics)
-                total_value += metrics['current_value']
-                portfolio.append(item)
-
+                if item and item.get('crypto_id'):
+                    crypto_ids.add(item['crypto_id'])
+                    portfolio.append((doc.id, encrypted_item, item))
             except Exception as item_error:
                 print(f"Error processing portfolio item {
                       doc.id}: {item_error}")
-                db.collection('error_logs').add({
-                    'error_type': 'portfolio_processing_error',
-                    'item_id': doc.id,
-                    'user_id': user_id,
-                    'error_message': str(item_error),
-                    'timestamp': firestore.SERVER_TIMESTAMP
-                })
+                continue
+
+        # Batch fetch crypto prices
+        try:
+            crypto_prices = crypto_cache.get_crypto_prices(
+                list(crypto_ids), currency)
+        except Exception as price_error:
+            print(f"Error fetching crypto prices: {price_error}")
+            crypto_prices = {}
+
+        # Second pass: process items with prices
+        processed_portfolio = []
+        for doc_id, encrypted_item, item in portfolio:
+            try:
+                current_price = (crypto_prices.get(item['crypto_id'], {})
+                                 .get(currency.lower(), 0))
+
+                metrics = calculate_portfolio_metrics(
+                    item, current_price, currency)
+                item.update(metrics)
+                total_value += metrics['current_value']
+                processed_portfolio.append(item)
+
+            except Exception as process_error:
+                print(f"Error calculating metrics for {
+                      doc_id}: {process_error}")
                 continue
 
         return render_template('dashboard.html',
-                               portfolio=portfolio,
+                               portfolio=processed_portfolio,
                                total_value=total_value,
-                               environment="development",
                                currency=currency,
+                               current_page=page,
+                               total_pages=total_pages,
                                last_update=current_time,
                                username=user_data.get('username'))
 
     except Exception as e:
-        print(f"Dashboard error: {e}")
-        db.collection('error_logs').add({
-            'error_type': 'dashboard_error',
-            'user_id': session.get('user_id'),
-            'error_message': str(e),
-            'timestamp': firestore.SERVER_TIMESTAMP
-        })
+        error_id = log_error('dashboard_error', user_id, str(e))
+        flash(f'An error occurred loading the dashboard. Reference: {
+              error_id}', 'error')
+
         return render_template('dashboard.html',
                                portfolio=[],
                                total_value=0,
