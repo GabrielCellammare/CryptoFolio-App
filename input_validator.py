@@ -55,7 +55,7 @@ class InputValidator:
         'portfolio_add': {
             'crypto_id': ValidationRule(type=InputType.CRYPTO_ID, pattern=PATTERNS['crypto_id']),
             'symbol': ValidationRule(min_length=1, max_length=10),
-            'amount': ValidationRule(type=InputType.NUMBER, min_value=1),
+            'amount': ValidationRule(type=InputType.NUMBER, min_value=0.0000001),
             'purchase_price': ValidationRule(type=InputType.NUMBER, min_value=0),
             'purchase_date': ValidationRule(type=InputType.DATE)
         },
@@ -69,7 +69,7 @@ class InputValidator:
                                        allowed_values=['USD', 'EUR'])
         },
         'portfolio_update': {
-            'amount': ValidationRule(type=InputType.NUMBER, min_value=0),
+            'amount': ValidationRule(type=InputType.NUMBER, min_value=0.0000001),
             'purchase_price': ValidationRule(type=InputType.NUMBER, min_value=0),
             'purchase_date': ValidationRule(type=InputType.DATE)
         }

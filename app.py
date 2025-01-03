@@ -14,9 +14,10 @@ Main features:
 - Error handling and logging
 """
 
+from difflib import restore
 from typing import Dict, Any, Optional, Tuple
 import time
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, after_this_request, jsonify, request, session
 import base64
 from flask import Blueprint, make_response, render_template, request, jsonify, session, redirect, url_for, flash
 from firebase_admin import firestore
@@ -33,8 +34,10 @@ from init_app import configure_oauth, create_app
 from input_validator import InputValidator, ValidationError
 from portfolio_encryption import PortfolioEncryption
 from portfolio_utils import calculate_portfolio_metrics
+from rate_limiter import FirebaseRateLimiter
 from secure_bye_array import SecureByteArray
 from security import CSRFProtection
+import redis
 
 
 # Application initialization
@@ -42,7 +45,6 @@ from security import CSRFProtection
 
 # First, load environment variables before any initialization
 load_dotenv()
-
 
 # Create the Flask application
 app = create_app()
@@ -56,9 +58,75 @@ portfolio_encryption = PortfolioEncryption(cipher)
 
 # Initialize OAuth after app creation
 oauth = configure_oauth(app)
-
 # Middleware
 # Register the CORS headers handler - this will be called automatically after each request
+
+
+def rate_limit_decorator(f):
+    """Decorator per applicare il rate limiting alle route"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id') or getattr(request, 'user_id', None)
+        if not user_id:
+            return jsonify({'status': 'error', 'message': 'Authentication required'}), 401
+
+        # Inizializza il rate limiter con l'istanza esistente di Firestore
+        rate_limiter = FirebaseRateLimiter(db)
+        is_allowed, remaining, retry_after = rate_limiter.check_rate_limit(
+            user_id)
+
+        if not is_allowed:
+            response = jsonify({
+                'status': 'error',
+                'message': 'Rate limit exceeded',
+                'retry_after': retry_after
+            })
+            response.headers['X-RateLimit-Remaining'] = str(remaining)
+            response.headers['X-RateLimit-Reset'] = str(retry_after)
+            response.status_code = 429
+            return response
+
+        # Esegui la funzione originale
+        response = f(*args, **kwargs)
+
+        # Aggiungi gli header del rate limit alla risposta
+        if isinstance(response, tuple):
+            response_obj, status_code = response
+        else:
+            response_obj, status_code = response, 200
+
+        if isinstance(response_obj, dict):
+            response_obj = jsonify(response_obj)
+
+        response_obj.headers['X-RateLimit-Remaining'] = str(remaining)
+        return response_obj, status_code
+
+    return decorated_function
+
+# Fixed error logging function
+
+
+def log_error(error_type: str, user_id: Optional[str], error_message: str) -> str:
+    """
+    Safely log errors to Firestore
+
+    Returns:
+        str: The error reference ID
+    """
+    try:
+        error_ref = db.collection('error_logs').document()
+        error_ref.set({
+            'error_type': error_type,
+            'user_id': user_id,
+            'error_message': str(error_message),
+            'timestamp': restore.SERVER_TIMESTAMP,
+            'request_path': request.path,
+            'request_method': request.method
+        })
+        return error_ref.id
+    except Exception as e:
+        app.logger.error(f"Failed to log error: {str(e)}")
+        return "ERROR_LOG_FAILED"
 
 
 @app.after_request
@@ -533,6 +601,7 @@ def get_cryptocurrencies():
 @app.route('/api/portfolio/add', methods=['POST'])
 @login_required
 @csrf.csrf_protect
+@rate_limit_decorator
 def add_portfolio():
     """
     Adds a new portfolio item with encrypted data storage.
@@ -578,10 +647,6 @@ def add_portfolio():
         user_id = session.get('user_id')
         if not user_id:
             return jsonify({'status': 'error', 'message': 'Authentication required'}), 401
-
-        # 2. Rate Limiting Check
-        if not check_rate_limit(user_id):
-            return jsonify({'status': 'error', 'message': 'Rate limit exceeded'}), 429
 
         # 3. Security Context Validation
         security_ref = db.collection('user_security').document(user_id)
@@ -1144,12 +1209,11 @@ JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
 JWT_TOKEN_EXPIRATION = timedelta(days=7)
 JWT_REQUEST_COOLDOWN = timedelta(hours=12)
 MAX_DAILY_TOKENS = 2
-portfolio_api = Blueprint('portfolio_api', __name__)
-
 # Rate limiting configuration
 RATE_LIMIT_REQUESTS = 100
 RATE_LIMIT_WINDOW = 3600  # 1 hour in seconds
-rate_limit_store: Dict[str, Dict[str, Any]] = {}
+
+portfolio_api = Blueprint('portfolio_api', __name__)
 
 
 class AuthError(Exception):
@@ -1415,44 +1479,6 @@ def get_token_creation_time(token: str) -> Optional[datetime]:
         return None
 
 
-def check_rate_limit(user_id: str) -> bool:
-    """
-    Check if user has exceeded rate limit
-
-    Args:
-        user_id: The user's unique identifier
-
-    Returns:
-        Boolean indicating if rate limit is exceeded
-    """
-    current_time = time.time()
-
-    if user_id not in rate_limit_store:
-        rate_limit_store[user_id] = {
-            'requests': 1,
-            'window_start': current_time
-        }
-        return True
-
-    user_limits = rate_limit_store[user_id]
-
-    # Reset if window has expired
-    if current_time - user_limits['window_start'] > RATE_LIMIT_WINDOW:
-        rate_limit_store[user_id] = {
-            'requests': 1,
-            'window_start': current_time
-        }
-        return True
-
-    # Check if limit exceeded
-    if user_limits['requests'] >= RATE_LIMIT_REQUESTS:
-        return False
-
-    # Increment request count
-    user_limits['requests'] += 1
-    return True
-
-
 def jwt_required(f):
     """Enhanced decorator to verify JWT tokens with Firebase check"""
     @wraps(f)
@@ -1494,10 +1520,6 @@ def jwt_required(f):
                 doc_ref.update({'status': 'expired'})
                 raise AuthError('Token expired', 401)
 
-            # Check rate limit
-            if not check_rate_limit(user_id):
-                raise AuthError('Rate limit exceeded', 429)
-
             # Add user_id to request
             request.user_id = user_id
 
@@ -1535,12 +1557,6 @@ def handle_auth_error(error):
 def handle_bad_request(error):
     """Handle bad request errors"""
     return jsonify({'error': 'Bad request', 'message': str(error)}), 400
-
-
-@portfolio_api.errorhandler(429)
-def handle_rate_limit(error):
-    """Handle rate limit errors"""
-    return jsonify({'error': 'Rate limit exceeded'}), 429
 
 
 @portfolio_api.errorhandler(500)
@@ -1726,6 +1742,7 @@ def get_portfolio():
 
 @portfolio_api.route('/portfolio', methods=['POST'])
 @jwt_required
+@rate_limit_decorator
 def add_crypto():
     """
     Adds a new encrypted portfolio item.
