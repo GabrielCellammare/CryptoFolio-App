@@ -30,6 +30,7 @@ from cryptocache import CryptoCache
 import os
 
 from init_app import configure_oauth, create_app
+from input_validator import InputValidator, ValidationError
 from portfolio_encryption import PortfolioEncryption
 from portfolio_utils import calculate_portfolio_metrics
 from secure_bye_array import SecureByteArray
@@ -558,72 +559,120 @@ def add_portfolio():
     """
     secure_salt = None
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+        # 1. Input Validation
+        try:
+            data = request.get_json()
+            validated_data = InputValidator.validate_portfolio_add(data)
+        except ValidationError as e:
+            return jsonify({
+                'status': 'error',
+                'field': e.field,
+                'message': e.message
+            }), 400
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid request data'
+            }), 400
 
-        required_fields = ['crypto_id', 'symbol',
-                           'amount', 'purchase_price', 'purchase_date']
-        if not all(field in data for field in required_fields):
-            return jsonify({'status': 'error', 'message': 'Missing required fields'}), 400
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'status': 'error', 'message': 'Authentication required'}), 401
 
-        user_id = session['user_id']
+        # 2. Rate Limiting Check
+        if not check_rate_limit(user_id):
+            return jsonify({'status': 'error', 'message': 'Rate limit exceeded'}), 429
 
-        # Retrieve the user's salt from security collection
+        # 3. Security Context Validation
         security_ref = db.collection('user_security').document(user_id)
         security_data = security_ref.get()
 
         if not security_data.exists:
-            return jsonify({'status': 'error', 'message': 'Security credentials not found'}), 400
+            return jsonify({'status': 'error', 'message': 'Security configuration error'}), 400
 
-        # Convert stored base64 salt back to SecureByteArray
-        encoded_salt = security_data.to_dict()['salt']
-        secure_salt = SecureByteArray(base64.b64decode(encoded_salt))
+        # 4. Secure Salt Handling
+        try:
+            encoded_salt = security_data.to_dict()['salt']
+            secure_salt = SecureByteArray(base64.b64decode(encoded_salt))
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': 'Security initialization failed'}), 500
 
-        # Encrypt sensitive data using portfolio encryption handler
-        encrypted_data = portfolio_encryption.encrypt_portfolio_item(
-            data,
-            user_id,
-            secure_salt
-        )
+        # 5. Transaction-based Data Storage
+        transaction = db.transaction()
 
-        # Store encrypted portfolio item
-        portfolio_ref = db.collection('users').document(
-            user_id).collection('portfolio')
-        new_doc = portfolio_ref.add({
-            'crypto_id': encrypted_data['crypto_id'],
-            'symbol': encrypted_data['symbol'].upper(),
-            'amount': encrypted_data['amount'],
-            'purchase_price': encrypted_data['purchase_price'],
-            'purchase_date': encrypted_data['purchase_date'],
-            'created_at': firestore.SERVER_TIMESTAMP
-        })
+        @firestore.transactional
+        def create_portfolio_item(transaction, validated_data, user_id, secure_salt):
+            # Encrypt portfolio data
+            encrypted_data = portfolio_encryption.encrypt_portfolio_item(
+                validated_data,
+                user_id,
+                secure_salt
+            )
 
-        # Create audit log for the addition
-        audit_ref = db.collection('audit_logs').add({
-            'user_id': user_id,
-            'action': 'add_portfolio',
-            'document_id': new_doc[1].id,
-            'timestamp': firestore.SERVER_TIMESTAMP,
-            'ip_address': request.remote_addr,
-            'user_agent': request.user_agent.string
-        })
+            # Create portfolio document
+            portfolio_ref = db.collection('users').document(
+                user_id).collection('portfolio').document()
+
+            # Store encrypted data
+            transaction.set(portfolio_ref, {
+                'crypto_id': encrypted_data['crypto_id'],
+                'symbol': encrypted_data['symbol'].upper(),
+                'amount': encrypted_data['amount'],
+                'purchase_price': encrypted_data['purchase_price'],
+                'purchase_date': encrypted_data['purchase_date'],
+                'created_at': firestore.SERVER_TIMESTAMP,
+                'version': 1  # For future schema migrations
+            })
+
+            # Create audit log
+            audit_ref = db.collection('audit_logs').document()
+            transaction.set(audit_ref, {
+                'user_id': user_id,
+                'action': 'add_portfolio',
+                'document_id': portfolio_ref.id,
+                'timestamp': firestore.SERVER_TIMESTAMP,
+                'ip_address': request.remote_addr,
+                'user_agent': request.user_agent.string,
+                'metadata': {
+                    'crypto_id': validated_data['crypto_id'],
+                    'symbol': validated_data['symbol']
+                }
+            })
+
+            return portfolio_ref.id
+
+        # Execute transaction
+        try:
+            doc_id = create_portfolio_item(
+                transaction, validated_data, user_id, secure_salt)
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to create portfolio item'
+            }), 500
 
         return jsonify({
             'status': 'success',
-            'message': 'Cryptocurrency added successfully',
-            'document_id': new_doc[1].id
+            'message': 'Portfolio item added successfully',
+            'document_id': doc_id
         }), 201
 
     except Exception as e:
-        # Log the error securely without exposing sensitive details
-        error_ref = db.collection('error_logs').add({
+        # Secure error logging
+        error_id = db.collection('error_logs').add({
             'error_type': 'portfolio_addition_error',
             'user_id': session.get('user_id'),
             'error_message': str(e),
-            'timestamp': firestore.SERVER_TIMESTAMP
-        })
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'request_path': request.path,
+            'request_method': request.method
+        }).id
+
+        return jsonify({
+            'status': 'error',
+            'message': 'An unexpected error occurred',
+            'error_reference': error_id
+        }), 500
 
     finally:
         # Clean up secure objects
@@ -660,10 +709,17 @@ def update_portfolio(doc_id):
     """
     secure_salt = None
     try:
+        # Get and validate the input data
         data = request.get_json()
-        required_fields = ['amount', 'purchase_price', 'purchase_date']
-        if not all(field in data for field in required_fields):
-            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Validate the input data using our InputValidator
+        try:
+            validated_data = InputValidator.validate_request_data(
+                data,
+                InputValidator.COMMON_RULES['portfolio_update']
+            )
+        except ValidationError as ve:
+            return jsonify({'error': f'Validation error: {ve.field} - {ve.message}'}), 400
 
         user_id = session['user_id']
 
@@ -686,16 +742,9 @@ def update_portfolio(doc_id):
         if not portfolio_doc.exists:
             return jsonify({'error': 'Portfolio item not found'}), 404
 
-        # Create update data with only the fields that should be updated
-        update_data = {
-            'amount': data['amount'],
-            'purchase_price': data['purchase_price'],
-            'purchase_date': data['purchase_date']
-        }
-
-        # Encrypt the update data using portfolio encryption handler
+        # Use the validated data for the update
         encrypted_update = portfolio_encryption.encrypt_portfolio_item(
-            update_data,
+            validated_data,
             user_id,
             secure_salt
         )
@@ -936,13 +985,18 @@ def update_currency_preference():
     """
     try:
         data = request.get_json()
-        currency = data.get('currency', 'USD').upper()
 
-        if currency not in ['USD', 'EUR']:
-            return jsonify({'error': 'Invalid currency'}), 400
+        # Validate the input data using our InputValidator
+        try:
+            validated_data = InputValidator.validate_request_data(
+                data,
+                InputValidator.COMMON_RULES['currency_preference']
+            )
+        except ValidationError as ve:
+            return jsonify({'error': f'Validation error: {ve.field} - {ve.message}'}), 400
 
         user_ref = db.collection('users').document(session['user_id'])
-        user_ref.update({'preferred_currency': currency})
+        user_ref.update({'preferred_currency': validated_data['currency']})
 
         return jsonify({'message': 'Currency preference updated successfully'})
     except Exception as e:
@@ -1702,93 +1756,101 @@ def add_crypto():
     secure_salt = None
     try:
         data = request.get_json()
-        user_id = request.user_id
-
-        # Validate required fields
-        required_fields = ['crypto_id', 'symbol',
-                           'amount', 'purchase_price', 'purchase_date']
-        if not all(field in data for field in required_fields):
-            return jsonify({
-                'status': 'error',
-                'message': 'Missing required fields'
-            }), 400
-
-        # Validate numeric fields
         try:
-            amount = float(data['amount'])
-            purchase_price = float(data['purchase_price'])
-        except ValueError:
+            validated_data = InputValidator.validate_portfolio_add(data)
+            user_id = request.user_id
+
+            # Validate required fields
+            required_fields = ['crypto_id', 'symbol',
+                               'amount', 'purchase_price', 'purchase_date']
+            if not all(field in data for field in required_fields):
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Missing required fields'
+                }), 400
+
+            # Validate numeric fields
+            try:
+                amount = float(data['amount'])
+                purchase_price = float(data['purchase_price'])
+            except ValueError:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Invalid numeric values'
+                }), 400
+
+            # Retrieve user's security data and salt
+            security_ref = db.collection('user_security').document(user_id)
+            security_data = security_ref.get()
+
+            if not security_data.exists:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Security credentials not found'
+                }), 400
+
+            # Convert stored base64 salt to SecureByteArray
+            encoded_salt = security_data.to_dict()['salt']
+            secure_salt = SecureByteArray(base64.b64decode(encoded_salt))
+
+            # Encrypt portfolio data
+            encrypted_data = portfolio_encryption.encrypt_portfolio_item(
+                data,
+                user_id,
+                secure_salt
+            )
+
+            # Store encrypted portfolio item
+            portfolio_ref = db.collection('users').document(
+                user_id).collection('portfolio')
+            new_doc = portfolio_ref.add({
+                'crypto_id': encrypted_data['crypto_id'],
+                'symbol': encrypted_data['symbol'].upper(),
+                'amount': encrypted_data['amount'],
+                'purchase_price': encrypted_data['purchase_price'],
+                'purchase_date': encrypted_data['purchase_date'],
+                'created_at': firestore.SERVER_TIMESTAMP
+            })
+
+            # Create audit log
+            db.collection('audit_logs').add({
+                'user_id': user_id,
+                'action': 'add_portfolio_api',
+                'document_id': new_doc[1].id,
+                'timestamp': firestore.SERVER_TIMESTAMP,
+                'ip_address': request.remote_addr,
+                'user_agent': request.user_agent.string
+            })
+
+            return jsonify({
+                'status': 'success',
+                'message': 'Cryptocurrency added successfully',
+                'document_id': new_doc[1].id
+            }), 201
+
+        except Exception as e:
+            # Log error details securely
+            db.collection('error_logs').add({
+                'error_type': 'portfolio_add_error',
+                'user_id': request.user_id,
+                'error_message': str(e),
+                'timestamp': firestore.SERVER_TIMESTAMP
+            })
             return jsonify({
                 'status': 'error',
-                'message': 'Invalid numeric values'
-            }), 400
+                'message': 'Failed to add portfolio item'
+            }), 500
 
-        # Retrieve user's security data and salt
-        security_ref = db.collection('user_security').document(user_id)
-        security_data = security_ref.get()
+        finally:
+            # Clean up secure objects
+            if secure_salt is not None:
+                secure_salt.secure_zero()
 
-        if not security_data.exists:
-            return jsonify({
-                'status': 'error',
-                'message': 'Security credentials not found'
-            }), 400
-
-        # Convert stored base64 salt to SecureByteArray
-        encoded_salt = security_data.to_dict()['salt']
-        secure_salt = SecureByteArray(base64.b64decode(encoded_salt))
-
-        # Encrypt portfolio data
-        encrypted_data = portfolio_encryption.encrypt_portfolio_item(
-            data,
-            user_id,
-            secure_salt
-        )
-
-        # Store encrypted portfolio item
-        portfolio_ref = db.collection('users').document(
-            user_id).collection('portfolio')
-        new_doc = portfolio_ref.add({
-            'crypto_id': encrypted_data['crypto_id'],
-            'symbol': encrypted_data['symbol'].upper(),
-            'amount': encrypted_data['amount'],
-            'purchase_price': encrypted_data['purchase_price'],
-            'purchase_date': encrypted_data['purchase_date'],
-            'created_at': firestore.SERVER_TIMESTAMP
-        })
-
-        # Create audit log
-        db.collection('audit_logs').add({
-            'user_id': user_id,
-            'action': 'add_portfolio_api',
-            'document_id': new_doc[1].id,
-            'timestamp': firestore.SERVER_TIMESTAMP,
-            'ip_address': request.remote_addr,
-            'user_agent': request.user_agent.string
-        })
-
-        return jsonify({
-            'status': 'success',
-            'message': 'Cryptocurrency added successfully',
-            'document_id': new_doc[1].id
-        }), 201
-
-    except Exception as e:
-        # Log error details securely
-        db.collection('error_logs').add({
-            'error_type': 'portfolio_add_error',
-            'user_id': request.user_id,
-            'error_message': str(e),
-            'timestamp': firestore.SERVER_TIMESTAMP
-        })
+    except ValidationError as e:
         return jsonify({
             'status': 'error',
-            'message': 'Failed to add portfolio item'
-        }), 500
-
-    finally:
-        # Clean up secure objects
-        if secure_salt is not None:
-            secure_salt.secure_zero()
+            'message': f'Validation error: {e.field} - {e.message}'
+        }), 400
 
 
 app.register_blueprint(portfolio_api, url_prefix='/api/v1')  # Add this line
