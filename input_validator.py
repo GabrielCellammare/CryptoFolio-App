@@ -126,9 +126,8 @@ class InputValidator:
             try:
                 if isinstance(value, str):
                     value = datetime.strptime(value, '%Y-%m-%d')
-                else:
                     parsed_date = value
-                # New validation check
+                    # New validation check
                 if parsed_date < cls.MIN_ALLOWED_DATE:
                     raise ValidationError(
                         "input",

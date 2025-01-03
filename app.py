@@ -1139,7 +1139,6 @@ Features:
 - Input validation
 """
 
-
 # Configuration
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
 JWT_TOKEN_EXPIRATION = timedelta(days=7)
