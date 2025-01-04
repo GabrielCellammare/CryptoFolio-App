@@ -1,383 +1,448 @@
-// portfolio-charts.js
+/**
+ * @fileoverview Portfolio visualization and management module
+ * This module handles the visualization and interaction with portfolio data
+ * using Chart.js library. It implements secure data handling practices and
+ * follows modern JavaScript patterns.
+ * 
+ * @requires chart.js
+ * @module PortfolioCharts
+ */
+
 import { formatCurrency } from "./utils.js";
-/**
- * Initializes the portfolio chart with current portfolio data
- * Uses the portfolio data already available in the DOM to avoid additional API calls
- */
-// Store the chart instance globally so we can access it for cleanup
-let currentChart = null;
 
-/**
- * Initializes the portfolio chart with current portfolio data
- */
+// IIFE to avoid polluting global namespace
+const PortfolioCharts = (function () {
+    'use strict';
 
-function initializePortfolioChart() {
-    const chartContainer = document.createElement('div');
-    chartContainer.className = 'card mb-4';
-    chartContainer.innerHTML = `
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">Portfolio Distribution</h5>
-            <div class="btn-group">
-                <button class="btn btn-sm btn-outline-secondary" id="pieView">Distribution</button>
-                <button class="btn btn-sm btn-outline-secondary active" id="barView">Holdings</button>
+    // Private state
+    const state = {
+        chart: null,
+        config: {
+            colors: {
+                positive: {
+                    background: 'rgba(40, 167, 69, 0.5)',
+                    border: 'rgb(40, 167, 69)'
+                },
+                negative: {
+                    background: 'rgba(220, 53, 69, 0.5)',
+                    border: 'rgb(220, 53, 69)'
+                }
+            },
+            chartStyles: [
+                'rgba(255, 99, 132, 0.5)',
+                'rgba(54, 162, 235, 0.5)',
+                'rgba(255, 206, 86, 0.5)',
+                'rgba(75, 192, 192, 0.5)',
+                'rgba(153, 102, 255, 0.5)'
+            ]
+        }
+    };
+
+    /**
+     * Sanitizes string input to prevent XSS attacks
+     * @param {string} str - Input string to sanitize
+     * @returns {string} Sanitized string
+     * @private
+     */
+    const sanitizeHTML = (str) => {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    };
+
+    /**
+     * Safely parses numeric values
+     * @param {string} value - Value to parse
+     * @returns {number} Parsed number or 0 if invalid
+     * @private
+     */
+    const safeParseFloat = (value) => {
+        const parsed = parseFloat(value.replace(/[^0-9.-]+/g, ''));
+        return isFinite(parsed) ? parsed : 0;
+    };
+
+    /**
+     * Creates chart container with secure HTML
+     * @returns {HTMLElement} Chart container element
+     * @private
+     */
+    const createChartContainer = () => {
+        const container = document.createElement('div');
+        container.className = 'card mb-4';
+        container.innerHTML = `
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">${sanitizeHTML('Portfolio Distribution')}</h5>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary" id="pieView">Distribution</button>
+                    <button class="btn btn-sm btn-outline-secondary active" id="barView">Holdings</button>
+                </div>
             </div>
-        </div>
-        <div class="card-body">
-            <canvas id="portfolioChart" style="height: 300px;"></canvas>
-        </div>
-    `;
+            <div class="card-body">
+                <canvas id="portfolioChart" style="height: 300px;"></canvas>
+            </div>
+        `;
+        return container;
+    };
 
-    const portfolioTable = document.querySelector('#portfolioTable');
-    portfolioTable.parentNode.insertBefore(chartContainer, portfolioTable);
+    /**
+     * Extracts and validates portfolio data from DOM
+     * @returns {Array<Object>} Validated portfolio data
+     * @private
+     */
+    const extractPortfolioData = () => {
+        const rows = document.querySelectorAll('#portfolioTable tbody tr');
+        return Array.from(rows).map(row => {
+            const profitLossText = row.querySelector('.profit-loss')?.textContent || '0';
+            return {
+                name: sanitizeHTML(row.querySelector('.crypto-name')?.textContent?.trim() || ''),
+                amount: safeParseFloat(row.querySelector('td:nth-child(2) .display-value')?.textContent || '0'),
+                currentValue: safeParseFloat(row.querySelector('.current-value')?.textContent || '0'),
+                profitLoss: safeParseFloat(profitLossText.split('(')[0] || '0')
+            };
+        });
+    };
 
-    const portfolioData = extractPortfolioData();
-    const ctx = document.getElementById('portfolioChart').getContext('2d');
-    currentChart = new Chart(ctx, createBarChartConfig(portfolioData));
+    /**
+     * Creates secure bar chart configuration
+     * @param {Array<Object>} data - Portfolio data
+     * @returns {Object} Chart.js configuration object
+     * @private
+     */
+    const createBarChartConfig = (data) => {
+        const currency = document.getElementById('currencySelect')?.value || 'USD';
+        const maxAbsValue = Math.max(...data.map(item => Math.abs(item.profitLoss)));
 
-    document.getElementById('pieView').addEventListener('click', () => {
-        switchChartType('pie', portfolioData);
-        toggleActiveButton('pieView');
-    });
-
-    document.getElementById('barView').addEventListener('click', () => {
-        switchChartType('bar', portfolioData);
-        toggleActiveButton('barView');
-    });
-
-    return currentChart;
-}
-
-/**
- * Safely switches between chart types
- * @param {string} type - 'pie' or 'bar'
- * @param {Array} data - Portfolio data
- */
-function switchChartType(type, data) {
-    const ctx = document.getElementById('portfolioChart').getContext('2d');
-    if (currentChart) {
-        currentChart.destroy();
-    }
-    const config = type === 'pie' ? createPieChartConfig(data) : createBarChartConfig(data);
-    currentChart = new Chart(ctx, config);
-}
-/**
- * Extracts portfolio data from the existing table in the DOM
- * This avoids making additional API calls since the data is already available
- */
-/**
- * Extracts portfolio data from the existing table in the DOM
- */
-function extractPortfolioData() {
-    const rows = document.querySelectorAll('#portfolioTable tbody tr');
-    const data = [];
-
-    rows.forEach(row => {
-        const profitLossText = row.querySelector('.profit-loss').textContent;
-        const profitLossValue = parseFloat(profitLossText.split('(')[0].trim().replace(/[^0-9.-]+/g, ''));
-
-        const item = {
-            name: row.querySelector('.crypto-name').textContent.trim(),
-            amount: parseFloat(row.querySelector('td:nth-child(2) .display-value').textContent),
-            currentValue: parseFloat(row.querySelector('.current-value').textContent.replace(/[^0-9.-]+/g, '')),
-            profitLoss: profitLossValue
-        };
-        data.push(item);
-    });
-
-    return data;
-}
-
-//*Creates configuration for bar chart visualization*/
-function createBarChartConfig(data) {
-    const currency = document.getElementById('currencySelect').value;
-
-    // Calculate the maximum absolute value for setting scale
-    const maxAbsValue = Math.max(...data.map(item => Math.abs(item.profitLoss)));
-
-    return {
-        type: 'bar',
-        data: {
-            labels: data.map(item => item.name),
-            datasets: [{
-                label: 'Profit/Loss',
-                data: data.map(item => item.profitLoss), // Use profit/loss instead of current value
-                backgroundColor: data.map(item =>
-                    item.profitLoss >= 0 ? 'rgba(40, 167, 69, 0.5)' : 'rgba(220, 53, 69, 0.5)'
-                ),
-                borderColor: data.map(item =>
-                    item.profitLoss >= 0 ? 'rgb(40, 167, 69)' : 'rgb(220, 53, 69)'
-                ),
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    suggestedMin: -maxAbsValue, // Set minimum to negative of max value
-                    suggestedMax: maxAbsValue,  // Set maximum to max value
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.1)',
-                        zeroLineColor: 'rgba(0, 0, 0, 0.25)',
-                        zeroLineWidth: 2
+        return {
+            type: 'bar',
+            data: {
+                labels: data.map(item => sanitizeHTML(item.name)),
+                datasets: [{
+                    label: 'Profit/Loss',
+                    data: data.map(item => item.profitLoss),
+                    backgroundColor: data.map(item =>
+                        item.profitLoss >= 0 ? state.config.colors.positive.background : state.config.colors.negative.background
+                    ),
+                    borderColor: data.map(item =>
+                        item.profitLoss >= 0 ? state.config.colors.positive.border : state.config.colors.negative.border
+                    ),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        suggestedMin: -maxAbsValue,
+                        suggestedMax: maxAbsValue,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)',
+                            zeroLineColor: 'rgba(0, 0, 0, 0.25)',
+                            zeroLineWidth: 2
+                        },
+                        ticks: {
+                            callback: (value) => formatCurrency(value, currency)
+                        }
                     },
-                    ticks: {
-                        callback: function (value) {
-                            return formatCurrency(value, currency);
+                    x: {
+                        grid: {
+                            display: false
                         }
                     }
                 },
-                x: {
-                    grid: {
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const value = context.raw;
+                                const formattedValue = formatCurrency(value, currency);
+                                const percentageChange = ((value / data[context.dataIndex].currentValue) * 100).toFixed(2);
+                                return `${formattedValue} (${percentageChange}%)`;
+                            }
+                        }
+                    },
+                    legend: {
                         display: false
                     }
                 }
+            }
+        };
+    };
+
+    /**
+     * Creates secure pie chart configuration
+     * @param {Array<Object>} data - Portfolio data
+     * @returns {Object} Chart.js configuration object
+     * @private
+     */
+    const createPieChartConfig = (data) => {
+        const currency = document.getElementById('currencySelect')?.value || 'USD';
+
+        return {
+            type: 'pie',
+            data: {
+                labels: data.map(item => sanitizeHTML(item.name)),
+                datasets: [{
+                    data: data.map(item => Math.abs(item.currentValue)),
+                    backgroundColor: state.config.chartStyles,
+                    borderColor: state.config.chartStyles.map(color => color.replace('0.5', '1'))
+                }]
             },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            const value = context.raw;
-                            const formattedValue = formatCurrency(value, currency);
-                            const percentageChange = ((value / data[context.dataIndex].currentValue) * 100).toFixed(2);
-                            return `${formattedValue} (${percentageChange}%)`;
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const value = context.raw;
+                                const formattedValue = formatCurrency(value, currency);
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${sanitizeHTML(context.label)}: ${formattedValue} (${percentage}%)`;
+                            }
                         }
                     }
-                },
-                legend: {
-                    display: false // Hide legend since we're only showing one dataset
                 }
             }
-        }
+        };
     };
-}
 
-
-/**
- * Creates configuration for pie chart visualization
- */
-function createPieChartConfig(data) {
-    const currency = document.getElementById('currencySelect').value;
-
-    return {
-        type: 'pie',
-        data: {
-            labels: data.map(item => item.name),
-            datasets: [{
-                data: data.map(item => Math.abs(item.currentValue)),
-                backgroundColor: [
-                    'rgba(255, 99, 132, 0.5)',
-                    'rgba(54, 162, 235, 0.5)',
-                    'rgba(255, 206, 86, 0.5)',
-                    'rgba(75, 192, 192, 0.5)',
-                    'rgba(153, 102, 255, 0.5)',
-                ],
-                borderColor: [
-                    'rgba(255, 99, 132, 1)',
-                    'rgba(54, 162, 235, 1)',
-                    'rgba(255, 206, 86, 1)',
-                    'rgba(75, 192, 192, 1)',
-                    'rgba(153, 102, 255, 1)',
-                ]
-            }]
+    /**
+     * Table sorting functionality
+     * @private
+     */
+    const TableSorter = {
+        sortTypes: {
+            0: 'text',
+            1: 'number',
+            2: 'number',
+            3: 'date',
+            4: 'number',
+            5: 'number',
+            6: 'number'
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            const value = context.raw;
-                            const formattedValue = formatCurrency(value, currency);
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${context.label}: ${formattedValue} (${percentage}%)`;
-                        }
-                    }
-                }
+
+        getCellValue(row, columnIndex, sortType) {
+            const cell = row.cells[columnIndex];
+            const displayValue = cell.querySelector('.display-value');
+            const value = displayValue ? displayValue.textContent : cell.textContent;
+
+            switch (sortType) {
+                case 'number': return safeParseFloat(value);
+                case 'date': return new Date(value);
+                default: return value.trim().toLowerCase();
             }
+        },
+
+        sortTable(columnIndex, header) {
+            const table = document.getElementById('portfolioTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            // Reset other headers
+            table.querySelectorAll('th').forEach(th => {
+                if (th !== header) {
+                    th.dataset.sortDirection = 'none';
+                    this.updateSortIndicator(th, 'none');
+                }
+            });
+
+            const currentDirection = header.dataset.sortDirection;
+            const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+            header.dataset.sortDirection = newDirection;
+            this.updateSortIndicator(header, newDirection);
+
+            const sortType = this.sortTypes[columnIndex];
+            rows.sort((rowA, rowB) => {
+                const valueA = this.getCellValue(rowA, columnIndex, sortType);
+                const valueB = this.getCellValue(rowB, columnIndex, sortType);
+
+                if (!valueA && valueA !== 0) return 1;
+                if (!valueB && valueB !== 0) return -1;
+
+                return newDirection === 'asc' ?
+                    (valueA < valueB ? -1 : valueA > valueB ? 1 : 0) :
+                    (valueA > valueB ? -1 : valueA < valueB ? 1 : 0);
+            });
+
+            tbody.innerHTML = '';
+            rows.forEach(row => tbody.appendChild(row));
         }
     };
-}
 
-/**
- * Determines the type of sorting to be applied for each column
- */
-function getSortType(columnIndex) {
-    const typeMap = {
-        0: 'text',      // Cryptocurrency name
-        1: 'number',    // Amount
-        2: 'number',    // Purchase Price
-        3: 'date',      // Purchase Date
-        4: 'number',    // Current Price
-        5: 'number',    // Current Value
-        6: 'number'     // Profit/Loss
-    };
-    return typeMap[columnIndex] || 'text';
-}
+    /**
+     * Public methods
+     */
+    return {
+        /**
+         * Initializes the portfolio visualization
+         * @public
+         */
+        initialize() {
+            try {
+                const portfolioTable = document.querySelector('#portfolioTable');
+                if (!portfolioTable) {
+                    throw new Error('Portfolio table not found');
+                }
 
+                const container = createChartContainer();
+                portfolioTable.parentNode.insertBefore(container, portfolioTable);
 
-/**
- * Extracts and formats cell values for sorting
- */
-function getCellValue(row, columnIndex, sortType) {
-    const cell = row.cells[columnIndex];
-    const displayValue = cell.querySelector('.display-value');
-    const value = displayValue ? displayValue.textContent : cell.textContent;
+                const portfolioData = extractPortfolioData();
+                const ctx = document.getElementById('portfolioChart')?.getContext('2d');
+                if (!ctx) {
+                    throw new Error('Canvas context not available');
+                }
 
-    switch (sortType) {
-        case 'number':
-            return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
-        case 'date':
-            return new Date(value);
-        default:
-            return value.trim().toLowerCase();
-    }
-}
+                state.chart = new Chart(ctx, createBarChartConfig(portfolioData));
 
-/**
- * Toggles active state of chart view buttons
- */
-function toggleActiveButton(activeId) {
-    document.querySelectorAll('.btn-group .btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    document.getElementById(activeId).classList.add('active');
-}
+                // Event listeners using event delegation
+                document.addEventListener('click', (e) => {
+                    if (e.target.id === 'pieView') {
+                        this.switchChartType('pie', portfolioData);
+                        this.toggleActiveButton('pieView');
+                    } else if (e.target.id === 'barView') {
+                        this.switchChartType('bar', portfolioData);
+                        this.toggleActiveButton('barView');
+                    }
+                });
 
-// Add necessary styles
-const styles = `
-    .sort-indicator {
-        font-size: 0.8em;
-        margin-left: 5px;
-        color: #6c757d;
-    }
-    
-    .btn-group .btn.active {
-        background-color: #6c757d;
-        color: white;
-        border-color: #6c757d;
-    }
-`;
-/**
- * Creates and adds a sort indicator span element to a table header
- */
-function addSortIndicator(th) {
-    // Check if indicator already exists
-    if (!th.querySelector('.sort-indicator')) {
-        const indicator = document.createElement('span');
-        indicator.className = 'sort-indicator';
-        indicator.textContent = '⇅';
-        th.appendChild(indicator);
-    }
-}
+                this.initializeTableSorting();
+            } catch (error) {
+                console.error('Portfolio chart initialization failed:', error);
+                this.handleError(error);
+            }
+        },
 
-/**
- * Updates the sort indicator for a header
- */
-function updateSortIndicator(header, direction) {
-    const indicator = header.querySelector('.sort-indicator');
-    if (indicator) {
-        indicator.textContent = direction === 'asc' ? '↑' : direction === 'desc' ? '↓' : '⇅';
-    }
-}
+        /**
+         * Switches between chart types
+         * @param {string} type - Chart type ('pie' or 'bar')
+         * @param {Array<Object>} data - Portfolio data
+         * @public
+         */
+        switchChartType(type, data) {
+            try {
+                const ctx = document.getElementById('portfolioChart')?.getContext('2d');
+                if (!ctx) {
+                    throw new Error('Canvas context not available');
+                }
 
-/**
- * Initializes sorting functionality for the portfolio table
- */
-function initializeTableSorting() {
-    const table = document.getElementById('portfolioTable');
-    const thead = table.querySelector('thead');
+                if (state.chart) {
+                    state.chart.destroy();
+                }
 
-    thead.querySelectorAll('th').forEach((th, index) => {
-        // Skip the Actions column
-        if (index < thead.querySelectorAll('th').length - 1) {
-            th.style.cursor = 'pointer';
-            th.dataset.sortDirection = 'none';
-            th.dataset.sortType = getSortType(index);
+                const config = type === 'pie' ? createPieChartConfig(data) : createBarChartConfig(data);
+                state.chart = new Chart(ctx, config);
+            } catch (error) {
+                console.error('Chart type switch failed:', error);
+                this.handleError(error);
+            }
+        },
 
-            // Add sort indicator
-            addSortIndicator(th);
+        /**
+         * Initializes table sorting functionality
+         * @public
+         */
+        initializeTableSorting() {
+            const table = document.getElementById('portfolioTable');
+            const thead = table.querySelector('thead');
 
-            th.addEventListener('click', () => sortTable(index, th));
-        }
-    });
-}
+            thead.querySelectorAll('th').forEach((th, index) => {
+                if (index < thead.querySelectorAll('th').length - 1) {
+                    th.style.cursor = 'pointer';
+                    th.dataset.sortDirection = 'none';
+                    th.dataset.sortType = TableSorter.sortTypes[index];
 
-/**
- * Sorts the table based on the selected column
- */
-function sortTable(columnIndex, header) {
-    const table = document.getElementById('portfolioTable');
-    const tbody = table.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    const indicator = document.createElement('span');
+                    indicator.className = 'sort-indicator';
+                    indicator.textContent = '⇅';
+                    th.appendChild(indicator);
 
-    // Reset other headers
-    table.querySelectorAll('th').forEach(th => {
-        if (th !== header) {
-            th.dataset.sortDirection = 'none';
-            updateSortIndicator(th, 'none');
-        }
-    });
+                    th.addEventListener('click', () => TableSorter.sortTable.call(TableSorter, index, th));
+                }
+            });
+        },
 
-    // Update sort direction
-    const currentDirection = header.dataset.sortDirection;
-    const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
-    header.dataset.sortDirection = newDirection;
-    updateSortIndicator(header, newDirection);
-
-    // Sort the rows
-    const sortType = header.dataset.sortType;
-    rows.sort((rowA, rowB) => {
-        const valueA = getCellValue(rowA, columnIndex, sortType);
-        const valueB = getCellValue(rowB, columnIndex, sortType);
-
-        // Handle undefined or null values
-        if (!valueA && valueA !== 0) return 1;
-        if (!valueB && valueB !== 0) return -1;
-
-        if (valueA < valueB) return newDirection === 'asc' ? -1 : 1;
-        if (valueA > valueB) return newDirection === 'asc' ? 1 : -1;
-        return 0;
-    });
-
-    // Update the table
-    tbody.innerHTML = '';
-    rows.forEach(row => tbody.appendChild(row));
-}
-
-// Rest of the code remains the same...
-
-// Initialize features when document is ready
-// Initialize features when document is ready
-
-document.addEventListener('DOMContentLoaded', () => {
-    const chartScript = document.createElement('script');
-    chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-    document.head.appendChild(chartScript);
-
-    chartScript.onload = () => {
-        try {
-            initializePortfolioChart();
-            initializeTableSorting(); // Add this line to initialize sorting
-        } catch (error) {
-            console.error('Error initializing portfolio features:', error);
+        /**
+         * Handles errors gracefully
+         * @param {Error} error - Error object
+         * @private
+         */
+        handleError(error) {
             const chartContainer = document.querySelector('#portfolioChart')?.closest('.card');
             if (chartContainer) {
                 chartContainer.innerHTML = `
                     <div class="alert alert-warning m-3">
-                        Unable to load portfolio visualization. Please try refreshing the page.
+                        ${sanitizeHTML('Unable to load portfolio visualization. Please try refreshing the page.')}
                     </div>
                 `;
             }
+        },
+
+        /**
+         * Toggles active state of chart view buttons
+         * @param {string} activeId - ID of active button
+         * @private
+         */
+        toggleActiveButton(activeId) {
+            document.querySelectorAll('.btn-group .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(activeId)?.classList.add('active');
         }
     };
+})();
 
-    // Add the styles to the document
+// Initialize when document is ready
+document.addEventListener('DOMContentLoaded', () => {
+    const chartScript = document.createElement('script');
+    chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+    chartScript.integrity = 'sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC';
+    chartScript.crossOrigin = 'anonymous';
+
+    // Add styles
+    const styles = `
+        .sort-indicator {
+            font-size: 0.8em;
+            margin-left: 5px;
+            color: #6c757d;
+        }
+        
+        .btn-group .btn.active {
+            background-color: #6c757d;
+            color: white;
+            border-color: #6c757d;
+        }
+        
+        .btn-group .btn:focus {
+            box-shadow: none;
+            outline: 2px solid rgba(108, 117, 125, 0.5);
+        }
+    `;
+
     const styleSheet = document.createElement('style');
     styleSheet.textContent = styles;
     document.head.appendChild(styleSheet);
+
+    // Initialize portfolio charts after Chart.js loads
+    chartScript.onload = () => {
+        try {
+            PortfolioCharts.initialize();
+        } catch (error) {
+            console.error('Failed to initialize portfolio features:', error);
+            PortfolioCharts.handleError(error);
+        }
+    };
+
+    chartScript.onerror = (error) => {
+        console.error('Failed to load Chart.js:', error);
+        PortfolioCharts.handleError(new Error('Failed to load required dependencies'));
+    };
+
+    document.head.appendChild(chartScript);
 });
+
+// Export for module usage
+export default PortfolioCharts;
