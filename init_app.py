@@ -6,6 +6,11 @@ from dotenv import load_dotenv
 from config import Config, ConfigurationError
 import os
 
+from ngrok_manager import NgrokManager
+
+# Create NgrokManager instance
+ngrok_manager = NgrokManager()
+
 
 def create_app():
     """
@@ -55,6 +60,16 @@ def create_app():
         raise ValueError(
             "MASTER_ENCRYPTION_KEY must be set in environment variables")
 
+    # Initialize ngrok in development environment
+    if os.environ.get('FLASK_ENV') == 'development':
+        ngrok_manager.init_app(app)
+        try:
+            ngrok_url = ngrok_manager.start_tunnel(port=5000)
+            os.environ['NGROK_URL'] = ngrok_url
+            app.logger.info(f"ngrok tunnel established at: {ngrok_url}")
+        except Exception as e:
+            app.logger.error(f"Failed to establish ngrok tunnel: {e}")
+
     return app
 
 # OAuth Configuration
@@ -89,23 +104,29 @@ def configure_oauth(app):
 
     oauth = OAuth(app)
 
-    # Configure Google OAuth
+    # Get the base URL for callbacks
+    base_url = os.getenv('NGROK_URL') if os.getenv(
+        'FLASK_ENV') == 'development' else os.getenv('BASE_URL')
+
+    # Configure Google OAuth with dynamic callback URL
     oauth.register(
         name='google',
         client_id=os.getenv('GOOGLE_CLIENT_ID'),
         client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),
         server_metadata_url=os.getenv('SERVER_METADATA_URL_GOOGLE'),
-        client_kwargs={'scope': 'openid email profile'}
+        client_kwargs={'scope': 'openid email profile'},
+        redirect_uri=f"{base_url}/auth/callback/google"
     )
 
-    # Configure GitHub OAuth
+    # Configure GitHub OAuth with dynamic callback URL
     oauth.register(
         name='github',
         client_id=os.getenv('GITHUB_CLIENT_ID'),
         client_secret=os.getenv('GITHUB_CLIENT_SECRET'),
         access_token_url='https://github.com/login/oauth/access_token',
         authorize_url='https://github.com/login/oauth/authorize',
-        client_kwargs={'scope': 'read:user user:email'}
+        client_kwargs={'scope': 'read:user user:email'},
+        redirect_uri=f"{base_url}/auth/callback/github"
     )
 
     return oauth

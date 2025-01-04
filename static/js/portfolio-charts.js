@@ -236,6 +236,13 @@ const PortfolioCharts = (function () {
             }
         },
 
+        updateSortIndicator(header, direction) {
+            const indicator = header.querySelector('.sort-indicator');
+            if (indicator) {
+                indicator.textContent = direction === 'asc' ? '↑' : direction === 'desc' ? '↓' : '⇅';
+            }
+        },
+
         sortTable(columnIndex, header) {
             const table = document.getElementById('portfolioTable');
             const tbody = table.querySelector('tbody');
@@ -340,6 +347,7 @@ const PortfolioCharts = (function () {
                 this.handleError(error);
             }
         },
+
 
         /**
          * Initializes table sorting functionality
