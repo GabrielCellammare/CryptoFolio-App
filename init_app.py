@@ -59,7 +59,7 @@ def create_app():
     if not master_key:
         raise ValueError(
             "MASTER_ENCRYPTION_KEY must be set in environment variables")
-
+    """
     # Initialize ngrok in development environment
     if os.environ.get('FLASK_ENV') == 'development':
         ngrok_manager.init_app(app)
@@ -69,8 +69,9 @@ def create_app():
             app.logger.info(f"ngrok tunnel established at: {ngrok_url}")
         except Exception as e:
             app.logger.error(f"Failed to establish ngrok tunnel: {e}")
-
+    """
     return app
+
 
 # OAuth Configuration
 

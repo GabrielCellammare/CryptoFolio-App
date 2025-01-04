@@ -11,6 +11,28 @@ export function setupUIHandlers() {
 }
 
 /**
+ * Format date string to yyyy-MM-dd format
+ * @param {string} dateString - Date string in any format
+ * @returns {string} Formatted date string
+ */
+function formatDateForInput(dateString) {
+    // Handle empty or invalid dates
+    if (!dateString) return '';
+
+    // Create a date object from the string
+    const date = new Date(dateString);
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) return '';
+
+    // Format to YYYY-MM-DD
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+}
+/**
  * Set up add cryptocurrency form handler
  */
 function setupAddCryptoForm() {
@@ -73,14 +95,10 @@ function setupAddCryptoForm() {
                 symbol: $(selectedOption.element).data('symbol'),
                 amount: parseFloat(document.getElementById('amount').value),
                 purchase_price: parseFloat(document.getElementById('purchase-price').value),
-                purchase_date: document.getElementById('purchase-date').value
+                purchase_date: purchaseDate
             };
 
-            // Aggiungi nonce per ulteriore protezione CSRF
-            const nonce = document.querySelector('meta[name="csrf-nonce"]')?.content;
-            if (nonce) {
-                cryptoData.nonce = nonce;
-            }
+
 
             await ApiService.addCrypto(cryptoData);
             showSuccess('Cryptocurrency added successfully');
@@ -220,7 +238,14 @@ function toggleEditMode(row, enable) {
 
     if (enable) {
         row.dataset.originalValues = JSON.stringify(Array.from(editInputs).map(input => input.value));
-        displayValues.forEach(span => span.classList.add('d-none'));
+        displayValues.forEach((span, index) => {
+            const input = editInputs[index];
+            if (input.type === 'date') {
+                // Format the date properly for the input
+                input.value = formatDateForInput(span.textContent);
+            }
+            span.classList.add('d-none');
+        });
         editInputs.forEach(input => input.classList.remove('d-none'));
         editBtn.classList.add('d-none');
         saveBtn.classList.remove('d-none');

@@ -171,12 +171,12 @@
                                         <td>
                                             <span class="display-value">{{ "%.8f"|format(item.purchase_price) }}</span>
                                             <input type="number" class="form-control form-control-sm edit-input d-none" 
-                                                   value="{{ "%.6f"|format(item.purchase_price) }}" step="0.01" min="0">
+                                                   value="{{ "%.6f"|format(item.purchase_price) }}" step="0.00000001" min="0">
                                         </td>
                                         <td>
-                                            <span class="display-value">{{ item.purchase_date }}</span>
+                                            <span class="display-value">{{ item.purchase_date.split(' ')[0] if ' ' in item.purchase_date else item.purchase_date }}</span>
                                             <input type="date" class="form-control form-control-sm edit-input d-none" 
-                                                   value="{{ item.purchase_date }}">
+                                                   value="{{ item.purchase_date.split(' ')[0] if ' ' in item.purchase_date else item.purchase_date }}">
                                         </td>
                                         <td class="current-price">{{ "%.2f"|format(item.current_price) }}</td>
                                         <td class="current-value">{{ "%.2f"|format(item.current_value) }}</td>
@@ -229,7 +229,7 @@
                             <div class="mb-3">
                                 <label for="purchase-price" class="form-label">Purchase Price (USD)</label>
                                 <input type="number" class="form-control" id="purchase-price" 
-                                       step="0.01" min="0" required>
+                                       step="0.00000001" min="0" required>
                             </div>
                             <div class="mb-3">
                                 <label for="purchase-date" class="form-label">Purchase Date</label>
