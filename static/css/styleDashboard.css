@@ -240,3 +240,25 @@ body {
 .input-group>.btn.active {
     background-color: #e9ecef;
 }
+
+.alert {
+    transition: all 0.3s ease-in-out;
+}
+
+.alert-warning {
+    border-left: 4px solid #ffc107;
+}
+
+.alert-danger {
+    border-left: 4px solid #dc3545;
+}
+
+#rateLimitInfo .alert {
+    margin-bottom: 0;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+#rateLimitInfo i {
+    margin-right: 0.5rem;
+}
