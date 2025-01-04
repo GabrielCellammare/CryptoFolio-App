@@ -1,132 +1,253 @@
+/**
+ * CurrencyManager handles currency-related operations and UI updates
+ * Security considerations:
+ * - Input validation and sanitization
+ * - Error handling with safe error messages
+ * - XSS prevention
+ * - API error handling
+ * - Rate limiting for currency updates
+ */
+
 import { ApiService } from './api-service.js';
 
-// currency-manager.js
 export default class CurrencyManager {
+    // Private fields using # prefix for better encapsulation
+    #currencySelect;
+    #lastUpdateTimestamp = 0;
+    #updateInProgress = false;
+    #MIN_UPDATE_INTERVAL = 2000; // Rate limiting: minimum 2 seconds between updates
+
+    /**
+     * Initialize the CurrencyManager with required DOM elements
+     * @throws {Error} If required DOM elements are not found
+     */
     constructor() {
-        this.currencySelect = document.getElementById('currencySelect');
-        this.initialize();
+        // Validate DOM elements exist before proceeding
+        const currencySelect = document.getElementById('currencySelect');
+        if (!currencySelect) {
+            throw new Error('Required currency select element not found');
+        }
+        this.#currencySelect = currencySelect;
+
+        this.#initialize().catch(error => {
+            this.#handleError('Initialization failed', error);
+        });
     }
 
-    async initialize() {
+    /**
+     * Initialize currency manager and set up event listeners
+     * @private
+     */
+    async #initialize() {
         try {
-            // Get current currency using the class method
-            const currentCurrency = await this.getCurrentCurrency();
-            this.currencySelect.value = currentCurrency;
+            const currentCurrency = await this.#getCurrentCurrency();
 
-            // Import the updatePriceLabels function from utils.js
+            // Sanitize currency value before setting
+            if (!this.#isValidCurrency(currentCurrency)) {
+                throw new Error('Invalid currency value received');
+            }
+
+            this.#currencySelect.value = currentCurrency;
+
             const { updatePriceLabels } = await import('./utils.js');
-
-            // Update initial price labels
             updatePriceLabels(currentCurrency);
 
-            // Add event listener for currency changes
-            this.currencySelect.addEventListener('change', async (e) => {
-                const loadingOverlay = document.querySelector('.loading-overlay');
+            this.#setupEventListeners();
+        } catch (error) {
+            this.#handleError('Initialization error', error);
+        }
+    }
+
+    /**
+     * Set up event listeners with proper error handling and rate limiting
+     * @private
+     */
+    #setupEventListeners() {
+        this.#currencySelect.addEventListener('change', async (e) => {
+            if (!this.#canUpdate()) {
+                this.#showUserMessage('Please wait before updating currency again', 'warning');
+                return;
+            }
+
+            const loadingOverlay = document.querySelector('.loading-overlay');
+            if (!loadingOverlay) return;
+
+            try {
+                this.#updateInProgress = true;
                 loadingOverlay.style.display = 'flex';
 
-                try {
-                    const newCurrency = e.target.value;
-                    await this.updateCurrency(newCurrency);
-
-                    // Update price labels before reload
-                    updatePriceLabels(newCurrency);
-
-                    // Force reload to get fresh converted prices
-                    window.location.reload();
-                } catch (error) {
-                    console.error('Currency update error:', error);
-                    this.showError('Currency update failed. Please try again.');
-                    loadingOverlay.style.display = 'none';
+                const newCurrency = e.target.value;
+                if (!this.#isValidCurrency(newCurrency)) {
+                    throw new Error('Invalid currency selection');
                 }
-            });
-        } catch (error) {
-            console.error('Initialization error:', error);
-            this.showError('Failed to initialize currency manager');
-        }
+
+                await this.#updateCurrency(newCurrency);
+
+                // Use session storage to maintain state during reload
+                sessionStorage.setItem('pendingCurrencyUpdate', 'true');
+                window.location.reload();
+            } catch (error) {
+                this.#handleError('Currency update failed', error);
+            } finally {
+                this.#updateInProgress = false;
+                loadingOverlay.style.display = 'none';
+            }
+        });
     }
 
-    async getCurrentCurrency() {
+    /**
+     * Rate limiting check for currency updates
+     * @private
+     * @returns {boolean} Whether an update is allowed
+     */
+    #canUpdate() {
+        const now = Date.now();
+        if (this.#updateInProgress || (now - this.#lastUpdateTimestamp) < this.#MIN_UPDATE_INTERVAL) {
+            return false;
+        }
+        this.#lastUpdateTimestamp = now;
+        return true;
+    }
+
+    /**
+     * Validate currency codes
+     * @private
+     * @param {string} currency Currency code to validate
+     * @returns {boolean} Whether the currency code is valid
+     */
+    #isValidCurrency(currency) {
+        const validCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD']; // Add all supported currencies
+        return typeof currency === 'string' &&
+            currency.length === 3 &&
+            validCurrencies.includes(currency.toUpperCase());
+    }
+
+    /**
+     * Get current currency with error handling
+     * @private
+     * @returns {Promise<string>} Current currency code
+     */
+    async #getCurrentCurrency() {
         try {
             const response = await ApiService.getCurrentCurrency();
-            return response.currency || 'USD';
+
+            if (!response || !response.currency) {
+                throw new Error('Invalid response format');
+            }
+
+            return this.#isValidCurrency(response.currency) ? response.currency : 'USD';
         } catch (error) {
-            console.error('Error fetching currency:', error);
-            return 'USD'; // Default fallback
+            this.#handleError('Error fetching currency', error);
+            return 'USD';
         }
     }
 
-    async updateCurrency(currency) {
+    /**
+     * Update currency settings
+     * @private
+     * @param {string} currency New currency code
+     */
+    async #updateCurrency(currency) {
         try {
-            // Use ApiService for the secure PUT request
             await ApiService.safeFetch('/api/preferences/currency', {
                 method: 'PUT',
                 body: JSON.stringify({ currency })
             });
 
-            // Update crypto select prices if available
-            const cryptoSelect = document.getElementById('crypto-select');
-            if (cryptoSelect) {
-                await this.updateCryptoSelectPrices(currency);
-            }
+            await this.#updateCryptoSelectPrices(currency);
         } catch (error) {
-            console.error('Currency update error:', error);
-            throw error; // Propagate the error for handling in the caller
+            this.#handleError('Currency update error', error);
+            throw error;
         }
     }
 
-    async updateCryptoSelectPrices(currency) {
+    /**
+     * Update cryptocurrency prices in select element
+     * @private
+     * @param {string} currency Currency code
+     */
+    async #updateCryptoSelectPrices(currency) {
         try {
             const data = await ApiService.fetchCryptocurrencies();
-
-            if (data.status === 'success' && data.data) {
-                const select2Element = $('#crypto-select');
-                const { formatCurrency } = await import('./utils.js');
-
-                // Update prices in select2 options
-                const updatedOptions = data.data.map(crypto => ({
-                    id: crypto.id,
-                    text: `${crypto.name} (${crypto.symbol}) - ${formatCurrency(crypto.current_price, currency)}`
-                }));
-
-                select2Element.empty();
-                select2Element.select2({
-                    data: updatedOptions,
-                    placeholder: 'Select a cryptocurrency'
-                });
+            if (!data?.status === 'success' || !Array.isArray(data?.data)) {
+                throw new Error('Invalid cryptocurrency data received');
             }
+
+            const select2Element = $('#crypto-select');
+            if (!select2Element.length) return;
+
+            const { formatCurrency } = await import('./utils.js');
+
+            const updatedOptions = data.data.map(crypto => ({
+                id: this.#sanitizeInput(crypto.id),
+                text: this.#sanitizeInput(
+                    `${crypto.name} (${crypto.symbol}) - ${formatCurrency(crypto.current_price, currency)}`
+                )
+            }));
+
+            select2Element.empty();
+            select2Element.select2({
+                data: updatedOptions,
+                placeholder: 'Select a cryptocurrency'
+            });
         } catch (error) {
-            console.error('Error updating crypto prices:', error);
-            this.showError('Failed to update cryptocurrency prices');
+            this.#handleError('Error updating crypto prices', error);
         }
     }
 
-    showError(message) {
+    /**
+     * Sanitize user input to prevent XSS
+     * @private
+     * @param {string} input Input to sanitize
+     * @returns {string} Sanitized input
+     */
+    #sanitizeInput(input) {
+        const div = document.createElement('div');
+        div.textContent = input;
+        return div.innerHTML;
+    }
+
+    /**
+     * Handle errors safely without exposing sensitive information
+     * @private
+     * @param {string} userMessage Message to show to user
+     * @param {Error} error Error object
+     */
+    #handleError(userMessage, error) {
+        // Log full error for debugging but don't expose to user
+        console.error(`${userMessage}:`, error);
+
+        // Show sanitized message to user
+        this.#showUserMessage(userMessage, 'error');
+    }
+
+    /**
+     * Show message to user safely
+     * @private
+     * @param {string} message Message to display
+     * @param {string} type Message type (error, warning, success)
+     */
+    #showUserMessage(message, type = 'error') {
         const flashMessages = document.getElementById('flashMessages');
+        if (!flashMessages) return;
+
         const alert = document.createElement('div');
-        alert.className = 'alert alert-danger alert-dismissible fade show';
+        alert.className = `alert alert-${type} alert-dismissible fade show`;
+
+        // Sanitize message content
+        const sanitizedMessage = this.#sanitizeInput(message);
+
         alert.innerHTML = `
-            ${message}
+            ${sanitizedMessage}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
+
         flashMessages.appendChild(alert);
 
-        // Remove the alert after 5 seconds
         setTimeout(() => {
-            alert.remove();
-        }, 5000);
-    }
-
-    async updateDisplayValues(newCurrency) {
-        const { updatePriceLabels } = await import('./utils.js');
-        updatePriceLabels(newCurrency);
-
-        // Update portfolio value
-        const portfolioValueElement = document.getElementById('formatted-portfolio-value');
-        if (portfolioValueElement) {
-            const value = parseFloat(portfolioValueElement.textContent.replace(/[^0-9.-]+/g, ''));
-            if (!isNaN(value)) {
-                portfolioValueElement.textContent = formatCurrency(value, newCurrency);
+            if (alert.parentNode === flashMessages) {
+                flashMessages.removeChild(alert);
             }
-        }
+        }, 5000);
     }
 }
