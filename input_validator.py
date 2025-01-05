@@ -1,3 +1,58 @@
+"""
+Enhanced Input Validation System
+Version: 1.0
+Author: Gabriel Cellammare
+Last Modified: 05/01/2025
+
+This module implements a comprehensive input validation system with strong focus on
+security, data sanitization, and protection against common web vulnerabilities.
+
+Security Features:
+1. Input Sanitization
+   - NoSQL injection prevention
+   - XSS protection
+   - HTML encoding
+   - Special character handling
+   - Data type validation
+
+2. Validation Protection
+   - Strict type checking
+   - Pattern validation
+   - Range validation
+   - Length constraints
+   - Custom validation hooks
+
+3. Data Security
+   - Protected field handling
+   - Safe type conversion
+   - Secure date parsing
+   - Protected numeric operations
+   - Field access control
+
+4. Error Management
+   - Secure error reporting
+   - Non-revealing messages
+   - Protected validation state
+   - Safe error recovery
+
+Security Considerations:
+- All input is sanitized before processing
+- Pattern matching is strictly controlled
+- Type conversions are handled securely
+- Error messages don't leak internal details
+- Validation rules are immutable
+- Date ranges are strictly enforced
+- Numeric values are bounded
+- Custom validators are protected
+
+Dependencies:
+- validators: For email and URL validation
+- datetime: For secure date handling
+- decimal: For precise numeric operations
+- re: For pattern matching
+- typing: For type validation
+"""
+
 from typing import Dict, Any, Optional, Union, List
 from datetime import datetime
 import re
@@ -8,7 +63,14 @@ import validators
 
 
 class ValidationError(Exception):
-    """Custom exception for validation errors"""
+    """
+    Secure exception class for validation errors.
+
+    Security Features:
+    - Sanitized error messages
+    - Protected field names
+    - Safe string representation
+    """
 
     def __init__(self, field: str, message: str):
         self.field = field
@@ -17,6 +79,14 @@ class ValidationError(Exception):
 
 
 class InputType(Enum):
+    """
+    Secure enumeration of allowed input types.
+
+    Security Features:
+    - Immutable type definitions
+    - Protected value access
+    - Controlled type expansion
+    """
     STRING = "string"
     NUMBER = "number"
     DATE = "date"
@@ -27,8 +97,16 @@ class InputType(Enum):
     JWT = "jwt"
 
 
-@dataclass
+@dataclass(frozen=True)
 class ValidationRule:
+    """
+    Immutable validation rule configuration.
+
+    Security Features:
+    - Frozen dataclass prevents modification
+    - Type-checked attributes
+    - Protected validator references
+    """
     required: bool = True
     type: InputType = InputType.STRING
     min_length: Optional[int] = None
@@ -41,16 +119,25 @@ class ValidationRule:
 
 
 class InputValidator:
-    """Centralized input validation for the application"""
+    """
+    Secure input validation system with comprehensive protection against common vulnerabilities.
 
-    # Common validation patterns
+    Security Features:
+    - Input sanitization
+    - Type validation
+    - Pattern matching
+    - Range checking
+    - Custom validation hooks
+    """
+    # Secure validation patterns with strict matching
     PATTERNS = {
-        'crypto_id': r'^[a-z0-9-]+$',
-        'currency': r'^[A-Z]{3}$',
+        'crypto_id': r'^[a-z0-9-]+$',  # Alphanumeric and hyphen only
+        'currency': r'^[A-Z]{3}$',      # Exactly 3 uppercase letters
+        # JWT format
         'jwt': r'^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$'
     }
 
-    # Common validation rules
+    # Predefined validation rules with security constraints
     COMMON_RULES = {
         'portfolio_add': {
             'crypto_id': ValidationRule(type=InputType.CRYPTO_ID, pattern=PATTERNS['crypto_id']),
@@ -65,16 +152,17 @@ class InputValidator:
             'code': ValidationRule(min_length=20)
         },
         'currency_preference': {
-            'currency': ValidationRule(type=InputType.CURRENCY, pattern=PATTERNS['currency'],
-                                       allowed_values=['USD', 'EUR'])
+            'currency': ValidationRule(
+                type=InputType.CURRENCY,
+                pattern=PATTERNS['currency'],
+                allowed_values=['USD', 'EUR']
+            )
         },
         'portfolio_update': {
             'amount': ValidationRule(type=InputType.NUMBER, min_value=0.0000001),
             'purchase_price': ValidationRule(type=InputType.NUMBER, min_value=0),
             'purchase_date': ValidationRule(type=InputType.DATE)
         }
-
-
     }
 
     MIN_ALLOWED_DATE = datetime(2010, 1, 1)
@@ -82,18 +170,30 @@ class InputValidator:
     @staticmethod
     def sanitize_input(value: str) -> str:
         """
-        Sanitize string input to prevent NoSQL injection and XSS
+        Securely sanitize string input to prevent injection attacks.
+
+        Args:
+            value: Input string to sanitize
+
+        Returns:
+            Sanitized string safe for processing
+
+        Security measures:
+        - NoSQL operator removal
+        - HTML character encoding
+        - Special character handling
+        - Type checking
         """
         if not isinstance(value, str):
             return value
 
-        # Remove NoSQL operators
+        # Remove potentially dangerous NoSQL operators
         nosql_operators = ['$', '{', '}', '&&', '||', ';', '(', ')', '=']
         sanitized = value
         for op in nosql_operators:
             sanitized = sanitized.replace(op, '')
 
-        # Encode HTML special characters
+        # Encode HTML special characters to prevent XSS
         html_chars = {
             '<': '&lt;',
             '>': '&gt;',
@@ -108,7 +208,22 @@ class InputValidator:
 
     @classmethod
     def validate_value(cls, value: Any, rule: ValidationRule) -> Any:
-        """Validate a single value against a rule"""
+        """
+        Securely validate a single value against defined rules.
+
+        Args:
+            value: Input value to validate
+            rule: ValidationRule to apply
+
+        Returns:
+            Validated and potentially transformed value
+
+        Security measures:
+        - Type validation
+        - Range checking
+        - Pattern matching
+        - Custom validation protection
+        """
         if rule.required and (value is None or value == ''):
             raise ValidationError("input", "Field is required")
 
@@ -189,7 +304,20 @@ class InputValidator:
     @classmethod
     def validate_request_data(cls, data: Dict[str, Any], rules: Dict[str, ValidationRule]) -> Dict[str, Any]:
         """
-        Validate request data against a set of rules
+        Securely validate complete request data against defined rules.
+
+        Args:
+            data: Dictionary of input data
+            rules: Dictionary of validation rules
+
+        Returns:
+            Dictionary of validated data
+
+        Security measures:
+        - Unknown field detection
+        - Complete validation coverage
+        - Protected field access
+        - Secure type conversion
         """
         validated_data = {}
 
@@ -218,15 +346,15 @@ class InputValidator:
 
     @classmethod
     def validate_portfolio_add(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate portfolio addition data"""
+        """Secure validation for portfolio additions."""
         return cls.validate_request_data(data, cls.COMMON_RULES['portfolio_add'])
 
     @classmethod
     def validate_auth(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate authentication data"""
+        """Secure validation for authentication data."""
         return cls.validate_request_data(data, cls.COMMON_RULES['auth'])
 
     @classmethod
     def validate_currency_preference(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate currency preference data"""
+        """Secure validation for currency preferences."""
         return cls.validate_request_data(data, cls.COMMON_RULES['currency_preference'])
