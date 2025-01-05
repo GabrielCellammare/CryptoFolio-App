@@ -1097,15 +1097,6 @@ def refresh_csrf_nonce():
             'expires': expiration_iso
         }
 
-        # Create an audit log entry for nonce generation
-        db.collection('audit_logs').add({
-            'user_id': session.get('user_id'),
-            'action': 'nonce_refresh',
-            'timestamp': firestore.SERVER_TIMESTAMP,
-            'ip_address': request.remote_addr,
-            'user_agent': request.user_agent.string
-        })
-
         return jsonify(response_data)
 
     except Exception as e:

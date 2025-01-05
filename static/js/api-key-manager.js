@@ -101,6 +101,8 @@ export default class ApiKeyManager {
         });
     }
 
+
+
     /**
      * Handle token generation with security measures
      */
@@ -184,6 +186,34 @@ export default class ApiKeyManager {
         }
     }
 
+    #sanitizeToken(token) {
+        // Verifica che il token sia nel formato atteso (esempio: JWT)
+        if (!this.#isValidTokenFormat(token)) {
+            throw new Error('Invalid token format');
+        }
+
+        // Rimuove caratteri potenzialmente pericolosi
+        return this.#escapeHtmlChars(token);
+    }
+
+    #isValidTokenFormat(token) {
+        // Verifica che il token sia una stringa JWT valida
+        const jwtPattern = /^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$/;
+        return jwtPattern.test(token);
+    }
+
+    #escapeHtmlChars(str) {
+        const htmlEscapes = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#x27;',
+            '/': '&#x2F;'
+        };
+        return str.replace(/[&<>"'/]/g, char => htmlEscapes[char]);
+    }
+
     /**
      * Update UI with token information
      */
@@ -197,7 +227,21 @@ export default class ApiKeyManager {
             tokenInfo.created_at || tokenInfo.token_created_at
         );
 
-        this.#elements.apiKeyInput.value = tokenInfo.access_token;
+        try {
+            // Sanitizza il token prima di inserirlo nel DOM
+            const sanitizedToken = this.#sanitizeToken(tokenInfo.access_token);
+            this.#elements.apiKeyInput.value = sanitizedToken;
+
+            // Imposta attributi di sicurezza sull'elemento
+            this.#elements.apiKeyInput.setAttribute('data-sanitized', 'true');
+            this.#elements.apiKeyInput.setAttribute('autocomplete', 'off');
+        } catch (error) {
+            console.error('Token sanitization failed:', error);
+            this.#showError('Invalid token format detected');
+            this.#setNoTokenState();
+        }
+
+
         this.#elements.apiKeyInput.classList.remove('text-muted');
         this.#elements.toggleButton.disabled = false;
         this.#elements.copyButton.disabled = false;
