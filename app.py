@@ -25,7 +25,7 @@ from functools import wraps
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import jwt
-from config import Config
+from config import SecureConfig
 from cryptography_utils import AESCipher
 from cryptocache import CryptoCache
 import os
@@ -42,12 +42,13 @@ import redis
 
 # Application initialization
 
+secure_config = SecureConfig()
 
 # First, load environment variables before any initialization
 load_dotenv()
 
 # Create the Flask application
-app = create_app()
+app = create_app(secure_config)
 csrf = CSRFProtection(app)
 
 # Initialize other components after app creation
@@ -130,22 +131,33 @@ def log_error(error_type: str, user_id: Optional[str], error_message: str) -> st
 
 
 @app.after_request
-def add_cors_headers(response):
+def add_security_headers(response):
     """
-    Adds CORS headers to all API responses.
+    Adds comprehensive security headers to all API responses.
     Called automatically by Flask after each request.
+
+    This middleware implements multiple layers of security:
+    1. CORS headers with strict origin validation
+    2. Rate limiting protection
+    3. Security headers (CSP, HSTS, etc.)
+    4. Request integrity verification
 
     Args:
         response (Response): Flask response object to modify
 
     Returns:
-        Response: Modified response with CORS headers added
+        Response: Modified response with security headers
 
     Security features:
-    - Configures allowed origins, methods and headers
-    - Implements security headers like Content-Security-Policy
+    - Validates origins against whitelist
+    - Implements rate limiting per origin
+    - Adds Content-Security-Policy
+    - Configures HTTP Strict Transport Security
+    - Prevents clickjacking with X-Frame-Options
+    - Mitigates XSS with security headers
+    - Verifies request integrity with HMAC
     """
-    return Config.add_cors_headers(response)
+    return secure_config.add_security_headers(response)
 
 # Decorator for requiring login
 

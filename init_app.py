@@ -135,7 +135,7 @@ def secure_firebase_init() -> None:
     initialize_app(cred)
 
 
-def create_app() -> Flask:
+def create_app(secure_config) -> Flask:
     """
     Creates and configures a secure Flask application instance.
 
@@ -157,7 +157,7 @@ def create_app() -> Flask:
     # Validate and set security configurations
     try:
         # Initialize CORS with security configurations
-        Config.initialize_cors_config(app)
+        secure_config.initialize_app(app)
 
         # Validate and set secret key
         secret_key = os.environ.get('FLASK_SECRET_KEY')

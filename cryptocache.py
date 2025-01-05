@@ -1,13 +1,73 @@
 """
-CryptoCache: A secure caching system for cryptocurrency data
-This module provides a secure way to cache and retrieve cryptocurrency pricing data
-while implementing proper security controls and error handling.
+CryptoCache: Advanced Cryptocurrency Data Security Framework
+Version: 1.0
+Author: Gabriel Cellammare
+Last Modified: 05/01/2025
 
-Security features:
-- Input validation for all public methods
-- Secure API request handling
-- Rate limiting and request throttling
-- Cache data validation
+This module implements a comprehensive security framework for caching cryptocurrency
+pricing data with defense-in-depth measures and robust security controls. It provides
+multi-layered protection against various attack vectors while ensuring data integrity
+and secure API communications.
+
+Core Security Features:
+
+1. Data Protection
+   - Secure cache file handling
+   - Data validation and sanitization
+   - Protected memory operations
+   - Integrity verification
+
+2. API Security
+   - Rate limiting implementation 
+   - Request throttling
+   - Secure HTTP headers
+   - Response validation
+
+3. Cache Management
+   - Secure directory creation
+   - Protected file operations
+   - Timestamp validation
+   - Data expiration controls
+
+4. Error Handling
+   - Comprehensive exception management
+   - Secure logging practices
+   - Fail-safe defaults
+   - Recovery procedures
+
+Security Considerations:
+
+1. File System Security:
+   - Cache directory permissions must be properly configured
+   - File operations need atomic write protection
+   - Path traversal prevention required
+   - Temporary file handling must be secure
+
+2. API Communication:
+   - SSL/TLS verification should be enforced
+   - API keys need secure storage
+   - Request headers should be sanitized
+   - Rate limiting must prevent DOS
+
+3. Data Validation:
+   - All input parameters require validation
+   - Cache data must be verified
+   - Response data needs sanitization
+   - Type checking should be strict
+
+4. Memory Management:
+   - Sensitive data needs secure cleanup
+   - Memory limits should be enforced
+   - Large objects require streaming
+   - Garbage collection timing matters
+
+Dependencies:
+- requests: HTTP client with security features
+- pathlib: Secure path operations
+- json: Data serialization
+- logging: Security event tracking
+- dotenv: Environment management
+- hashlib: Cryptographic operations
 
 """
 
