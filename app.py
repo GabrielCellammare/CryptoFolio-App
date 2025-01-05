@@ -1,35 +1,72 @@
 """
 Cryptocurrency Portfolio Management Application
+============================================
 
-This Flask application provides a secure platform for managing cryptocurrency portfolios.
-It includes OAuth authentication, encrypted data storage, CSRF protection, and real-time
-cryptocurrency price tracking.
+A secure Flask application for managing cryptocurrency portfolios with
+comprehensive security features and OAuth authentication.
 
-Main features:
-- User authentication via Google and GitHub OAuth
-- Encrypted portfolio data storage using AES
-- Real-time cryptocurrency price tracking
-- CSRF protection for all forms and API endpoints
-- Audit logging for security events
-- Error handling and logging
+This module implements a secure web application that allows users to:
+- Authenticate via OAuth (Google & GitHub)
+- Manage cryptocurrency portfolios
+- Track portfolio performance
+- Set currency preferences
+- Maintain secure sessions
+
+Security Features:
+----------------
+- OAuth authentication (Google & GitHub)
+- AES encryption for sensitive data
+- CSRF protection
+- Rate limiting
+- Audit logging
+- Input validation
+- Secure session management
+- Security headers
+- Encrypted backups
+
+Architecture:
+-----------
+The application follows a layered architecture:
+1. Authentication Layer: OAuth and session management
+2. Security Layer: Encryption, CSRF, rate limiting
+3. Business Logic Layer: Portfolio operations
+4. Data Access Layer: Firebase interactions
+5. API Layer: REST endpoints
+
+Author: Gabriel Cellammare
+Version: 1.0
+Last Modified: 05/01/2025
 """
 
-from difflib import restore
-from typing import Dict, Any, Optional, Tuple
-import time
-from flask import Blueprint, jsonify, request, session
-import base64
-from flask import Blueprint, make_response, render_template, request, jsonify, session, redirect, url_for, flash
-from firebase_admin import firestore
-from functools import wraps
+# Standard library imports - organized by functionality
 from datetime import datetime, timedelta, timezone
-from dotenv import load_dotenv
+from difflib import restore
+from functools import wraps
+from typing import Dict, Any, Optional, Tuple
+import base64
 import jwt
-from config import SecureConfig
-from cryptography_utils import AESCipher
-from cryptocache import CryptoCache
 import os
+import time
 
+# Third-party imports - security-critical imports first
+from cryptography_utils import AESCipher  # Handles encryption operations
+from firebase_admin import firestore     # Database operations
+from flask import (
+    Blueprint,
+    jsonify,
+    make_response,
+    render_template,
+    request,
+    session,
+    redirect,
+    url_for,
+    flash
+)
+from dotenv import load_dotenv
+
+# Local application imports
+from config import SecureConfig
+from cryptocache import CryptoCache
 from init_app import configure_oauth, create_app
 from input_validator import InputValidator, ValidationError
 from portfolio_encryption import PortfolioEncryption
@@ -37,36 +74,47 @@ from portfolio_utils import calculate_portfolio_metrics
 from rate_limiter import FirebaseRateLimiter
 from secure_bye_array import SecureByteArray
 from security import CSRFProtection
-import redis
 
-
-# Application initialization
-
-
-# First, load environment variables before any initialization
+# Load environment variables
+# SECURITY NOTE: Critical for secure configuration management
 load_dotenv()
 
-
+# Initialize core security components
+# SECURITY NOTE: Order matters - config must be loaded before other components
 secure_config = SecureConfig()
-
-# Create the Flask application
 app = create_app(secure_config)
 csrf = CSRFProtection(app)
 
-# Initialize other components after app creation
+# Initialize database and caching
+# SECURITY NOTE: These handle sensitive data and need proper security configuration
 db = firestore.client()
 crypto_cache = CryptoCache()
+
+# Initialize encryption components
+# SECURITY NOTE: Critical for data protection - key must be properly secured
 cipher = AESCipher(os.environ.get('MASTER_ENCRYPTION_KEY'))
 portfolio_encryption = PortfolioEncryption(cipher)
 
-# Initialize OAuth after app creation
+# Initialize OAuth
+# SECURITY NOTE: OAuth configuration must be properly secured
 oauth = configure_oauth(app)
-# Middleware
-# Register the CORS headers handler - this will be called automatically after each request
 
 
 def rate_limit_decorator(f):
-    """Decorator per applicare il rate limiting alle route"""
+    """
+    Rate limiting decorator to prevent API abuse.
+
+    Args:
+        f: Function to be decorated
+
+    Returns:
+        Decorated function with rate limiting applied
+
+    Raises:
+        ValidationError: If authentication fails
+        RateLimitExceeded: If rate limit is exceeded
+
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user_id = session.get('user_id') or getattr(request, 'user_id', None)
@@ -106,15 +154,37 @@ def rate_limit_decorator(f):
 
     return decorated_function
 
-# Fixed error logging function
+
+@app.before_request
+def check_session_timeout():
+    """
+    Checks and enforces session timeout rules.
+
+    Validates session age and redirects to login if expired.
+    Session timeout is set to 60 minutes of inactivity.
+    """
+    if 'last_active' in session:
+        last_active = datetime.fromtimestamp(session['last_active'])
+        if datetime.now() - last_active > timedelta(minutes=60):
+            session.clear()
+            return redirect(url_for('index'))
+    session['last_active'] = datetime.now().timestamp()
 
 
 def log_error(error_type: str, user_id: Optional[str], error_message: str) -> str:
     """
-    Safely log errors to Firestore
+    Securely logs errors to Firestore with sanitized data.
+
+    Args:
+        error_type: Category of error
+        user_id: Affected user's ID (optional)
+        error_message: Description of error
 
     Returns:
-        str: The error reference ID
+        str: Error reference ID for tracking
+
+    Raises:
+        FirestoreError: If logging fails
     """
     try:
         error_ref = db.collection('error_logs').document()
@@ -132,51 +202,25 @@ def log_error(error_type: str, user_id: Optional[str], error_message: str) -> st
         return "ERROR_LOG_FAILED"
 
 
-@app.after_request
-def add_security_headers(response):
-    """
-    Adds comprehensive security headers to all API responses.
-    Called automatically by Flask after each request.
-
-    This middleware implements multiple layers of security:
-    1. CORS headers with strict origin validation
-    2. Rate limiting protection
-    3. Security headers (CSP, HSTS, etc.)
-    4. Request integrity verification
-
-    Args:
-        response (Response): Flask response object to modify
-
-    Returns:
-        Response: Modified response with security headers
-
-    Security features:
-    - Validates origins against whitelist
-    - Implements rate limiting per origin
-    - Adds Content-Security-Policy
-    - Configures HTTP Strict Transport Security
-    - Prevents clickjacking with X-Frame-Options
-    - Mitigates XSS with security headers
-    - Verifies request integrity with HMAC
-    """
-    return secure_config.add_security_headers(response)
-
-# Decorator for requiring login
-
-
 def login_required(f):
     """
-    Decorator to protect routes that require user authentication.
-    Redirects to login page if user is not authenticated.
+    Decorator that ensures routes are only accessible to authenticated users.
+
+    Checks for valid user session and redirects to login page if session is invalid.
 
     Args:
-        f (function): Route handler function to protect
+        f(callable): The route function to be protected
 
     Returns:
-        function: Decorated function that checks for authentication
+        callable: Decorated function that includes authentication check
+
+    Security features:
+    - Validates session existence
+    - Prevents unauthorized access
+    - Maintains secure redirect chain
     """
 
-    @wraps(f)
+    @ wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
             return redirect(url_for('index'))
@@ -186,20 +230,28 @@ def login_required(f):
 # Login route
 
 
-@app.route('/auth/login/<provider>')
+@ app.route('/auth/login/<provider>')
 def login(provider):
     """
-    Handles login requests for different OAuth providers.
-    Generates and stores CSRF token before OAuth redirect.
+    Initiates OAuth login flow for specified provider.
+
+    Generates CSRF token and redirects user to OAuth provider's login page.
+    Supports Google and GitHub authentication.
 
     Args:
-        provider (str): OAuth provider name ('google' or 'github')
+        provider (str): Name of OAuth provider ('google' or 'github')
 
     Returns:
         Response: Redirect to OAuth provider's authorization page
 
     Raises:
         ValueError: If invalid provider specified
+
+    Security features:
+    - CSRF token generation
+    - Provider validation
+    - Secure redirect handling
+    - Session state management
     """
     if provider not in ['google', 'github']:
         flash('Invalid authentication provider', 'error')
@@ -216,24 +268,42 @@ def login(provider):
 # Authentication routes
 
 
-@app.route('/auth/callback/<provider>')
+@ app.route('/auth/callback/<provider>')
 def auth_callback(provider):
     """
-    Handles OAuth callback for authentication providers.
-    Processes user data, creates/updates user records, and manages session.
+    Handles OAuth callback after successful provider authentication.
+
+    Processes OAuth response, validates tokens, and creates/updates user records
+    with proper encryption.
 
     Args:
         provider (str): OAuth provider name ('google' or 'github')
 
     Returns:
-        Response: Redirect to dashboard on success or error page on failure
+        Response: Redirect to dashboard on success or error page
 
-    Security:
-    - Validates CSRF state
-    - Validates and stores OAuth tokens
-    - Encrypts sensitive user data
-    - Creates audit logs
-    - Implements secure error handling
+    Raises:
+        ValueError: For invalid CSRF state or token
+        EncryptionError: For encryption/decryption failures
+        FirestoreError: For database operation failures
+
+    Security features:
+    - CSRF state validation
+    - Token validation
+    - Data encryption
+    - Secure salt generation
+    - Audit logging
+    - Error handling
+
+    Flow:
+    1. Validates CSRF state from provider
+    2. Retrieves and validates OAuth tokens
+    3. Fetches user info from provider
+    4. Generates secure user ID and salt
+    5. Encrypts sensitive user data
+    6. Creates/updates user records
+    7. Establishes secure session
+    8. Creates audit log entry
     """
 
     try:
@@ -419,31 +489,36 @@ def auth_callback(provider):
         session.pop('oauth_csrf', None)
 
 
-@app.route('/auth/logout')
-@login_required
-@csrf.csrf_protect
+@ app.route('/auth/logout')
+@ login_required
+@ csrf.csrf_protect
 def logout():
     """
-    Handles user logout requests.
-    Clears all session data and redirects to landing page.
+    Handles user logout process securely.
+
+    Clears session data and redirects to landing page with proper security measures.
 
     Returns:
-        Response: Redirect to index page with success message
+        Response: Redirect to index with success message
 
     Security features:
-    - CSRF protection for logout request
-    - Complete session data cleanup
-    - Audit logging of logout events
-    - Secure redirect handling
+    - Complete session cleanup
+    - CSRF protection
+    - Audit logging
+    - Secure redirect
     """
     session.clear()
     flash('Logout successful!', 'success')
     return redirect(url_for('index'))
 
-# Main routes
+
+"""
+Portfolio Management Methods
+--------------------------
+"""
 
 
-@app.route('/')
+@ app.route('/')
 def index():
     """
     Renders the application landing page.
@@ -454,13 +529,35 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/dashboard')
-@login_required
-@csrf.csrf_protect
+@ app.route('/dashboard')
+@ login_required
+@ csrf.csrf_protect
 def dashboard():
     """
-    Enhanced dashboard view that handles large datasets through pagination and chunking.
-    Implements connection retry logic and better error handling.
+    Renders main dashboard with encrypted portfolio data.
+
+    Implements pagination, data chunking, and retry logic for large datasets.
+    Decrypts and processes portfolio data securely.
+
+    Returns:
+        Response: Rendered dashboard template with portfolio data
+
+    Raises:
+        EncryptionError: For decryption failures
+        FirestoreError: For database operation failures
+
+    Security features:
+    - Authentication required
+    - Data encryption/decryption
+    - Input validation
+    - Error handling
+    - Audit logging
+
+    Performance features:
+    - Pagination (50 items per page)
+    - Connection retry logic (max 3 attempts)
+    - Batch price fetching
+    - Data chunking
     """
     user_id = session['user_id']
     user_ref = db.collection('users').document(user_id)
@@ -588,61 +685,42 @@ def dashboard():
                                username=decrypted_username)
 
 
-# API Routes
-@app.route('/api/cryptocurrencies')
-@login_required
-@csrf.csrf_protect
-def get_cryptocurrencies():
-    """
-    Retrieves list of available cryptocurrencies from cache.
-    Requires authentication to access.
-
-    Returns:
-        JSON response containing:
-        - status: 'success' or 'error'
-        - data: List of available cryptocurrencies
-        - message: Error message (if applicable)
-
-    Security features:
-    - Requires authentication
-    - CSRF protection
-    - Secure error handling
-    """
-
-    try:
-        cryptos = crypto_cache.get_available_cryptocurrencies()
-        return jsonify({'status': 'success', 'data': cryptos}), 200
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-@app.route('/api/portfolio/add', methods=['POST'])
-@login_required
-@csrf.csrf_protect
-@rate_limit_decorator
+@ app.route('/api/portfolio/add', methods=['POST'])
+@ login_required
+@ csrf.csrf_protect
+@ rate_limit_decorator
 def add_portfolio():
     """
-    Adds a new portfolio item with encrypted data storage.
+    Adds new portfolio entry with encrypted storage.
 
-    Required JSON payload fields:
-        - crypto_id (str): Cryptocurrency identifier
-        - symbol (str): Cryptocurrency symbol
-        - amount (float): Quantity purchased
-        - purchase_price (float): Price at purchase
-        - purchase_date (str): Date of purchase
+    Processes and validates input data, encrypts sensitive fields,
+    and stores in database within a transaction.
+
+    Required JSON fields:
+        crypto_id (str): Cryptocurrency identifier
+        symbol (str): Cryptocurrency symbol
+        amount (float): Purchase quantity
+        purchase_price (float): Price at purchase
+        purchase_date (str): Date of purchase
 
     Returns:
-        JSON response with:
-        - status: 'success' or 'error'
-        - message: Description of result
-        - document_id: ID of created document (on success)
+        JSON Response:
+            status: 'success' or 'error'
+            message: Result description
+            document_id: Created document ID (on success)
+
+    Raises:
+        ValidationError: For invalid input data
+        EncryptionError: For encryption failures
+        FirestoreError: For database operation failures
 
     Security features:
-    - Requires authentication
-    - CSRF protection
-    - Encrypts sensitive data
-    - Creates audit logs
-    - Secure error handling
+    - Input validation
+    - Data encryption
+    - Transaction handling
+    - Audit logging
+    - Rate limiting
+    - Error handling
     """
     secure_salt = None
     try:
@@ -683,7 +761,7 @@ def add_portfolio():
         # 5. Transaction-based Data Storage
         transaction = db.transaction()
 
-        @firestore.transactional
+        @ firestore.transactional
         def create_portfolio_item(transaction, validated_data, user_id, secure_salt):
             # Encrypt portfolio data
             encrypted_data = portfolio_encryption.encrypt_portfolio_item(
@@ -763,32 +841,39 @@ def add_portfolio():
             secure_salt.secure_zero()
 
 
-@app.route('/api/portfolio/update/<doc_id>', methods=['PUT'])
-@login_required
-@csrf.csrf_protect
+@ app.route('/api/portfolio/update/<doc_id>', methods=['PUT'])
+@ login_required
+@ csrf.csrf_protect
 def update_portfolio(doc_id):
     """
-    Updates an existing portfolio item while maintaining encryption.
+    Updates existing portfolio entry while maintaining encryption.
+
+    Validates ownership, updates encrypted data, and maintains audit trail.
 
     Args:
-        doc_id (str): Document ID of portfolio item to update
+        doc_id (str): Document ID to update
 
-    Required JSON payload fields:
-        - amount (float): New quantity
-        - purchase_price (float): New purchase price
-        - purchase_date (str): New purchase date
+    Required JSON fields:
+        amount (float): New quantity
+        purchase_price (float): New purchase price
+        purchase_date (str): New purchase date
 
     Returns:
-        JSON response with:
-        - message: Success/error message
-        - timestamp: Update timestamp
+        JSON Response:
+            message: Success/error message
+            timestamp: Update timestamp
+
+    Raises:
+        ValidationError: For invalid input
+        EncryptionError: For encryption failures
+        FirestoreError: For database failures
 
     Security features:
-    - Requires authentication
-    - CSRF protection
-    - Maintains encryption
-    - Verifies document ownership
-    - Creates audit logs
+    - Document ownership verification
+    - Data encryption
+    - Input validation
+    - Audit logging
+    - Error handling
     """
     secure_salt = None
     try:
@@ -869,46 +954,44 @@ def update_portfolio(doc_id):
             secure_salt.secure_zero()
 
 
-@app.route('/api/portfolio/delete/<doc_id>', methods=['DELETE'])
-@login_required
-@csrf.csrf_protect
+@ app.route('/api/portfolio/delete/<doc_id>', methods=['DELETE'])
+@ login_required
+@ csrf.csrf_protect
 def delete_portfolio(doc_id):
     """
-    Securely delete a portfolio item while maintaining an encrypted backup.
-    This implementation ensures that sensitive data remains protected during the deletion process
-    and backup creation, while maintaining a complete audit trail.
-    Verifies ownership, creates backup, and cleans up associated data.
+    Securely deletes portfolio entry with encrypted backup.
+
+    Creates encrypted backup, removes document, and cleans associated data.
 
     Args:
-        doc_id (str): Document ID of portfolio item to delete
+        doc_id (str): Document ID to delete
 
     URL Parameters:
-        reason (str, optional): Reason for deletion
+        reason (str, optional): Deletion reason
 
     Returns:
-        JSON response containing:
-        - message: Success/error message
-        - backup_id: ID of created backup document
-        - timestamp: Deletion timestamp
-        - error_reference: Error log ID (if error occurs)
+        JSON Response:
+            message: Success/error message
+            backup_id: Backup document ID
+            timestamp: Deletion timestamp
+
+    Raises:
+        EncryptionError: For encryption failures
+        FirestoreError: For database failures
 
     Security features:
-    - Requires authentication
-    - CSRF protection
-    - Verifies document ownership
-    - Creates encrypted backup
-    - Maintains audit trail
-    - Cleans up associated files
-    - Secure error handling
-    - Protects sensitive data during deletion
+    - Document ownership verification
+    - Encrypted backup creation
+    - Associated data cleanup
+    - Audit logging
+    - Error handling
 
     Recovery features:
     - Encrypted backup creation
     - Metadata preservation
-    - Associated file tracking
     - Deletion reason logging
-
     """
+
     secure_salt = None
     try:
         user_id = session['user_id']
@@ -1016,54 +1099,84 @@ def delete_portfolio(doc_id):
         if secure_salt is not None:
             secure_salt.secure_zero()
 
-# Currency Preference Routes
 
-# Add these routes to app.py
+"""
+API Routes Documentation
+----------------------
+"""
 
 
-@app.route('/api/preferences/currency', methods=['GET'])
-@login_required
-@csrf.csrf_protect
-def get_currency_preference():
+@ app.route('/api/cryptocurrencies')
+@ login_required
+@ csrf.csrf_protect
+def get_cryptocurrencies():
     """
-    Gets user's preferred currency setting.
-    Requires authentication to access.
+    Retrieves available cryptocurrencies from cache.
+
+    Args:
+        None
 
     Returns:
-        JSON response containing:
-        - currency: User's preferred currency code (defaults to 'USD')
+        JSON Response:
+            status: 'success' or 'error'
+            data: List of cryptocurrencies
+            message: Error message if applicable
 
     Security features:
-    - Requires authentication
+    - Authentication required
+    - CSRF protection
+    - Rate limiting
+    - Error handling
+    """
+
+    try:
+        cryptos = crypto_cache.get_available_cryptocurrencies()
+        return jsonify({'status': 'success', 'data': cryptos}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@ app.route('/api/preferences/currency', methods=['GET'])
+@ login_required
+@ csrf.csrf_protect
+def get_currency_preference():
+    """
+    Retrieves user's preferred currency setting.
+
+    Returns:
+        JSON Response:
+            currency: Preferred currency code (default 'USD')
+
+    Security features:
+    - Authentication required
     - CSRF protection
     - Secure database access
     """
+
     user_ref = db.collection('users').document(session['user_id'])
     user_data = user_ref.get().to_dict()
     return jsonify({'currency': user_data.get('preferred_currency', 'USD')})
 
 
-@app.route('/api/preferences/currency', methods=['PUT'])
-@login_required
-@csrf.csrf_protect
+@ app.route('/api/preferences/currency', methods=['PUT'])
+@ login_required
+@ csrf.csrf_protect
 def update_currency_preference():
     """
-    Updates user's preferred currency setting.
-    Requires authentication to access.
+    Updates user's currency preference setting.
 
-    Required JSON payload fields:
-        - currency (str): New currency preference code ('USD' or 'EUR')
+    Required JSON fields:
+        currency (str): New currency code ('USD' or 'EUR')
 
     Returns:
-        JSON response containing:
-        - message: Success message
-        - error: Error message (if applicable)
+        JSON Response:
+            message: Success message
+            error: Error message if applicable
 
     Security features:
-    - Requires authentication
+    - Authentication required
     - CSRF protection
     - Input validation
-    - Secure database updates
     - Error handling
     """
     try:
@@ -1086,25 +1199,25 @@ def update_currency_preference():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/csrf/nonce', methods=['GET'])
-@login_required
-@csrf.csrf_protect
+@ app.route('/api/csrf/nonce', methods=['GET'])
+@ login_required
+@ csrf.csrf_protect
 def refresh_csrf_nonce():
     """
-    Generates and returns a new CSRF nonce for frontend requests.
+    Generates new CSRF nonce for frontend requests.
 
     Returns:
-        JSON response containing:
-        - status: 'success' or 'error'
-        - nonce: New CSRF nonce value
-        - expires: Nonce expiration timestamp
-        - message: Error message (if applicable)
+        JSON Response:
+            status: 'success' or 'error'
+            nonce: New CSRF nonce
+            expires: Expiration timestamp
+            message: Error message if applicable
 
     Security features:
-    - Requires authentication
-    - Generates cryptographically secure nonce
-    - Sets expiration time
-    - Creates audit logs
+    - Authentication required
+    - Cryptographic nonce generation
+    - Expiration handling
+    - Audit logging
     """
     try:
         # Generate a new nonce using the CSRF protection instance
@@ -1141,20 +1254,23 @@ def refresh_csrf_nonce():
         }), 500
 
 
-@app.route('/navigate-home', methods=['POST'])
-@login_required
-@csrf.csrf_protect
+@ app.route('/navigate-home', methods=['POST'])
+@ login_required
+@ csrf.csrf_protect
 def navigate_home():
     """
     Handles secure navigation to home page.
 
-    This route:
-    1. Verifies the user's session state
-    2. Performs any necessary cleanup
-    3. Redirects to the appropriate page based on authentication status
+    Verifies session state and performs necessary cleanup.
 
     Returns:
-        Response: Redirect to appropriate page with proper session handling
+        Response: Redirect with proper session handling
+
+    Security features:
+    - Session validation
+    - Audit logging
+    - Secure redirect
+    - Error handling
     """
     try:
         if 'user_id' in session:
@@ -1189,15 +1305,61 @@ def navigate_home():
         }), 500
 
 
-@app.route('/api/csrf/token', methods=['GET'])
-@login_required
-@csrf.csrf_protect
+@ app.route('/api/csrf/token', methods=['GET'])
+@ login_required
+@ csrf.csrf_protect
 def get_csrf_token():
+    """
+    Generates and returns new CSRF token.
+
+    Returns:
+        Response: JSON with token and secure cookie
+
+    Security features:
+    - Authentication required
+    - Secure cookie settings
+    - HTTP-only flag
+    - SameSite policy
+    """
     token = csrf.generate_token()
     response = make_response(jsonify({'token': token}))
     response.set_cookie('csrf_token', token, secure=True,
                         httponly=True, samesite='Lax')
     return response
+
+
+"""
+Middleware Documentation
+----------------------
+"""
+
+
+@app.after_request
+def add_security_headers(response):
+    """
+    Adds security headers to all API responses.
+
+    Implements multiple security layers through HTTP headers:
+    1. CORS with strict origin validation
+    2. Content Security Policy (CSP)
+    3. HTTP Strict Transport Security (HSTS)
+    4. X-Frame-Options for clickjacking prevention
+    5. XSS protection headers
+
+    Args:
+        response (Response): Flask response object
+
+    Returns:
+        Response: Modified response with security headers
+
+    Security features:
+    - Origin validation
+    - CSP configuration
+    - HSTS enforcement
+    - Clickjacking prevention
+    - XSS protection
+    """
+    return secure_config.add_security_headers(response)
 
 
 """
@@ -1278,9 +1440,9 @@ def check_token_request_eligibility(user_id: str) -> Tuple[bool, Optional[dateti
     return True, None, None
 
 
-@app.route('/api/token/cleanup', methods=['POST'])
-@login_required
-@csrf.csrf_protect
+@ app.route('/api/token/cleanup', methods=['POST'])
+@ login_required
+@ csrf.csrf_protect
 def cleanup_tokens():
     """
     Endpoint to clean up expired tokens and return the number of tokens cleaned
@@ -1393,9 +1555,9 @@ def expire_previous_tokens(user_id: str) -> None:
         })
 
 
-@app.route('/api/token/status', methods=['GET'])
-@login_required
-@csrf.csrf_protect
+@ app.route('/api/token/status', methods=['GET'])
+@ login_required
+@ csrf.csrf_protect
 def get_token_status():
     """
     Get current token status for the user
@@ -1490,7 +1652,7 @@ def get_token_creation_time(token: str) -> Optional[datetime]:
 
 def jwt_required(f):
     """Enhanced decorator to verify JWT tokens with Firebase check"""
-    @wraps(f)
+    @ wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
 
@@ -1554,7 +1716,7 @@ def jwt_required(f):
 # Error Handlers
 
 
-@portfolio_api.errorhandler(AuthError)
+@ portfolio_api.errorhandler(AuthError)
 def handle_auth_error(error):
     """Handle authentication errors"""
     response = jsonify({'error': error.error})
@@ -1562,13 +1724,13 @@ def handle_auth_error(error):
     return response
 
 
-@portfolio_api.errorhandler(400)
+@ portfolio_api.errorhandler(400)
 def handle_bad_request(error):
     """Handle bad request errors"""
     return jsonify({'error': 'Bad request', 'message': str(error)}), 400
 
 
-@portfolio_api.errorhandler(500)
+@ portfolio_api.errorhandler(500)
 def handle_internal_error(error):
     """Handle internal server errors"""
     # Log error details securely
@@ -1584,9 +1746,9 @@ def handle_internal_error(error):
 # Routes
 
 
-@app.route('/api/token', methods=['POST'])
-@login_required
-@csrf.csrf_protect
+@ app.route('/api/token', methods=['POST'])
+@ login_required
+@ csrf.csrf_protect
 def get_tokens():
     """
     Generate a new JWT token for authenticated users with request limits.
@@ -1621,8 +1783,8 @@ def get_tokens():
         }), e.status_code
 
 
-@portfolio_api.route('/portfolio', methods=['GET'])
-@jwt_required
+@ portfolio_api.route('/portfolio', methods=['GET'])
+@ jwt_required
 def get_portfolio():
     """
     Retrieves and decrypts user's portfolio data.
@@ -1749,9 +1911,9 @@ def get_portfolio():
             secure_salt.secure_zero()
 
 
-@portfolio_api.route('/portfolio', methods=['POST'])
-@jwt_required
-@rate_limit_decorator
+@ portfolio_api.route('/portfolio', methods=['POST'])
+@ jwt_required
+@ rate_limit_decorator
 def add_crypto():
     """
     Adds a new encrypted portfolio item.
@@ -1759,7 +1921,7 @@ def add_crypto():
     Required JSON payload:
     {
         "crypto_id": "bitcoin",
-        "symbol": "BTC", 
+        "symbol": "BTC",
         "amount": 1.5,
         "purchase_price": 45000,
         "purchase_date": "2024-01-15"
