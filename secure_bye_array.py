@@ -2,7 +2,7 @@
 SecureByteArray: Secure Memory Management Implementation
 Version: 1.0
 Author: [Gabriel Cellammare]
-Last Modified: [05/01/2024]
+Last Modified: [05/01/2025]
 
 This module provides a secure implementation for handling sensitive data in memory with:
 - Protected memory management

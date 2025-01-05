@@ -2,7 +2,7 @@
 CSRFProtection: Advanced Cross-Site Request Forgery protection for Flask applications.
 Version: 1.0
 Author: [Gabriel Cellammare]
-Last Modified: [05/01/2024]
+Last Modified: [05/01/2025]
 
 This module provides comprehensive CSRF protection for Flask applications by implementing:
 - Double-submit cookie pattern with secure token generation
