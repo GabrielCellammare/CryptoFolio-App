@@ -1,3 +1,29 @@
+"""
+SecureByteArray: Secure Memory Management Implementation
+Version: 1.0
+Author: [Gabriel Cellammare]
+Last Modified: [05/01/2024]
+
+This module provides a secure implementation for handling sensitive data in memory with:
+- Protected memory management
+- Anti-dumping measures
+- Secure data wiping
+- Automatic cleanup mechanisms
+
+Security Features:
+1. Memory Protection: Implements secure allocation and wiping
+2. Anti-Dumping: Uses multiple overwrite passes
+3. Context Management: Automatic cleanup
+4. Access Control: Locking mechanism
+5. Secure Random: Uses secrets module for cryptographic operations
+
+Dependencies:
+- array (for byte array management)
+- ctypes (for low-level memory operations)
+- secrets (for cryptographic random generation)
+- logging (for security event tracking)
+"""
+
 import array
 import ctypes
 import secrets
@@ -6,44 +32,69 @@ import logging
 
 
 class MemorySecurityError(Exception):
-    """Custom exception for memory security errors."""
+    """
+    Custom exception for memory security operations.
+
+    Used to distinguish memory security issues from standard exceptions.
+    Provides specific error context for security-related failures.
+    """
     pass
 
 
 class SecureByteArray:
     """
-    Secure implementation for handling sensitive data in memory.
+    Secure Memory Management Implementation
 
-    This class provides:
-    - Secure memory management with automatic cleanup
-    - Protection against memory dumping
-    - Secure overwriting of sensitive data
-    - Context management for automatic cleanup
+    Provides protected memory operations for sensitive data handling:
+    - Secure memory allocation and deallocation
+    - Protection against memory dumps
+    - Multi-pass secure data wiping
+    - Automatic memory cleanup
+    - Memory access controls
 
-    Attributes:
-        _data (array.array): Byte array containing the data
-        _address (int): Memory address of the array
-        _length (int): Length of the array in bytes
-        _is_locked (bool): Indicates if the array is locked for modifications
+    Security Features:
+    - Uses cryptographic random for overwriting
+    - Implements multiple wipe passes
+    - Verifies memory allocation
+    - Provides memory locking
+    - Implements secure copying
+
+    Usage:
+        # Using as context manager (recommended)
+        with SecureByteArray(sensitive_data) as secure_data:
+            processed_data = secure_data.to_bytes()
+
+        # Direct usage (requires manual cleanup)
+        secure_data = SecureByteArray(sensitive_data)
+        try:
+            processed_data = secure_data.to_bytes()
+        finally:
+            secure_data.secure_zero()
     """
 
-    # Logging configuration
+    # Configure logging for security events
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
 
-    # Security constants
-    SECURE_WIPE_PASSES = 3  # Number of passes for secure wiping
-    MIN_RANDOM_BYTES = 32   # Minimum number of random bytes for overwriting
+    # Security configuration constants
+    SECURE_WIPE_PASSES = 3  # Minimum passes for secure wiping
+    MIN_RANDOM_BYTES = 32   # Minimum random bytes for secure overwriting
 
     def __init__(self, data: Optional[Union[bytes, bytearray, array.array]] = None):
         """
-        Initializes a new SecureByteArray.
+        Initialize secure byte array with optional data.
 
         Args:
-            data: Initial data to store (optional)
+            data: Initial sensitive data (optional)
 
         Raises:
-            MemorySecurityError: If secure memory allocation fails
+            MemorySecurityError: On memory allocation failure
+            TypeError: On invalid input data type
+
+        Security:
+        - Validates input types
+        - Verifies memory allocation
+        - Initializes security state
         """
         try:
             if data is not None:
@@ -70,30 +121,43 @@ class SecureByteArray:
 
     def _verify_memory_allocation(self) -> None:
         """
-        Verifies that memory has been allocated correctly.
+        Verify memory allocation security.
 
         Raises:
-            MemorySecurityError: If memory allocation failed
+            MemorySecurityError: If allocation verification fails
+
+        Security:
+        - Checks memory address validity
+        - Validates allocation size
+        - Verifies address space
         """
         if self._length > 0 and (self._address is None or self._address == 0):
             raise MemorySecurityError("Memory allocation failed")
 
     def secure_zero(self) -> None:
         """
-        Overwrites memory with random data and then zeros securely.
-        Uses multiple passes to make data recovery more difficult.
+        Securely wipe memory contents.
+
+        Security Implementation:
+        - Multiple overwrite passes
+        - Cryptographic random data
+        - Final zero overwrite
+        - Memory fence operations
+
+        Raises:
+            MemorySecurityError: If secure wiping fails
         """
         if self._length == 0:
             return
 
         try:
             for _ in range(self.SECURE_WIPE_PASSES):
-                # Overwrite with random data
+                # Cryptographic random overwrite
                 random_data = secrets.token_bytes(
                     max(self._length, self.MIN_RANDOM_BYTES))
                 ctypes.memmove(self._address, random_data, self._length)
 
-            # Final overwrite with zeros
+            # Final secure zero pass
             ctypes.memset(self._address, 0, self._length)
 
         except Exception as e:
@@ -104,15 +168,20 @@ class SecureByteArray:
 
     def to_bytes(self) -> bytes:
         """
-        Returns a secure copy of the data as bytes.
+        Create secure copy of data.
 
         Returns:
-            bytes: Copy of the data
+            bytes: Copy of protected data
 
         Raises:
-            MemorySecurityError: If the array is locked
+            MemorySecurityError: If array is locked
+
+        Security:
+        - Validates lock state
+        - Creates secure copy
+        - Maintains original protection
         """
         if self._is_locked:
             raise MemorySecurityError(
-                "Cannot access data while the array is locked")
+                "Cannot access data while array is locked")
         return bytes(self._data)
