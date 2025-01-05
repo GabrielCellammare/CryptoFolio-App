@@ -1364,15 +1364,36 @@ def add_security_headers(response):
 
 """
 Enhanced Portfolio API Implementation
-Provides secure JWT-based authentication and comprehensive API endpoints
-for cryptocurrency portfolio management.
+===================================
 
-Features:
-- JWT-based authentication with refresh token support
-- Rate limiting
-- Comprehensive error handling
-- Detailed logging
-- Input validation
+This module provides a secure API for cryptocurrency portfolio management with JWT-based
+authentication. It includes comprehensive security features, rate limiting, and error handling.
+
+Security Features:
+    - JWT-based authentication with refresh token support
+    - Rate limiting and request cooldown periods
+    - Comprehensive error handling and audit logging
+    - Secure data encryption for portfolio items
+    - CSRF protection
+    - Input validation
+
+Module Structure:
+    - Configuration
+    - Custom Exceptions
+    - Authentication Services
+    - Token Management
+    - Portfolio Management
+    - Route Handlers
+    - Error Handlers
+
+Dependencies:
+    - Flask
+    - PyJWT
+    - Firebase Admin
+    - cryptography
+
+Author: Gabriel Cellammare
+Modified: 05/01/2024
 """
 
 # Configuration
@@ -1398,7 +1419,28 @@ class AuthError(Exception):
 
 def get_user_token_history(user_id: str, since: datetime) -> list:
     """
-    Retrieve user's token generation history from Firestore
+    Retrieves the token generation history for a specific user from Firestore.
+
+    Args:
+        user_id (str): The unique identifier of the user whose token history is being retrieved.
+        since (datetime): The starting datetime point from which to retrieve the history.
+
+    Returns:
+        List[Dict]: A list of dictionaries containing token history records, where each dictionary
+        contains token details such as creation time, expiration, and status.
+
+    Raises:
+        FirestoreError: If there's an error accessing the Firestore database.
+
+    Example:
+        >>> history = get_user_token_history("user123", datetime(2024, 1, 1))
+        >>> print(history[0])
+        {
+            'user_id': 'user123',
+            'created_at': datetime(2024, 1, 5, 10, 30),
+            'status': 'active',
+            'expires_at': datetime(2024, 1, 12, 10, 30)
+        }
     """
     token_docs = (db.collection('user_tokens')
                   .where('user_id', '==', user_id)
@@ -1413,7 +1455,25 @@ def get_user_token_history(user_id: str, since: datetime) -> list:
 
 def check_token_request_eligibility(user_id: str) -> Tuple[bool, Optional[datetime], Optional[str]]:
     """
-    Enhanced eligibility check using Firestore database
+    Determines if a user is eligible to request a new token based on daily limits and cooldown periods.
+
+    Args:
+        user_id (str): The unique identifier of the user requesting a token.
+
+    Returns:
+        Tuple[bool, Optional[datetime], Optional[str]]: A tuple containing:
+            - bool: Whether the user is eligible for a new token
+            - Optional[datetime]: The next time the user will be eligible (if currently ineligible)
+            - Optional[str]: An error message explaining why the user is ineligible (if applicable)
+
+    Raises:
+        FirestoreError: If there's an error accessing the token history.
+
+    Example:
+        >>> is_eligible, next_time, message = check_token_request_eligibility("user123")
+        >>> if not is_eligible:
+        >>>     print(f"Next eligible at {next_time}: {message}")
+
     """
     current_time = datetime.now(timezone.utc)
     day_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1445,7 +1505,25 @@ def check_token_request_eligibility(user_id: str) -> Tuple[bool, Optional[dateti
 @ csrf.csrf_protect
 def cleanup_tokens():
     """
-    Endpoint to clean up expired tokens and return the number of tokens cleaned
+    Cleans up expired tokens in the database by updating their status and maintaining an audit trail.
+
+    Returns:
+        Dict[str, Any]: A JSON response containing:
+            - success (bool): Whether the cleanup operation was successful
+            - cleaned_tokens (int): The number of tokens that were cleaned up
+
+    Raises:
+        FirestoreError: If there's an error accessing or updating the database.
+        Exception: For any other unexpected errors during cleanup.
+
+    Security:
+        - Requires authentication via @login_required decorator
+        - Protected against CSRF attacks
+        - Creates audit trail for cleanup operations
+
+    Example:
+        >>> response = cleanup_tokens()
+        >>> print(f"Cleaned {response['cleaned_tokens']} expired tokens")
     """
     try:
         current_time = datetime.now(timezone.utc)
@@ -1487,7 +1565,26 @@ def cleanup_tokens():
 
 def get_active_token(user_id: str) -> Optional[Dict[str, Any]]:
     """
-    Retrieve the most recent active token for a user
+    Retrieves the most recent active token for a specified user.
+
+    Args:
+        user_id (str): The unique identifier of the user.
+
+    Returns:
+        Optional[Dict[str, Any]]: Dictionary containing token information if an active token exists,
+        None otherwise. The dictionary includes:
+            - access_token: The JWT token string
+            - created_at: Token creation timestamp
+            - expires_at: Token expiration timestamp
+            - status: Current token status
+
+    Raises:
+        FirestoreError: If there's an error accessing the token data.
+
+    Example:
+        >>> token_info = get_active_token("user123")
+        >>> if token_info:
+        >>>     print(f"Token expires at {token_info['expires_at']}")
     """
     current_time = datetime.now(timezone.utc)
 
@@ -1506,14 +1603,26 @@ def get_active_token(user_id: str) -> Optional[Dict[str, Any]]:
 
 def expire_previous_tokens(user_id: str) -> None:
     """
-    Expires all active tokens for a given user in the database.
-    This ensures only one token is active at a time per user.
+    Expires all active tokens for a given user to ensure only one token is active at a time.
 
     Args:
-        user_id: The unique identifier of the user
+        user_id (str): The unique identifier of the user whose tokens should be expired.
 
-    The function uses a batch operation to update all tokens efficiently
-    and maintains an audit trail of token expiration.
+    Side Effects:
+        - Updates token status in database to 'expired'
+        - Creates audit log entries for token expiration
+        - Updates expiration timestamps
+
+    Raises:
+        FirestoreError: If there's an error updating the token status.
+
+    Security:
+        - Creates detailed audit logs for token expiration
+        - Uses batch operations for atomic updates
+        - Maintains complete expiration history
+
+    Example:
+        >>> expire_previous_tokens("user123")  # Expires all active tokens for user123
     """
     current_time = datetime.now(timezone.utc)
 
@@ -1651,7 +1760,37 @@ def get_token_creation_time(token: str) -> Optional[datetime]:
 
 
 def jwt_required(f):
-    """Enhanced decorator to verify JWT tokens with Firebase check"""
+    """
+    Decorator that verifies JWT tokens and ensures proper authentication for protected routes.
+
+    Args:
+        f (Callable): The function to be decorated.
+
+    Returns:
+        Callable: The decorated function with JWT verification.
+
+    Raises:
+        AuthError: In cases of:
+            - Missing or invalid token format
+            - Expired token
+            - Invalid token signature
+            - Token not found in database
+            - Token type mismatch
+            - Token verification failure
+
+    Security Features:
+        - Verifies JWT signature
+        - Checks token expiration
+        - Validates token in database
+        - Maintains audit trail
+        - Secure error logging
+        - Automatic token status updates
+
+    Example:
+        >>> @jwt_required
+        >>> def protected_route():
+        >>>     return "Access granted"
+    """
     @ wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
@@ -1718,7 +1857,20 @@ def jwt_required(f):
 
 @ portfolio_api.errorhandler(AuthError)
 def handle_auth_error(error):
-    """Handle authentication errors"""
+    """
+    Handles authentication-related errors and returns appropriate HTTP responses.
+
+    Args:
+        error (AuthError): The authentication error that occurred.
+
+    Returns:
+        Tuple[Response, int]: A JSON response containing error details and appropriate HTTP status code.
+
+    Example:
+        >>> @portfolio_api.errorhandler(AuthError)
+        >>> def handle_auth_error(error):
+        >>>     return jsonify({'error': 'Authentication failed'}), 401
+    """
     response = jsonify({'error': error.error})
     response.status_code = error.status_code
     return response
@@ -1726,13 +1878,48 @@ def handle_auth_error(error):
 
 @ portfolio_api.errorhandler(400)
 def handle_bad_request(error):
-    """Handle bad request errors"""
+    """
+    Handles bad request errors (HTTP 400) and returns appropriate responses.
+
+    Args:
+        error (BadRequestError): The bad request error that occurred.
+
+    Returns:
+        Tuple[Response, int]: A JSON response containing error details and 400 status code.
+
+    Example:
+        >>> @portfolio_api.errorhandler(400)
+        >>> def handle_bad_request(error):
+        >>>     return jsonify({'error': 'Invalid request parameters'}), 400
+    """
     return jsonify({'error': 'Bad request', 'message': str(error)}), 400
 
 
 @ portfolio_api.errorhandler(500)
 def handle_internal_error(error):
-    """Handle internal server errors"""
+    """
+    Handles internal server errors (HTTP 500) with secure logging.
+
+    Args:
+        error (Exception): The internal server error that occurred.
+
+    Returns:
+        Tuple[Response, int]: A JSON response containing error details and 500 status code.
+
+    Side Effects:
+        - Logs error details to secure error logging system
+        - Creates audit trail for internal errors
+
+    Security:
+        - Sanitizes error messages before logging
+        - Maintains secure error logs
+        - Provides generic error messages to users
+
+    Example:
+        >>> @portfolio_api.errorhandler(500)
+        >>> def handle_internal_error(error):
+        >>>     return jsonify({'error': 'Internal server error'}), 500
+    """
     # Log error details securely
     db.collection('error_logs').add({
         'error_type': 'internal_server_error',
@@ -1787,20 +1974,31 @@ def get_tokens():
 @ jwt_required
 def get_portfolio():
     """
-    Retrieves and decrypts user's portfolio data.
+    Retrieves and decrypts a user's portfolio data.
 
     Returns:
-        JSON response containing:
-        - status: 'success' or 'error'
-        - data: List of decrypted portfolio items with current values
-        - total_value: Total portfolio value
-        - currency: User's preferred currency
+        Dict[str, Any]: JSON response containing:
+            - status: 'success' or 'error'
+            - data: List of decrypted portfolio items with current values
+            - total_value: Total portfolio value
+            - currency: User's preferred currency
 
-    Security features:
-    - JWT authentication
-    - Data decryption using user's salt
-    - Secure error handling
-    - Audit logging
+    Raises:
+        AuthError: If the user is not properly authenticated.
+        FirestoreError: If there's an error accessing portfolio data.
+        CryptoError: If there's an error fetching cryptocurrency prices.
+        DecryptionError: If portfolio data cannot be decrypted.
+
+    Security Features:
+        - JWT authentication required
+        - Data decryption using user's unique salt
+        - Secure error handling
+        - Audit logging
+        - Secure cleanup of sensitive data
+
+    Example:
+        >>> portfolio = get_portfolio()
+        >>> print(f"Total portfolio value: {portfolio['total_value']} {portfolio['currency']}")
     """
     secure_salt = None
     try:
@@ -1916,6 +2114,49 @@ def get_portfolio():
 @ rate_limit_decorator
 def add_crypto():
     """
+
+    Adds a new encrypted portfolio item to the user's portfolio.
+
+    Required JSON payload:
+        {
+            "crypto_id": "bitcoin",
+            "symbol": "BTC",
+            "amount": 1.5,
+            "purchase_price": 45000,
+            "purchase_date": "2024-01-15"
+        }
+
+    Returns:
+        Dict[str, Any]: JSON response containing:
+            - status: 'success' or 'error'
+            - message: Result description
+            - document_id: Created document ID (on success)
+
+    Raises:
+        ValidationError: If the input data fails validation.
+        AuthError: If the user is not properly authenticated.
+        FirestoreError: If there's an error storing the portfolio item.
+        EncryptionError: If the portfolio data cannot be encrypted.
+
+    Security Features:
+        - JWT authentication required
+        - Rate limiting applied
+        - Input validation
+        - Data encryption
+        - Audit logging
+        - CSRF protection
+
+    Example:
+        >>> crypto_data = {
+        >>>     "crypto_id": "bitcoin",
+        >>>     "symbol": "BTC",
+        >>>     "amount": 1.5,
+        >>>     "purchase_price": 45000,
+        >>>     "purchase_date": "2024-01-15"
+        >>> }
+        >>> result = add_crypto(crypto_data)
+        >>> print(f"Added portfolio item with ID: {result['document_id']}")
+
     Adds a new encrypted portfolio item.
 
     Required JSON payload:
