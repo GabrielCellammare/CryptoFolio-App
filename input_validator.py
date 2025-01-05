@@ -48,7 +48,6 @@ Security Considerations:
 Dependencies:
 - validators: For email and URL validation
 - datetime: For secure date handling
-- decimal: For precise numeric operations
 - re: For pattern matching
 - typing: For type validation
 """
@@ -56,7 +55,6 @@ Dependencies:
 from typing import Dict, Any, Optional, Union, List
 from datetime import datetime
 import re
-from decimal import Decimal
 from dataclasses import dataclass
 from enum import Enum
 import validators
