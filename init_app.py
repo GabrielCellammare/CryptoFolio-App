@@ -48,16 +48,13 @@ Dependencies:
 - authlib: OAuth implementation
 - firebase_admin: Firebase operations
 - python-dotenv: Environment management
+- os
 """
 
-from typing import Optional
 from flask import Flask
 from authlib.integrations.flask_client import OAuth
 from firebase_admin import credentials, initialize_app
-from dotenv import load_dotenv
-from config import Config, ConfigurationError
 import os
-import secrets
 from pathlib import Path
 
 from ngrok_manager import NgrokManager

@@ -50,7 +50,6 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
-import requests
 import logging
 from pyngrok import ngrok, conf
 

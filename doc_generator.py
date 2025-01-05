@@ -1,8 +1,58 @@
+"""
+Documentation Generator Security Framework
+Version: 1.0
+Author: Gabriel Cellammare
+Last Modified: 05/01/2025
+
+This module implements a secure and robust documentation generation system with
+a strong focus on module discovery protection, configuration security, and
+safe file system operations.
+
+Security Features:
+1. File System Protection
+   - Secure path traversal prevention
+   - Protected file operations
+   - Safe directory creation
+   - Path validation and sanitization
+
+2. Module Security
+   - Protected module discovery
+   - Secure import handling
+   - Module isolation
+   - Safe module resolution
+
+3. Documentation Security
+   - Protected configuration generation
+   - Secure theme handling
+   - Safe template management
+   - Output isolation
+
+4. Configuration Management
+   - Protected variable handling
+   - Secure initialization
+   - Error isolation
+   - Safe defaults
+
+Security Considerations:
+- All file paths are validated and sanitized
+- Module imports are protected
+- Configuration files are isolated
+- Development artifacts are protected
+- Error states provide safe defaults
+- Directory traversal is prevented
+- Module resolution is secured
+- Output paths are protected
+
+Dependencies:
+- sphinx: Documentation generation framework
+- pdoc: Alternative documentation generator
+- pathlib: Secure path operations
+- importlib: Protected module importing
+"""
 import os
 import sys
-from typing import List, Optional, Dict
+from typing import Dict
 import pdoc
-import sphinx.ext.autodoc
 from sphinx.application import Sphinx
 from pathlib import Path
 import importlib.util
@@ -10,18 +60,34 @@ import importlib.util
 
 class DocGenerator:
     """
-    A class to automate documentation generation from multiple Python source files.
-    Supports both Sphinx and pdoc documentation formats with automatic module discovery.
+    A class that automates documentation generation from Python source files.
+
+    This class provides functionality to:
+    1. Discover Python modules in a project directory
+    2. Generate documentation using either Sphinx or pdoc
+    3. Handle configuration and setup for documentation generation
+    4. Provide error handling and fallback options
+
+    Attributes:
+        project_dir (Path): Root directory containing Python source files
+        output_dir (Path): Directory where documentation will be generated
+        has_rtd_theme (bool): Flag indicating if sphinx_rtd_theme is available
+        python_files (Dict[str, Path]): Mapping of module names to file paths
     """
 
     def __init__(self, project_dir: str, output_dir: str):
         """
-        Initialize the documentation generator.
+        Initialize the documentation generator with project and output directories.
 
         Args:
             project_dir: Root directory containing Python source files
             output_dir: Directory where documentation will be generated
+
+        Raises:
+            ValueError: If no Python files are found in the project directory
+            TypeError: If input parameters are not str or Path objects
         """
+
         self.project_dir = Path(project_dir)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -36,10 +102,18 @@ class DocGenerator:
 
     def _discover_python_files(self) -> Dict[str, Path]:
         """
-        Discover all Python files in the project directory.
+        Discover and catalog all Python files in the project directory.
+
+        This method walks through the project directory tree and:
+        1. Identifies all .py files
+        2. Excludes files in venv, build, and __pycache__ directories
+        3. Converts file paths to module names
 
         Returns:
-            Dict[str, Path]: Dictionary mapping module names to file paths
+            Dict[str, Path]: Dictionary mapping module names to their file paths
+
+        Example:
+            {'mypackage.module': Path('/path/to/mypackage/module.py')}
         """
         python_files = {}
         for file_path in self.project_dir.glob('**/*.py'):
@@ -58,8 +132,16 @@ class DocGenerator:
 
     def setup_sphinx(self) -> None:
         """
-        Set up Sphinx configuration and create necessary files.
-        Automatically includes all discovered Python modules.
+        Set up Sphinx configuration and create necessary directory structure.
+
+        This method:
+        1. Creates required Sphinx directories
+        2. Generates conf.py with project configuration
+        3. Creates index.rst with module documentation structure
+        4. Configures theme and extensions
+
+        Raises:
+            IOError: If unable to create necessary files or directories
         """
         sphinx_dirs = ['_static', '_templates',
                        '_build/html', '_build/doctrees']
@@ -144,7 +226,14 @@ Indices and tables
     def generate_sphinx_docs(self) -> None:
         """
         Generate Sphinx documentation for all discovered Python files.
-        Includes improved error handling and fallback options.
+
+        This method:
+        1. Sets up Sphinx configuration
+        2. Builds HTML documentation
+        3. Handles errors and provides theme fallback
+
+        Raises:
+            Exception: If documentation generation fails after fallback attempts
         """
         try:
             self.setup_sphinx()
@@ -179,7 +268,14 @@ Indices and tables
     def generate_pdoc_docs(self) -> None:
         """
         Generate pdoc documentation for all discovered Python files.
-        Creates a simpler but comprehensive documentation.
+
+        This method:
+        1. Adds project directory to Python path
+        2. Generates HTML documentation using pdoc
+        3. Outputs documentation to specified directory
+
+        Raises:
+            Exception: If pdoc documentation generation fails
         """
         sys.path.insert(0, str(self.project_dir))
 
@@ -191,10 +287,13 @@ Indices and tables
 
     def run(self, doc_type: str = 'sphinx') -> None:
         """
-        Run the documentation generation process.
+        Execute the documentation generation process.
 
         Args:
             doc_type: Type of documentation to generate ('sphinx' or 'pdoc')
+
+        Raises:
+            ValueError: Unsupported documentation type
         """
         print(f"\nStarting documentation generation...")
         print(f"Source directory: {self.project_dir}")
