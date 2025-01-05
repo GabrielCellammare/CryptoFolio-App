@@ -81,7 +81,8 @@ class SecurityManager {
                 credentials: 'same-origin',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                    'Cache-Control': 'no-cache'
+                    'Cache-Control': 'no-cache',
+                    'Origin': window.location.origin
                 }
             });
 
@@ -338,57 +339,6 @@ class ApiServiceImpl {
     }
 
     /**
-     * Checks token status and determines if refresh is needed
-     * @returns {Promise<Object>} Token status information
-     */
-    async checkTokenStatus() {
-        const token = localStorage.getItem(CONFIG.STORAGE_KEYS.ACCESS_TOKEN);
-        const expiryStr = localStorage.getItem(CONFIG.STORAGE_KEYS.TOKEN_EXPIRY);
-        const nextRequestStr = localStorage.getItem(CONFIG.STORAGE_KEYS.NEXT_TOKEN_REQUEST);
-
-        if (!token || !expiryStr) {
-            return { needsRefresh: true };
-        }
-
-        const expiry = new Date(expiryStr);
-        const now = new Date();
-
-        if (expiry.getTime() - now.getTime() < CONFIG.TIMING.TOKEN_REFRESH_THRESHOLD) {
-            if (nextRequestStr) {
-                const nextRequest = new Date(nextRequestStr);
-                if (now < nextRequest) {
-                    const waitTime = this.#formatWaitTime(nextRequest.getTime() - now.getTime());
-                    return {
-                        needsRefresh: false,
-                        error: `${CONFIG.MESSAGES.COOLDOWN} Try again in ${waitTime}`
-                    };
-                }
-            }
-            return { needsRefresh: true };
-        }
-
-        return { needsRefresh: false };
-    }
-
-    /**
-     * Formats wait time into human-readable string
-     * @param {number} milliseconds Time to format
-     * @returns {string} Formatted time string
-     */
-    #formatWaitTime(milliseconds) {
-        const hours = Math.floor(milliseconds / (1000 * 60 * 60));
-        const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
-
-        const parts = [];
-        if (hours > 0) parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
-        if (minutes > 0) parts.push(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`);
-        if (seconds > 0) parts.push(`${seconds} ${seconds === 1 ? 'second' : 'seconds'}`);
-
-        return parts.join(' and ');
-    }
-
-    /**
      * Makes a secure fetch request with retry logic and security headers
      * @param {string} url The URL to fetch
      * @param {Object} options Fetch options
@@ -465,47 +415,6 @@ class ApiServiceImpl {
     }
 
     /**
-     * Executes a single request attempt with timeout handling
-     * @private
-     */
-    async #executeRequest(url, options) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMING.REQUEST_TIMEOUT);
-
-        try {
-            const response = await fetch(url, {
-                ...options,
-                signal: controller.signal
-            });
-
-            this.#handleRateLimitHeaders(response);
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            return await response.json();
-        } finally {
-            clearTimeout(timeoutId);
-        }
-    }
-
-    /**
-     * Handles rate limit headers from response
-     * @private
-     */
-    #handleRateLimitHeaders(response) {
-        const remaining = response.headers.get('X-RateLimit-Remaining');
-        const resetTime = response.headers.get('X-RateLimit-Reset');
-
-        if (remaining && resetTime) {
-            if (parseInt(remaining) < 10) {
-                console.warn(`Rate limit warning: ${remaining} requests remaining`);
-            }
-        }
-    }
-
-    /**
      * Validates HTTPS usage in production
      * @private
      */
@@ -562,6 +471,7 @@ class ApiServiceImpl {
     }
 
     async addCrypto(cryptoData) {
+
         return this.safeFetch('/api/portfolio/add', {
             method: 'POST',
             body: JSON.stringify(cryptoData)
