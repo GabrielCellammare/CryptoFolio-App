@@ -244,73 +244,26 @@ class NgrokManager:
         - Protected tunnel creation
         - Error handling
         """
+
         try:
             self._validate_port(port)
 
-            # Try to load existing tunnel URL
-            saved_url = self._secure_load_state()
-            if saved_url:
-                # Verify if the saved tunnel is still active
-                try:
-                    response = requests.get(
-                        f"{saved_url}/healthcheck",
-                        timeout=5,
-                        verify=True  # Enforce SSL verification
-                    )
-                    if response.status_code == 200:
-                        self.ngrok_url = saved_url
-                        self.logger.info("Reused existing tunnel")
-                        return saved_url
-                except requests.exceptions.RequestException:
-                    self.logger.info("Saved tunnel inactive")
+            ngrok.kill()
 
-            # Create new tunnel with TLS
+            import time
+            time.sleep(1)
+
+            self.logger.info("Attempting to start ngrok tunnel...")
             self.tunnel = ngrok.connect(port, bind_tls=True)
             self.ngrok_url = self.tunnel.public_url
 
-            # Secure save
-            self._secure_save_state()
+            if not self.ngrok_url:
+                raise RuntimeError("Failed to create ngrok tunnel")
 
-            self.logger.info("Created new tunnel")
+            self.logger.info(f"Ngrok tunnel started: {self.ngrok_url}")
+            self._secure_save_state()
             return self.ngrok_url
 
         except Exception as e:
-            self.logger.error("Tunnel creation failed", exc_info=True)
+            self.logger.error(f"Failed to start ngrok tunnel: {e}")
             raise
-
-    def get_public_url(self) -> Optional[str]:
-        """
-        Get current public ngrok URL safely.
-
-        Returns:
-            Optional[str]: Current ngrok URL if available
-
-        Security measures:
-        - Safe return value
-        - Type validation
-        """
-        return self.ngrok_url
-
-    def cleanup(self):
-        """
-        Clean up ngrok resources securely.
-
-        Security measures:
-        - Protected cleanup
-        - Secure file deletion
-        - Error handling
-        """
-        try:
-            if self.tunnel:
-                ngrok.disconnect(self.tunnel.public_url)
-                self.tunnel = None
-            ngrok.kill()
-
-            # Secure state file cleanup
-            if self.state_file.exists():
-                self.state_file.unlink()
-
-        except Exception as e:
-            self.logger.error("Cleanup failed", exc_info=True)
-        finally:
-            self.ngrok_url = None

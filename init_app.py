@@ -201,12 +201,18 @@ def configure_development_environment(app: Flask) -> None:
     - Error isolation
     """
     try:
+        if 'NGROK_URL' in os.environ and os.environ['NGROK_URL']:
+            app.logger.info("Ngrok tunnel already configured")
+            return
+
         ngrok_manager.init_app(app)
         ngrok_url = ngrok_manager.start_tunnel(port=5000)
+
         if not ngrok_url.startswith('https://'):
             raise ValueError("Insecure ngrok URL detected")
+
         os.environ['NGROK_URL'] = ngrok_url
-        app.logger.info(f"Secure ngrok tunnel established")
+        app.logger.info(f"Secure ngrok tunnel established at {ngrok_url}")
     except Exception as e:
         app.logger.error(f"Development configuration failed: {e}")
         raise
