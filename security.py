@@ -1,15 +1,28 @@
 """
 CSRFProtection: Advanced Cross-Site Request Forgery protection for Flask applications.
+Version: 1.0
+Author: [Gabriel Cellammare]
+Last Modified: [05/01/2024]
 
-This class implements a comprehensive CSRF protection system using both tokens and nonces,
-providing double-submit cookie pattern and per-request validation to prevent CSRF attacks.
-
-Security features:
+This module provides comprehensive CSRF protection for Flask applications by implementing:
 - Double-submit cookie pattern with secure token generation
 - One-time use nonces for request validation
 - Automatic token/nonce expiration
 - Secure headers implementation
 - Session security hardening
+
+Security Considerations:
+1. Token Generation: Uses cryptographic-grade random generation
+2. Token Storage: Implements secure cookie storage with encryption
+3. Nonce Management: Provides one-time use validation with expiration
+4. Memory Protection: Implements cleanup to prevent DOS attacks
+5. Header Security: Implements security headers following OWASP recommendations
+
+Dependencies:
+- Flask
+- cryptography.fernet
+- secrets (for secure random generation)
+- logging (for security event tracking)
 """
 
 import logging
@@ -22,7 +35,7 @@ from datetime import timedelta
 from typing import Optional, Dict, Callable
 from cryptography.fernet import Fernet
 
-# Configure logging for security events
+# Configure logging with structured format for security audit
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -32,11 +45,28 @@ logger = logging.getLogger(__name__)
 
 class CSRFProtection:
     """
-    Implements CSRF protection for Flask applications using both tokens and nonces.
+    CSRF Protection Implementation
 
-    The class uses a double-submit cookie pattern combined with per-request nonces
-    to provide strong protection against CSRF attacks. It also implements automatic
-    cleanup of expired tokens and secure header configuration.
+    This class provides a comprehensive CSRF protection system using:
+    - Double-submit cookie validation
+    - One-time nonces
+    - Token encryption
+    - Automatic expiration
+
+    Security Features:
+    - Encrypted tokens using Fernet (symmetric encryption)
+    - Session-bound tokens
+    - One-time use nonces
+    - Automatic cleanup of expired tokens/nonces
+    - Memory protection against DOS
+
+    Usage:
+        csrf = CSRFProtection(app)
+
+        @app.route('/protected', methods=['POST'])
+        @csrf.csrf_protect
+        def protected_route():
+            return 'Protected'
     """
 
     def __init__(self, app: Optional[Flask] = None):
@@ -44,24 +74,20 @@ class CSRFProtection:
         Initialize CSRF protection.
 
         Args:
-            app: Optional Flask application instance. If provided, automatically
-                initializes the protection for the app.
+            app (Optional[Flask]): Flask application instance for auto-initialization
+
+        Security Notes:
+        - Generates a new Fernet key for token encryption
+        - Configures security constants for token/nonce management
+        - Implements memory protection limits
         """
-        # Dictionary to track used nonces with their expiration timestamps
         self.used_nonces: Dict[str, float] = {}
+        self.NONCE_EXPIRATION = 300  # 5 minutes
+        self.TOKEN_EXPIRATION = 3600  # 1 hour
+        self.MIN_TOKEN_LENGTH = 64  # Minimum secure token length
+        self.MAX_NONCES = 10000  # DOS protection limit
 
-        # Nonce validity duration (5 minutes)
-        self.NONCE_EXPIRATION = 300
-
-        # Token validity duration (1 hour)
-        self.TOKEN_EXPIRATION = 3600
-
-        # Minimum token length for security
-        self.MIN_TOKEN_LENGTH = 64
-
-        # Maximum number of stored nonces to prevent memory exhaustion
-        self.MAX_NONCES = 10000
-
+        # Generate encryption key for token protection
         self.encryption_key = Fernet.generate_key()
         self.fernet = Fernet(self.encryption_key)
 
@@ -70,37 +96,45 @@ class CSRFProtection:
 
     def init_app(self, app: Flask) -> None:
         """
-        Configure CSRF protection for a Flask application.
-
-        Sets up secure session configuration, registers cleanup handlers,
-        and adds security headers to all responses.
+        Configure application security settings.
 
         Args:
-            app: Flask application instance to protect
+            app (Flask): Flask application to secure
+
+        Security Implementation:
+        - Secure session configuration
+        - Security headers following OWASP recommendations
+        - Automatic cleanup handlers
         """
-        # Configure secure session settings
+        # Security-focused session configuration
         app.config.update(
-            SESSION_COOKIE_SECURE=True,      # Require HTTPS
-            SESSION_COOKIE_HTTPONLY=True,    # Prevent JavaScript access
-            SESSION_COOKIE_SAMESITE='Lax',   # Protect against CSRF
-            PERMANENT_SESSION_LIFETIME=timedelta(
-                hours=1),  # Session expiration
-            SESSION_COOKIE_NAME='secure_session'  # Non-default session name
+            SESSION_COOKIE_SECURE=True,
+            SESSION_COOKIE_HTTPONLY=True,
+            SESSION_COOKIE_SAMESITE='Lax',
+            PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
+            SESSION_COOKIE_NAME='secure_session'
         )
 
         @app.before_request
         def cleanup_expired_nonces() -> None:
-            """Remove expired nonces and enforce maximum storage limit."""
+            """
+            Cleanup handler for expired nonces.
+
+            Security Features:
+            - Removes expired nonces
+            - Implements DOS protection
+            - Memory usage control
+            """
             current_time = time.time()
 
-            # Clean expired nonces
+            # Remove expired nonces
             self.used_nonces = {
                 nonce: exp_time
                 for nonce, exp_time in self.used_nonces.items()
                 if exp_time > current_time
             }
 
-            # If too many nonces are stored, remove oldest ones
+            # Memory protection
             if len(self.used_nonces) > self.MAX_NONCES:
                 sorted_nonces = sorted(
                     self.used_nonces.items(), key=lambda x: x[1])
@@ -108,57 +142,51 @@ class CSRFProtection:
 
         @app.after_request
         def add_security_headers(response):
-            """Add security headers to all responses."""
+            """
+            Add security headers to all responses.
+
+            Security Headers:
+            - X-Content-Type-Options: Prevent MIME sniffing
+            - X-Frame-Options: Prevent clickjacking
+            - X-XSS-Protection: Basic XSS protection
+            - HSTS: Enforce HTTPS
+            - CSP: Content Security Policy
+            - Cache-Control: Prevent sensitive data caching
+            """
             response.headers.update({
-                'X-Content-Type-Options': 'nosniff',  # Prevent MIME type sniffing
-                'X-Frame-Options': 'DENY',  # Prevent clickjacking
-                'X-XSS-Protection': '1; mode=block',  # Enable XSS filtering
-                'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',  # Require HTTPS
+                'X-Content-Type-Options': 'nosniff',
+                'X-Frame-Options': 'DENY',
+                'X-XSS-Protection': '1; mode=block',
+                'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
                 'Content-Security-Policy': (
                     "default-src 'self'; "
-                    "img-src 'self' data:; "  # Permette immagini dal proprio dominio e data URLs
-                    # Permette gli stili necessari
+                    "img-src 'self' data:; "
                     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
-                    # Permette gli script necessari
                     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com; "
-                    "font-src 'self' https://cdnjs.cloudflare.com"  # Permette i font necessari
+                    "font-src 'self' https://cdnjs.cloudflare.com"
                 ),
-                'Cache-Control': 'no-store, must-revalidate'  # Prevent caching
+                'Cache-Control': 'no-store, must-revalidate'
             })
             return response
 
-            @wraps(f)
-            def decorated_function(*args, **kwargs):
-                if request.method in ['POST', 'PUT', 'DELETE']:
-                    token = request.cookies.get('csrf_token')
-                    client_token = request.headers.get('X-CSRF-Token')
-                    nonce = request.headers.get('X-CSRF-Nonce')
-
-                    # Add debug logging
-                    logger.debug(f"Cookie token: {token}")
-                    logger.debug(f"Header token: {client_token}")
-                    logger.debug(f"Session token: {session.get('csrf_token')}")
-                    logger.debug(f"Nonce: {nonce}")
-
     def generate_token(self) -> str:
         """
-        Generate a new CSRF token or return existing one.
+        Generate encrypted CSRF token.
 
         Returns:
-            str: A secure random token of sufficient length
+            str: Encrypted token
 
-        Note:
-            Tokens are stored in the session and remain valid for the session duration
+        Security Features:
+        - Uses secrets for cryptographic random generation
+        - Implements token encryption
+        - Includes timestamp for expiration
+        - Secure cookie settings
         """
-
-        """Generate an encrypted CSRF token"""
-
         raw_token = secrets.token_urlsafe(self.MIN_TOKEN_LENGTH)
         timestamp = str(int(time.time()))
         token_data = f"{raw_token}:{timestamp}"
         encrypted_token = self.fernet.encrypt(token_data.encode()).decode()
 
-        # Store in both cookie and session for OAuth flow
         session['csrf_token'] = encrypted_token
         response = make_response()
         response.set_cookie(
@@ -173,13 +201,15 @@ class CSRFProtection:
 
     def generate_nonce(self) -> str:
         """
-        Generate a single-use nonce for request validation.
+        Generate one-time use nonce.
 
         Returns:
-            str: A secure random nonce
+            str: Encrypted nonce
 
-        Note:
-            Nonces expire after NONCE_EXPIRATION seconds and can only be used once
+        Security Features:
+        - One-time use validation
+        - Automatic expiration
+        - Memory protection
         """
         if len(self.used_nonces) >= self.MAX_NONCES:
             logger.warning("Nonce storage limit reached, cleaning old nonces")
@@ -192,7 +222,18 @@ class CSRFProtection:
 
     def validate_and_refresh_token(self, encrypted_token):
         """
-        Proposed implementation that combines validation and regeneration
+        Validate and optionally refresh CSRF token.
+
+        Args:
+            encrypted_token (str): Token to validate
+
+        Returns:
+            tuple: (new/current token, validity boolean)
+
+        Security Features:
+        - Token validation
+        - Automatic refresh on expiration
+        - Encryption verification
         """
         if not encrypted_token:
             return self.generate_token(), False
@@ -208,24 +249,26 @@ class CSRFProtection:
             token_age = time.time() - float(timestamp)
 
             if token_age >= self.TOKEN_EXPIRATION:
-                # Generate new token when expired
                 return self.generate_token(), False
 
             return encrypted_token, True
         except Exception:
             return self.generate_token(), False
 
-    # In security.py decorated_function:
-
     def validate_nonce(self, encrypted_nonce: Optional[str]) -> bool:
         """
-        Validate a nonce and mark it as used.
+        Validate one-time use nonce.
 
         Args:
-            nonce: The nonce to validate
+            encrypted_nonce (str): Nonce to validate
 
         Returns:
-            bool: True if nonce is valid and unused, False otherwise
+            bool: Validation result
+
+        Security Features:
+        - One-time use enforcement
+        - Expiration checking
+        - Encryption validation
         """
         if not encrypted_nonce or encrypted_nonce not in self.used_nonces:
             logger.warning("Invalid or missing nonce")
@@ -241,7 +284,6 @@ class CSRFProtection:
                 del self.used_nonces[encrypted_nonce]
                 return False
 
-            # Remove nonce after successful validation (one-time use)
             del self.used_nonces[encrypted_nonce]
             return True
 
@@ -250,37 +292,35 @@ class CSRFProtection:
 
     def csrf_protect(self, f: Callable) -> Callable:
         """
-        Decorator to protect routes against CSRF attacks.
+        Route decorator for CSRF protection.
 
         Args:
-            f: The Flask route function to protect
+            f (Callable): Route function to protect
 
         Returns:
             Callable: Protected route function
 
-        Note:
-            Requires both valid token and nonce for state-changing requests
+        Security Features:
+        - Token validation
+        - Nonce validation
+        - Double-submit verification
+        - Generic error messages
         """
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if request.method in ['POST', 'PUT', 'DELETE']:
-                # Raccogliamo tutti i token necessari
                 token = request.cookies.get('csrf_token')
                 client_token = request.headers.get('X-CSRF-Token')
                 nonce = request.headers.get('X-CSRF-Nonce')
 
-                # Verifichiamo prima che tutti i token necessari siano presenti
                 if not all([token, client_token, nonce]):
                     logger.warning("Missing security credentials")
                     abort(403, description="Missing security credentials")
 
-                # Verifichiamo prima il nonce
                 if not self.validate_nonce(nonce):
-                    # Messaggio generico per sicurezza
                     logger.warning("Security validation failed")
                     abort(403, description="Security validation failed")
 
-                # Solo se il nonce è valido, procediamo con la validazione del token CSRF
                 if token != client_token:
                     logger.warning("Security validation failed")
                     abort(403, description="Security validation failed")
@@ -295,7 +335,11 @@ class CSRFProtection:
 
     def _cleanup_oldest_nonces(self) -> None:
         """
-        Remove oldest nonces when storage limit is reached.
+        Internal method for nonce cleanup.
+
+        Security Features:
+        - Memory protection
+        - DOS prevention
         """
         if len(self.used_nonces) > self.MAX_NONCES:
             sorted_nonces = sorted(
