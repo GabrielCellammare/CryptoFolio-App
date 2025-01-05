@@ -4,7 +4,7 @@ Version: 1.0
 Author: Gabriel Cellammare
 Last Modified: 05/01/2025
 
-This module implements a comprehensive input validation system with strong focus on
+This module implements a comprehensive input validation system with strong focus on 
 security, data sanitization, and protection against common web vulnerabilities.
 
 Security Features:
@@ -129,6 +129,7 @@ class InputValidator:
     - Range checking
     - Custom validation hooks
     """
+
     # Secure validation patterns with strict matching
     PATTERNS = {
         'crypto_id': r'^[a-z0-9-]+$',  # Alphanumeric and hyphen only
@@ -165,6 +166,7 @@ class InputValidator:
         }
     }
 
+    # Security constraint for date validation
     MIN_ALLOWED_DATE = datetime(2010, 1, 1)
 
     @staticmethod
@@ -230,40 +232,29 @@ class InputValidator:
         if value is None or value == '':
             return value
 
-        # Type validation
-        if rule.type == InputType.NUMBER:
-            try:
+        # Secure type validation
+        try:
+            if rule.type == InputType.NUMBER:
                 value = float(value)
-            except ValueError:
-                raise ValidationError("input", "Invalid number format")
-
-        elif rule.type == InputType.DATE:
-            try:
+            elif rule.type == InputType.DATE:
                 if isinstance(value, str):
                     value = datetime.strptime(value, '%Y-%m-%d')
-                    parsed_date = value
-                    # New validation check
-                if parsed_date < cls.MIN_ALLOWED_DATE:
+                if value < cls.MIN_ALLOWED_DATE:
                     raise ValidationError(
                         "input",
                         f"Date must be on or after {
                             cls.MIN_ALLOWED_DATE.strftime('%Y-%m-%d')}"
                     )
+            elif rule.type == InputType.EMAIL:
+                if not validators.email(value):
+                    raise ValidationError("input", "Invalid email format")
+            elif rule.type == InputType.URL:
+                if not validators.url(value):
+                    raise ValidationError("input", "Invalid URL format")
+        except (ValueError, TypeError) as e:
+            raise ValidationError("input", f"Invalid {rule.type.value} format")
 
-                value = parsed_date
-            except ValueError:
-                raise ValidationError(
-                    "input", "Invalid date format (use YYYY-MM-DD)")
-
-        elif rule.type == InputType.EMAIL:
-            if not validators.email(value):
-                raise ValidationError("input", "Invalid email format")
-
-        elif rule.type == InputType.URL:
-            if not validators.url(value):
-                raise ValidationError("input", "Invalid URL format")
-
-        # Length validation for strings
+        # Secure length validation
         if isinstance(value, str):
             if rule.min_length and len(value) < rule.min_length:
                 raise ValidationError(
@@ -272,7 +263,7 @@ class InputValidator:
                 raise ValidationError(
                     "input", f"Maximum length is {rule.max_length}")
 
-        # Range validation for numbers
+        # Secure range validation
         if isinstance(value, (int, float)):
             if rule.min_value is not None and value < rule.min_value:
                 raise ValidationError(
@@ -281,18 +272,21 @@ class InputValidator:
                 raise ValidationError(
                     "input", f"Maximum value is {rule.max_value}")
 
-        # Pattern validation
+        # Secure pattern validation
         if rule.pattern and isinstance(value, str):
             if not re.match(rule.pattern, value):
                 raise ValidationError(
                     "input", "Value does not match required pattern")
 
-        # Allowed values validation
+        # Secure allowed values validation
         if rule.allowed_values is not None and value not in rule.allowed_values:
-            raise ValidationError("input", f"Value must be one of: {
-                                  rule.allowed_values}")
+            raise ValidationError(
+                "input",
+                f"Value must be one of: {
+                    ', '.join(map(str, rule.allowed_values))}"
+            )
 
-        # Custom validation
+        # Protected custom validation
         if rule.custom_validator:
             try:
                 rule.custom_validator(value)
@@ -321,23 +315,25 @@ class InputValidator:
         """
         validated_data = {}
 
-        # Check for unknown fields
+        # Detect unauthorized fields
         unknown_fields = set(data.keys()) - set(rules.keys())
         if unknown_fields:
-            raise ValidationError("input", f"Unknown fields: {
-                                  ', '.join(unknown_fields)}")
+            raise ValidationError(
+                "input",
+                f"Unknown fields: {', '.join(unknown_fields)}"
+            )
 
-        # Validate each field
+        # Validate each field securely
         for field, rule in rules.items():
             value = data.get(field)
 
-            # Sanitize string inputs
+            # Apply security sanitization
             if isinstance(value, str):
                 value = cls.sanitize_input(value)
 
             try:
                 validated_value = cls.validate_value(value, rule)
-                if validated_value is not None:  # Only include non-None values
+                if validated_value is not None:
                     validated_data[field] = validated_value
             except ValidationError as e:
                 raise ValidationError(field, e.message)
