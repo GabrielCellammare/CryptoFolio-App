@@ -1,3 +1,49 @@
+"""
+Enhanced Portfolio Metrics Calculator
+Version: 1.0
+Author: [Gabriel Cellammare]
+Last Modified: [05/01/2025]
+
+This module implements secure portfolio data encryption and decryption with a strong
+focus on memory safety, cryptographic best practices, and secure data handling.
+
+Security Features:
+1. Memory Protection
+   - Secure memory allocation and deallocation
+   - Multiple-pass memory wiping
+   - Protected memory regions for sensitive data
+   - Automatic cleanup of sensitive information
+
+2. Cryptographic Security
+   - AES encryption for sensitive data
+   - Secure key and salt handling
+   - Isolation of cryptographic operations
+   - Protection against timing attacks
+
+3. Error Handling
+   - Secure error recovery
+   - Non-revealing error messages
+   - Protected logging of sensitive data
+   - Failsafe defaults for errors
+
+4. Input/Output Safety
+   - Strict type validation
+   - Secure conversion operations
+   - Protected field handling
+   - Safe defaults for failures
+
+Security Considerations:
+- All sensitive data is automatically wiped from memory
+- Cryptographic operations are isolated
+- Logging excludes sensitive information
+- Memory is protected against unauthorized access
+- Type conversions are handled securely
+- Error states provide safe defaults
+
+Dependencies:
+- cryptography_utils.AESCipher: For encryption operations
+- secure_byte_array.SecureByteArray: For secure memory operations
+"""
 from decimal import Decimal
 from typing import Dict, Optional, Union
 import array
@@ -8,41 +54,73 @@ from secure_bye_array import SecureByteArray
 
 
 class PortfolioEncryptionError(Exception):
-    """Custom exception for portfolio encryption errors."""
+    """
+    Custom exception for portfolio encryption errors.
+
+    Security:
+    - Does not expose internal state
+    - Provides generic error messages
+    - Protects against information leakage
+    """
     pass
 
 
 class PortfolioEncryption:
     """
-    Secure implementation for encrypting and decrypting portfolio data.
+    Secure portfolio data encryption implementation.
 
-    This class provides:
-    - Secure handling of sensitive financial data
-    - Automatic type conversion and validation
-    - Memory-safe operations with automatic cleanup
-    - Comprehensive error handling and logging
-    - Protection against data exposure in logs
+    Security Architecture:
+    1. Memory Safety
+       - Automatic memory cleanup
+       - Protected memory regions
+       - Secure memory wiping
+       - Isolation of sensitive data
 
-    Attributes:
-        _cipher: Encryption cipher instance
-        _logger: Configured logging instance
-        _sensitive_fields (frozenset): Fields requiring encryption
-        _is_initialized (bool): Indicates if the encryption system is ready
+    2. Cryptographic Operations
+       - Secure key management
+       - Protected encryption/decryption
+       - Salt handling
+       - Timing attack protection
 
-    Security Notes:
-        - All sensitive data is automatically cleaned from memory
-        - Numeric values are handled using Decimal for precision
-        - Failed decryption attempts are logged securely
-        - Memory is protected against unauthorized access
+    3. Data Protection
+       - Secure type conversion
+       - Protected field handling
+       - Safe default values
+       - Error state handling
+
+    4. Access Control
+       - Initialization verification
+       - Operation isolation
+       - Memory access control
+       - Cleanup guarantees
+
+    Usage Warnings:
+    1. Memory Management
+       - Always use with context managers
+       - Verify cleanup completion
+       - Monitor memory usage
+       - Check cleanup logs
+
+    2. Error Handling
+       - Implement proper exception catching
+       - Verify error states
+       - Check return values
+       - Monitor error logs
+
+    3. Cryptographic Safety
+       - Protect key material
+       - Verify salt uniqueness
+       - Monitor operation logs
+       - Check integrity
     """
 
-    # Security and configuration constants
+    # Security Constants
     SENSITIVE_FIELDS = frozenset(['amount', 'purchase_price', 'purchase_date'])
     SECURE_MEMORY_WIPE_PASSES = 3
     DEFAULT_NUMERIC_VALUE = Decimal('0.0')
     DEFAULT_STRING_VALUE = ''
 
-    # Logging configuration
+    # Logging Configuration
     logger = logging.getLogger(__name__)
     logging.basicConfig(
         level=logging.INFO,
@@ -51,13 +129,35 @@ class PortfolioEncryption:
 
     def __init__(self, cipher: 'AESCipher'):
         """
-        Initializes the portfolio encryption system.
+        Initialize encryption system with security verification.
+
+        Security Operations:
+        1. Cipher validation
+           - Verify interface compliance
+           - Check method availability
+           - Validate initialization
+
+        2. Memory preparation
+           - Initialize secure buffers
+           - Prepare cleanup tracking
+           - Set up protection
+
+        3. State verification
+           - Check initialization status
+           - Verify configurations
+           - Validate security settings
 
         Args:
-            cipher: Instance of AESCipher for cryptographic operations
+            cipher: AESCipher instance for cryptographic operations
 
         Raises:
-            PortfolioEncryptionError: If initialization fails
+            PortfolioEncryptionError: On security verification failure
+
+        Security Checks:
+        - Cipher interface verification
+        - Memory initialization
+        - Protection setup
+        - State validation
         """
         try:
             self._cipher = cipher
@@ -76,17 +176,35 @@ class PortfolioEncryption:
 
     def _secure_string_to_bytes(self, value: str) -> SecureByteArray:
         """
-        Securely converts string to bytes with memory protection.
+        Convert string to bytes with memory protection.
+
+        Security Operations:
+        1. Memory allocation
+           - Create protected buffer
+           - Initialize secure region
+           - Track for cleanup
+
+        2. Conversion safety
+           - Validate input encoding
+           - Protect conversion operation
+           - Verify output integrity
+
+        3. Error protection
+           - Handle conversion failures
+           - Provide safe defaults
+           - Clean up on error
 
         Args:
-            value: String value to convert
+            value: String to convert
 
         Returns:
-            SecureByteArray: Secure byte representation
+            SecureByteArray: Protected byte representation
 
-        Security:
-            - Creates isolated memory buffer
-            - Implements secure cleanup
+        Security Checks:
+        - Input validation
+        - Memory protection
+        - Conversion verification
+        - Cleanup tracking
         """
         try:
             secure_bytes = SecureByteArray(value.encode('utf-8'))
@@ -98,12 +216,31 @@ class PortfolioEncryption:
 
     def _secure_cleanup(self):
         """
-        Performs secure cleanup of all temporary buffers.
 
-        Security:
-            - Multiple overwrite passes
-            - Verifies memory is cleared
-            - Logs cleanup failures
+        Perform secure memory cleanup.
+
+        Security Operations:
+        1. Buffer identification
+        - Track all allocations
+        - Verify buffer status
+        - Check protection state
+
+        2. Memory wiping
+        - Multiple overwrite passes
+        - Pattern verification
+        - Completion checking
+
+        3. Resource release
+        - Free protected memory
+        - Clear security context
+        - Verify cleanup
+
+        Security Checks:
+        - Buffer tracking
+        - Wipe verification
+        - Cleanup completion
+        - Resource release
+
         """
         for buffer in self._temp_buffers:
             try:
