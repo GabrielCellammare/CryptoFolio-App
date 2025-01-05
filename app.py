@@ -17,7 +17,7 @@ Main features:
 from difflib import restore
 from typing import Dict, Any, Optional, Tuple
 import time
-from flask import Blueprint, after_this_request, jsonify, request, session
+from flask import Blueprint, jsonify, request, session
 import base64
 from flask import Blueprint, make_response, render_template, request, jsonify, session, redirect, url_for, flash
 from firebase_admin import firestore
