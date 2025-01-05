@@ -35,12 +35,12 @@ export function formatCurrency(amount, currency = 'USD') {
         return new Intl.NumberFormat(config.locale, {
             style: 'currency',
             currency: config.currency,
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
+            minimumFractionDigits: 6,
+            maximumFractionDigits: 6
         }).format(amount);
     } catch (error) {
         console.error('Error formatting currency:', error);
-        return `${config.symbol}${amount.toFixed(2)}`;
+        return `${config.symbol}${amount.toFixed(6)}`;
     }
 }
 

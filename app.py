@@ -676,6 +676,7 @@ def dashboard():
         error_id = log_error('dashboard_error', user_id, str(e))
         flash(f'An error occurred loading the dashboard. Reference: {
               error_id}', 'error')
+        decrypted_username = "Temporary Username"
 
         return render_template('dashboard.html',
                                portfolio=[],
