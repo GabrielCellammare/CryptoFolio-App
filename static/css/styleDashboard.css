@@ -262,3 +262,8 @@ body {
 #rateLimitInfo i {
     margin-right: 0.5rem;
 }
+
+.invalid {
+    border-color: red;
+    background-color: #fff0f0;
+}

@@ -37,6 +37,11 @@ function formatDateForInput(dateString) {
  */
 function setupAddCryptoForm() {
 
+    // Add input event listeners for real-time validation
+    const amountInput = document.getElementById('amount');
+    const priceInput = document.getElementById('purchase-price');
+
+
     // Validazione input
     function validateInput(value, type) {
         switch (type) {
@@ -50,19 +55,67 @@ function setupAddCryptoForm() {
                 return true;
         }
     }
+    // Improved validation function that checks for valid decimal numbers
+    function validateNumericInput(value, type) {
+        // Regular expression to match valid decimal numbers
+        // Allows: 
+        // - Optional negative sign
+        // - Whole numbers
+        // - Decimal numbers
+        // - Prevents scientific notation (e.g., e22222)
+        const decimalRegex = /^-?\d*\.?\d+$/;
+
+        // First check if it's a valid decimal number format
+        if (!decimalRegex.test(value)) {
+            return false;
+        }
+
+        // Convert to number for range validation
+        const numValue = parseFloat(value);
+
+        switch (type) {
+            case 'amount':
+            case 'price':
+                // Ensure the number is positive and within reasonable bounds
+                return !isNaN(numValue) &&
+                    numValue > 0 &&
+                    numValue < 1000000000 &&
+                    value.toLowerCase().indexOf('e') === -1; // Extra check for scientific notation
+            case 'date':
+                const date = new Date(value);
+                return date instanceof Date && !isNaN(date) && date <= new Date();
+            default:
+                return true;
+        }
+    }
 
     // Sanitizzazione input
     function sanitizeInput(value, type) {
         switch (type) {
             case 'amount':
             case 'price':
-                return parseFloat(value).toFixed(8);
+                return parseFloat(value).toFixed(6);
             case 'string':
                 return DOMPurify.sanitize(value);
             default:
                 return value;
         }
     }
+
+    function validateAndStyleInput(input, type) {
+        const isValid = validateNumericInput(input.value, type);
+        input.classList.toggle('invalid', !isValid);
+        return isValid;
+    }
+
+    // Real-time validation as user types
+    amountInput.addEventListener('input', (e) => {
+        validateAndStyleInput(e.target, 'amount');
+    });
+
+    priceInput.addEventListener('input', (e) => {
+        validateAndStyleInput(e.target, 'price');
+    });
 
     document.getElementById('addCryptoForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -76,19 +129,29 @@ function setupAddCryptoForm() {
             }
 
             // Validazione e sanitizzazione degli input
-            const amount = document.getElementById('amount').value;
-            const purchasePrice = document.getElementById('purchase-price').value;
+            const amount = amountInput.value
+            const purchasePrice = priceInput.value
             const purchaseDate = document.getElementById('purchase-date').value;
 
-            if (!validateInput(amount, 'amount')) {
+            if (!validateInput(amount, 'amount') && !sanitizeInput(amount, 'amount')) {
                 throw new Error('Invalid amount');
             }
-            if (!validateInput(purchasePrice, 'price')) {
+            if (!validateInput(purchasePrice, 'price') && !sanitizeInput(purchasePrice, 'price')) {
                 throw new Error('Invalid purchase price');
             }
             if (!validateInput(purchaseDate, 'date')) {
                 throw new Error('Invalid date');
             }
+
+
+            // Validate all inputs
+            if (!validateNumericInput(amount, 'amount')) {
+                throw new Error('Invalid amount. Please enter a valid number.');
+            }
+            if (!validateNumericInput(purchasePrice, 'price')) {
+                throw new Error('Invalid purchase price. Please enter a valid number.');
+            }
+
 
             const cryptoData = {
                 crypto_id: selectedOption.id,
