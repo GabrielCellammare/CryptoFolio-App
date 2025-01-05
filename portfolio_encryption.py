@@ -45,8 +45,7 @@ Dependencies:
 - secure_byte_array.SecureByteArray: For secure memory operations
 """
 from decimal import Decimal
-from typing import Dict, Optional, Union
-import array
+from typing import Dict
 import logging
 
 from cryptography_utils import AESCipher
