@@ -1,3 +1,67 @@
+"""
+Secure Cryptographic Operations Framework
+Version: 1.0
+Author: Gabriel Cellammare
+Last Modified: 05/01/2025
+This module implements a comprehensive cryptographic system with a strong focus on
+secure memory management, user identity protection, and robust encryption operations.
+It provides a defense-in-depth approach to protecting sensitive data through multiple
+layers of security controls and careful memory handling.
+Core Security Features:
+
+Memory Protection
+
+Secure byte array implementation for sensitive data
+Automatic memory zeroing after operations
+Protected key material handling
+Managed cleanup of cryptographic artifacts
+
+
+Encryption Operations
+
+AES-256-CBC encryption with PKCS7 padding
+Secure initialization vector management
+Salt generation and validation
+Protected cipher operations
+
+
+Key Management
+
+Secure key derivation using PBKDF2-HMAC-SHA3-256
+User-specific key isolation
+Master key protection
+Salt management for key derivation
+
+
+Identity Protection
+
+Secure user ID hashing with HMAC-SHA256
+Protected hash verification
+Timing attack prevention
+Base64 URL-safe encoding
+
+
+
+Security Considerations:
+
+All cryptographic operations use constant-time comparisons
+Memory containing sensitive data is securely erased
+Side-channel attack protections are implemented
+Cryptographic error states are safely handled
+Key material is protected throughout its lifecycle
+User identities are consistently hashed
+Encryption operations are isolated per user
+
+Dependencies:
+
+-cryptography: Core cryptographic operations
+-secure_byte_array: Protected memory management
+-hashlib: Hashing operations
+-base64: Secure encoding
+-typing: Type safety
+-logging: Security event tracking
+"""
+
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.backends import default_backend
