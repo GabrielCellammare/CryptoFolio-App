@@ -42,10 +42,12 @@ import redis
 
 # Application initialization
 
-secure_config = SecureConfig()
 
 # First, load environment variables before any initialization
 load_dotenv()
+
+
+secure_config = SecureConfig()
 
 # Create the Flask application
 app = create_app(secure_config)
@@ -359,8 +361,14 @@ def auth_callback(provider):
                 secure_salt
             ).decode()
 
+            encrypted_username = cipher.encrypt(
+                username,
+                user_id,
+                secure_salt
+            ).decode()
+
             user_ref.set({
-                'username': username,
+                'username': encrypted_username,
                 'email': encrypted_email,
                 'preferred_currency': 'USD',
                 'created_at': firestore.SERVER_TIMESTAMP,
@@ -478,6 +486,14 @@ def dashboard():
                     raise e
                 time.sleep(1)  # Wait before retrying
 
+        salt = base64.b64decode(security_data['salt'])
+
+        decrypted_username = cipher.decrypt(
+            user_data.get('username'),
+            user_id,
+            salt
+        )
+
         if not security_data or 'salt' not in security_data:
             flash('Security configuration error. Please contact support.', 'error')
             return render_template('dashboard.html',
@@ -485,9 +501,8 @@ def dashboard():
                                    total_value=0,
                                    currency='USD',
                                    last_update=datetime.now().strftime('%Y-%m-%d'),
-                                   username=user_data.get('username'))
+                                   username=decrypted_username)
 
-        salt = base64.b64decode(security_data['salt'])
         currency = user_data.get('preferred_currency', 'USD')
         current_time = datetime.now().strftime('%Y-%m-%d')
 
@@ -558,7 +573,7 @@ def dashboard():
                                current_page=page,
                                total_pages=total_pages,
                                last_update=current_time,
-                               username=user_data.get('username'))
+                               username=decrypted_username)
 
     except Exception as e:
         error_id = log_error('dashboard_error', user_id, str(e))
@@ -570,7 +585,7 @@ def dashboard():
                                total_value=0,
                                currency='USD',
                                last_update=datetime.now().strftime('%Y-%m-%d'),
-                               username=user_data.get('username'))
+                               username=decrypted_username)
 
 
 # API Routes
