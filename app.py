@@ -1958,6 +1958,7 @@ def get_tokens():
 
 
 @ portfolio_api.route('/portfolio', methods=['GET'])
+@ rate_limit_decorator
 @ jwt_required
 def get_portfolio():
     """

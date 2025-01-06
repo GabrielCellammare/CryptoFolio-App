@@ -85,7 +85,7 @@ function populateCryptoSelect(cryptos) {
 function setupAutoRefresh() {
     setInterval(() => {
         window.location.reload();
-    }, 60000); // Refresh every minute
+    }, 120000); // Refresh every minute
 }
 
 export { availableCryptos };

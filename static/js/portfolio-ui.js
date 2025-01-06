@@ -1,7 +1,7 @@
 // static/js/portfolio-ui.js
 
 import { ApiService } from './api-service.js';
-import { getCurrentCurrency, } from './utils.js';
+import InputValidator from './input-validator.js';
 import { showError, showSuccess, showLoading, hideLoading } from './utils.js';
 
 export function setupUIHandlers() {
@@ -41,6 +41,14 @@ function setupAddCryptoForm() {
     const amountInput = document.getElementById('amount');
     const priceInput = document.getElementById('purchase-price');
 
+    // Attach numeric validation to amount and price inputs
+    InputValidator.attachNumericInputHandler(amountInput);
+    InputValidator.attachNumericInputHandler(priceInput);
+
+    document.querySelectorAll('input[type="date"]').forEach(input => {
+        input.max = new Date().toISOString().split('T')[0];
+        input.min = '2010-01-01';
+    });
 
     // Validazione input
     function validateInput(value, type) {
@@ -119,6 +127,11 @@ function setupAddCryptoForm() {
 
     document.getElementById('addCryptoForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+
+
+        if (!validateForm()) {
+            return;
+        }
         showLoading();
 
 
@@ -156,8 +169,8 @@ function setupAddCryptoForm() {
             const cryptoData = {
                 crypto_id: selectedOption.id,
                 symbol: $(selectedOption.element).data('symbol'),
-                amount: parseFloat(document.getElementById('amount').value),
-                purchase_price: parseFloat(document.getElementById('purchase-price').value),
+                amount: parseFloat(amount),
+                purchase_price: parseFloat(purchasePrice),
                 purchase_date: purchaseDate
             };
 
@@ -177,6 +190,21 @@ function setupAddCryptoForm() {
             hideLoading();
         }
     });
+
+    function validateForm() {
+        const inputs = document.querySelectorAll('#addCryptoForm input');
+        let isValid = true;
+
+        inputs.forEach(input => {
+            if (!input.checkValidity()) {
+                input.reportValidity();
+                isValid = false;
+            }
+        });
+
+        return isValid;
+    }
+
 }
 
 /**
@@ -200,6 +228,13 @@ function setupEditHandlers() {
     // Edit button handler
     window.toggleEdit = function (button) {
         const row = button.closest('tr');
+        const inputs = row.querySelectorAll('.edit-input');
+        inputs.forEach(input => {
+            if (input.type === 'number') {
+                InputValidator.attachNumericInputHandler(input);
+            }
+        });
+
         toggleEditMode(row, true);
     };
 
@@ -208,18 +243,46 @@ function setupEditHandlers() {
     // Save changes handler
     window.saveChanges = async function (button) {
         const row = button.closest('tr');
+        const inputs = row.querySelectorAll('.edit-input');
+        let isValid = true;
+
+        inputs.forEach(input => {
+            if (!input.checkValidity()) {
+                input.reportValidity();
+                isValid = false;
+            }
+        });
+
+        if (!isValid) return;
+
         showLoading();
 
         try {
+            // Force security credentials refresh before save
+            await ApiService.initialize();
+            // Small delay to ensure token propagation
+            await new Promise(resolve => setTimeout(resolve, 100));
             const cryptoId = row.dataset.cryptoId;
             const updateData = getUpdateData(row);
             await ApiService.updateCrypto(cryptoId, updateData);
             showSuccess('Cryptocurrency updated successfully');
             window.location.reload();
         } catch (error) {
-            console.error('Error:', error);
-            showError(error.message);
-            toggleEditMode(row, false);
+            console.error('Save failed:', {
+                error: error.message,
+                status: error.status
+            });
+
+            if (error.status === 403) {
+                // Instead of immediate retry, force a new token fetch
+                await ApiService.initialize();
+                // Clear any cached credentials
+                showError('Please try saving again - security tokens refreshed');
+                return; // Don't toggle edit mode off, let user retry
+            } else {
+                showError(error.message);
+                toggleEditMode(row, false);
+            }
         } finally {
             hideLoading();
         }

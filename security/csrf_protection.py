@@ -321,6 +321,8 @@ class CSRFProtection:
                     logger.warning("Security validation failed")
                     abort(403, description="Security validation failed")
 
+                print("TOKEN COOKIE: ", token)
+                print("TOKEN_CLIENT:", client_token)
                 if token != client_token:
                     logger.warning("Security validation failed")
                     abort(403, description="Security validation failed")

@@ -271,6 +271,7 @@ export default class ApiKeyManager {
      */
     async #performCleanupAndUpdate() {
         try {
+            await ApiService.initialize();
             await this.#cleanupExpiredTokens();
             await this.#updateTokenStatus();
         } catch (error) {

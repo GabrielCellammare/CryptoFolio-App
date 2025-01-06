@@ -387,6 +387,20 @@ class ApiServiceImpl {
                     this.#rateLimiter.handleRateLimitError(errorData);
                 }
 
+                // New: Special handling for 403 errors during token cleanup
+                if (response.status === 403 && url.includes('/api/token/cleanup')) {
+                    // Log the error but don't throw - allow the application to continue
+                    console.warn('Token cleanup failed - continuing with operation');
+                    return { status: 'warning', message: 'Token cleanup deferred' };
+                }
+
+                if (response.status === 403) {
+                    // Force a complete re-initialization
+                    this.#initialized = false;
+                    await this.initialize();
+                    throw { status: 403, description: 'Invalid CSRF token' };
+                }
+
                 if (!response.ok) {
                     const error = new Error(`HTTP error! status: ${response.status}`);
                     error.status = response.status;
