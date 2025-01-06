@@ -4,11 +4,20 @@ body {
     flex-direction: column;
 }
 
+.main-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 2rem 0;
+    min-height: calc(100vh - 76px - 56px);
+    /* Viewport height minus navbar and footer */
+}
+
 .footer {
     margin-top: auto;
 }
 
-/* Stili per le cards nella homepage */
+/* Existing card styles */
 .card {
     transition: transform 0.2s ease-in-out;
     border: none;
@@ -19,7 +28,7 @@ body {
     transform: translateY(-5px);
 }
 
-/* Stili per i bottoni */
+/* Existing button styles */
 .btn {
     padding: 0.75rem 1.5rem;
     font-weight: 500;
@@ -29,67 +38,16 @@ body {
     padding: 1rem 2rem;
 }
 
-/* Stili per la navbar */
+/* Existing navbar styles */
 .navbar {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-
-.navbar-brand {
-    font-weight: 700;
-    font-size: 1.5rem;
-}
-
-/* Stili per i titoli */
-.display-4 {
-    font-weight: 700;
-    margin-bottom: 1.5rem;
-}
-
-.lead {
-    font-size: 1.25rem;
-    line-height: 1.6;
-}
-
-/* Stili per le tabelle nella dashboard */
-.table {
-    background-color: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.table thead th {
-    background-color: #f8f9fa;
-    border-bottom: 2px solid #dee2e6;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .display-4 {
-        font-size: 2.5rem;
-    }
-
-    .lead {
-        font-size: 1.1rem;
-    }
-
-    .card {
-        margin-bottom: 1rem;
-    }
-}
-
 
 .brand-container {
     display: flex;
     align-items: center;
     gap: 0.75rem;
 }
-
-.brand-logo {
-    display: inline-flex;
-    align-items: center;
-}
-
 
 .brand-logo {
     width: 24px;
@@ -107,10 +65,17 @@ body {
     background-clip: text;
 }
 
-/* Dark mode adjustments */
+/* Dark mode navbar */
 .navbar-dark .brand-text {
     background: linear-gradient(45deg, #60a5fa, #34d399);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        min-height: auto;
+        padding: 3rem 0;
+    }
 }

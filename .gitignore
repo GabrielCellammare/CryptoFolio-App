@@ -1,5 +1,5 @@
 /.env
 /firebase_config.json
 /__pycache__
-cache/crypto_cache.json
-instance/ngrok_state.json
+/cache
+/instance

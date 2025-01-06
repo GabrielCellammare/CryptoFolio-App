@@ -438,7 +438,6 @@ export default class ApiKeyManager {
     #showError(message) { this.#showAlert(message, 'danger'); }
     #showSuccess(message) { this.#showAlert(message, 'success'); }
     #showInfo(message) { this.#showAlert(message, 'info'); }
-    #showWarning(message) { this.#showAlert(message, 'warning'); }
 
     // Persistent alert methods
     #showPersistentAlert(message, type, id) {
