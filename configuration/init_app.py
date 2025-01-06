@@ -56,8 +56,7 @@ from authlib.integrations.flask_client import OAuth
 from firebase_admin import credentials, initialize_app
 import os
 from pathlib import Path
-
-from ngrok_manager import NgrokManager
+from configuration.ngrok_manager import NgrokManager
 
 # Create NgrokManager instance with security context
 ngrok_manager = NgrokManager()
@@ -152,7 +151,10 @@ def create_app(secure_config) -> Flask:
     - Error isolation
     """
     # Create Flask application instance with secure defaults
-    app = Flask(__name__)
+    root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app = Flask(__name__,
+                template_folder=os.path.join(root_path, 'templates'),
+                static_folder=os.path.join(root_path, 'static'))
 
     # Validate and set security configurations
     try:

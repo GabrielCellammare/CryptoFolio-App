@@ -74,7 +74,7 @@ import logging
 import hmac
 import hashlib
 from typing import Union, Any
-from secure_bye_array import SecureByteArray
+from security.secure_bye_array import SecureByteArray
 
 
 class CryptographicError(Exception):

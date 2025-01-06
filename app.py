@@ -49,7 +49,8 @@ import os
 import time
 
 # Third-party imports - security-critical imports first
-from cryptography_utils import AESCipher  # Handles encryption operations
+# Handles encryption operations
+from security.cryptography.cryptography_utils import AESCipher
 from firebase_admin import firestore     # Database operations
 from flask import (
     Blueprint,
@@ -65,15 +66,15 @@ from flask import (
 from dotenv import load_dotenv
 
 # Local application imports
-from config import SecureConfig
-from cryptocache import CryptoCache
-from init_app import configure_oauth, create_app
-from input_validator import InputValidator, ValidationError
-from portfolio_encryption import PortfolioEncryption
-from portfolio_utils import calculate_portfolio_metrics
-from rate_limiter import FirebaseRateLimiter
-from secure_bye_array import SecureByteArray
-from security import CSRFProtection
+from configuration.config import SecureConfig
+from utils.cryptocache import CryptoCache
+from configuration.init_app import configure_oauth, create_app
+from security.input_validator import InputValidator, ValidationError
+from security.cryptography.portfolio_encryption import PortfolioEncryption
+from utils.portfolio_utils import calculate_portfolio_metrics
+from security.rate_limiter import FirebaseRateLimiter
+from security.secure_bye_array import SecureByteArray
+from security.csrf_protection import CSRFProtection
 
 # Load environment variables
 # SECURITY NOTE: Critical for secure configuration management
@@ -431,14 +432,8 @@ def auth_callback(provider):
                 secure_salt
             ).decode()
 
-            encrypted_username = cipher.encrypt(
-                username,
-                user_id,
-                secure_salt
-            ).decode()
-
             user_ref.set({
-                'username': encrypted_username,
+                'username': username,
                 'email': encrypted_email,
                 'preferred_currency': 'USD',
                 'created_at': firestore.SERVER_TIMESTAMP,
@@ -583,14 +578,6 @@ def dashboard():
                     raise e
                 time.sleep(1)  # Wait before retrying
 
-        salt = base64.b64decode(security_data['salt'])
-
-        decrypted_username = cipher.decrypt(
-            user_data.get('username'),
-            user_id,
-            salt
-        )
-
         if not security_data or 'salt' not in security_data:
             flash('Security configuration error. Please contact support.', 'error')
             return render_template('dashboard.html',
@@ -598,8 +585,9 @@ def dashboard():
                                    total_value=0,
                                    currency='USD',
                                    last_update=datetime.now().strftime('%Y-%m-%d'),
-                                   username=decrypted_username)
+                                   username=user_data.get('username'))
 
+        salt = base64.b64decode(security_data['salt'])
         currency = user_data.get('preferred_currency', 'USD')
         current_time = datetime.now().strftime('%Y-%m-%d')
 
@@ -670,20 +658,18 @@ def dashboard():
                                current_page=page,
                                total_pages=total_pages,
                                last_update=current_time,
-                               username=decrypted_username)
+                               username=user_data.get('username'))
 
     except Exception as e:
         error_id = log_error('dashboard_error', user_id, str(e))
         flash(f'An error occurred loading the dashboard. Reference: {
               error_id}', 'error')
-        decrypted_username = "Temporary Username"
-
         return render_template('dashboard.html',
                                portfolio=[],
                                total_value=0,
                                currency='USD',
                                last_update=datetime.now().strftime('%Y-%m-%d'),
-                               username=decrypted_username)
+                               username=user_data.get('username'))
 
 
 @ app.route('/api/portfolio/add', methods=['POST'])

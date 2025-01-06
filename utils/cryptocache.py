@@ -79,7 +79,7 @@ from dotenv import load_dotenv
 import requests
 from requests.exceptions import RequestException
 import logging
-from typing import List, Dict, Optional, Any, Union
+from typing import List, Dict, Optional, Any
 import hashlib
 from urllib.parse import urljoin
 

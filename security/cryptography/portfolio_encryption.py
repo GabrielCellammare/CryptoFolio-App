@@ -48,8 +48,8 @@ from decimal import Decimal
 from typing import Dict
 import logging
 
-from cryptography_utils import AESCipher
-from secure_bye_array import SecureByteArray
+from security.cryptography.cryptography_utils import AESCipher
+from security.secure_bye_array import SecureByteArray
 
 
 class PortfolioEncryptionError(Exception):
