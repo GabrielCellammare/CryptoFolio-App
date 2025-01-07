@@ -49,6 +49,7 @@ Dependencies:
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any, Dict, Optional
 import logging
 from pyngrok import ngrok, conf
@@ -87,6 +88,10 @@ class NgrokManager:
         self.data_dir = Path('instance')
         self._create_secure_directory()
         self.state_file = self.data_dir / 'ngrok_state.json'
+
+        # Configure ngrok if app is provided
+        if app is not None:
+            self.init_app(app)
 
     def _setup_secure_logging(self):
         """
@@ -247,22 +252,19 @@ class NgrokManager:
         try:
             self._validate_port(port)
 
+            # Kill any existing tunnels
             ngrok.kill()
-
-            import time
-            time.sleep(1)
+            time.sleep(1)  # Wait for cleanup
 
             self.logger.info("Attempting to start ngrok tunnel...")
             self.tunnel = ngrok.connect(port, bind_tls=True)
             self.ngrok_url = self.tunnel.public_url
 
-            if not self.ngrok_url:
-                raise RuntimeError("Failed to create ngrok tunnel")
-
-            self.logger.info(f"Ngrok tunnel started: {self.ngrok_url}")
+            # Save state before returning
             self._secure_save_state()
-            return self.ngrok_url
+            self.logger.info(f"Ngrok tunnel started: {self.ngrok_url}")
 
+            return self.ngrok_url
         except Exception as e:
             self.logger.error(f"Failed to start ngrok tunnel: {e}")
             raise

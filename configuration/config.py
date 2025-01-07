@@ -76,13 +76,21 @@ class ConfigurationError(SecurityError):
 @dataclass(frozen=True)
 class SecurityHeaders:
     """Immutable security headers configuration."""
-    HSTS: str = field(default="strict")
+    HSTS: str = field(default="max-age=31536000; includeSubDomains")
     CONTENT_TYPE_OPTIONS: str = field(default="nosniff")
     FRAME_OPTIONS: str = field(default="DENY")
     XSS_PROTECTION: str = field(default="1; mode=block")
     REFERRER_POLICY: str = field(default="strict-origin-when-cross-origin")
     PERMITTED_CROSS_DOMAIN_POLICIES: str = field(default="none")
-    CSP: str = field(default="default-src 'self'")
+    CSP: str = field(default=(
+        "default-src 'self'; "
+        "img-src 'self' data: https:; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com; "
+        "font-src 'self' https://cdnjs.cloudflare.com; "
+        "connect-src 'self' https://*.ngrok-free.app https://*.ngrok.io; "
+        "frame-ancestors 'none';"
+    ))
 
 
 @dataclass(frozen=True)
@@ -109,11 +117,11 @@ class SecureConfig:
     # Secure pattern matching for origins
     ORIGIN_PATTERN: re.Pattern = re.compile(
         r'^https?://(?:'
-        # Domini normali
-        r'(?:[a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?::\d{1,5})?|'
-        r'localhost(?::\d{1,5})?|'  # localhost
-        r'127\.0\.0\.1(?::\d{1,5})?|'  # IPv4 loopback
-        r'\[::1\](?::\d{1,5})?'  # IPv6 loopback
+        # Handle wildcard subdomains
+        r'(?:\*\.)?(?:[a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?::\d{1,5})?|'
+        r'localhost(?::\d{1,5})?|'
+        r'127\.0\.0\.1(?::\d{1,5})?|'
+        r'\[::1\](?::\d{1,5})?'
         r')$'
     )
 
@@ -123,7 +131,8 @@ class SecureConfig:
         self._init_crypto()
         self._request_history = {}
         self._initialized = False
-        self._env_config = None
+        self._allowed_origins = set()  # Store allowed origins here
+        self._dynamic_origins = set()  # Store dynamic patterns (like *.ngrok-free.app)
         self._security_headers = SecurityHeaders()
 
     def _init_crypto(self) -> None:
@@ -206,7 +215,15 @@ class SecureConfig:
             # Generate HMAC for origin validation
             origin_hmac = self._generate_hmac(origin)
 
-            # Pattern matching
+            # For wildcard origins in allowed list, convert to regex pattern
+            allowed_origins = self.get_allowed_origins()
+            for allowed_origin in allowed_origins:
+                if '*' in allowed_origin:
+                    pattern = allowed_origin.replace('*', '[^.]+')
+                    if re.match(pattern, origin):
+                        return True
+
+            # If no wildcard match, use standard pattern matching
             if not self.ORIGIN_PATTERN.match(origin):
                 return False
 
@@ -259,9 +276,8 @@ class SecureConfig:
             return True
 
         except Exception as e:
-            self.logger.warning(
-                f"Origin validation failed: {self._sanitize_value(str(e))}"
-            )
+            self.logger.warning(f"Origin validation failed: {
+                                self._sanitize_value(str(e))}")
             return False
 
     def _check_rate_limit(self, origin: str) -> bool:
@@ -343,66 +359,101 @@ class SecureConfig:
                 )
 
     def initialize_app(self, app: Flask) -> None:
-        """
-        Initialize secure configuration for Flask application.
-
-        Args:
-            app: Flask application instance
-
-        Raises:
-            SecurityError: If initialization fails
-        """
         try:
             self._validate_env_variables()
 
-            # Create environment configurations
+            # Parse allowed origins during initialization
+            dev_origins = self._parse_origins_list(
+                os.getenv('DEV_ALLOWED_ORIGINS', ''))
+            prod_origins = self._parse_origins_list(
+                os.getenv('PROD_ALLOWED_ORIGINS', ''))
+
+            # Store based on environment
+            current_env = os.getenv('FLASK_ENV', 'production')
+            self._allowed_origins = dev_origins if current_env == 'development' else prod_origins
+
+            # Create environment configurations with the parsed origins
             environments = {
                 'development': EnvironmentConfig(
-                    origins=self._parse_origins(
-                        os.getenv('DEV_ALLOWED_ORIGINS')),
+                    origins=list(dev_origins),
                     max_requests=100
                 ),
                 'production': EnvironmentConfig(
-                    origins=self._parse_origins(
-                        os.getenv('PROD_ALLOWED_ORIGINS')),
+                    origins=list(prod_origins),
                     max_requests=1000
                 )
             }
 
+            # Store in app config
             app.config['ENVIRONMENTS'] = environments
 
-            # Set current environment configuration
-            current_env = os.getenv('FLASK_ENV', 'production')
-            if current_env not in self.SUPPORTED_ENVIRONMENTS:
-                self.logger.warning(f"Unsupported environment {
-                                    current_env}, using production")
-                current_env = 'production'
+            # Register dynamic origin handler
+            def add_dynamic_origin(origin: str):
+                if origin and self._validate_origin_format(origin):
+                    self._allowed_origins.add(origin)
+                    self.logger.info(f"Added dynamic origin: {origin}")
 
-            # Store the current environment configuration
-            self._env_config = environments[current_env]
-
-            # Security configurations
-            app.config['CORS_MAX_AGE'] = int(
-                os.getenv('CORS_MAX_AGE', self.DEFAULT_CORS_MAX_AGE)
-            )
-            app.config['HSTS_MAX_AGE'] = int(
-                os.getenv('HSTS_MAX_AGE', self.DEFAULT_HSTS_MAX_AGE)
-            )
-            app.config['INCLUDE_SUBDOMAINS'] = os.getenv(
-                'INCLUDE_SUBDOMAINS',
-                'false'
-            ).lower() == 'true'
+            app.add_dynamic_origin = add_dynamic_origin
 
             self._initialized = True
             self.logger.info(
-                f"Secure configuration initialized successfully for environment: {
-                    current_env}"
-            )
+                f"Secure configuration initialized for environment: {current_env}")
 
         except Exception as e:
             self.logger.error(f"Initialization failed: {str(e)}")
             raise SecurityError(
                 f"Configuration initialization failed: {str(e)}")
+
+    def _parse_origins_list(self, origins_string: str) -> set:
+        """
+        Parse origins string into a set of allowed origins and patterns.
+        """
+        origins = set()
+        if not origins_string:
+            return origins
+
+        for origin in origins_string.split(','):
+            origin = origin.strip()
+            if origin:
+                if '*' in origin:
+                    # Store wildcard patterns separately
+                    self._dynamic_origins.add(origin.replace('*', '.*'))
+                else:
+                    origins.add(origin)
+
+        return origins
+
+    def _validate_origin_format(self, origin: str) -> bool:
+        """
+        Validate origin format without checking against allowed list.
+        """
+        if not origin or '\x00' in origin:
+            return False
+
+        try:
+            parsed = urlparse(origin)
+            return (
+                parsed.scheme in {'http', 'https'} and
+                parsed.netloc and
+                not parsed.path.strip('/')
+            )
+        except Exception:
+            return False
+
+    def _check_origin_allowed(self, origin: str) -> bool:
+        """
+        Check if an origin is allowed, including dynamic patterns.
+        """
+        # Direct match
+        if origin in self._allowed_origins:
+            return True
+
+        # Check against dynamic patterns
+        for pattern in self._dynamic_origins:
+            if re.match(pattern, origin):
+                return True
+
+        return False
 
     def _parse_origins(self, origins_string: Optional[str]) -> List[str]:
         """
@@ -446,60 +497,46 @@ class SecureConfig:
         return current_app.config['ENVIRONMENTS'][env].origins
 
     def add_security_headers(self, response: Response) -> Response:
-        """
-        Add comprehensive security headers to response.
-
-        Args:
-            response: Flask response object
-
-        Returns:
-            Response: Response with security headers
-        """
+        """Add comprehensive security headers to response."""
         request_origin = request.headers.get('Origin')
 
-        # Validate request origin
         if request_origin:
-            if not self._validate_origin_secure(request_origin):
-                self.logger.warning(
-                    f"Invalid origin rejected: {request_origin}")
+            if not self._validate_origin_format(request_origin):
+                self.logger.warning(f"Invalid origin format: {request_origin}")
                 return response
 
-            if not self._check_rate_limit(request_origin):
-                self.logger.warning(
-                    f"Rate limit exceeded for: {request_origin}")
+            if not self._check_origin_allowed(request_origin):
+                self.logger.warning(f"Origin not allowed: {request_origin}")
                 return response
 
-            allowed_origins = self.get_allowed_origins()
-            if request_origin in allowed_origins:
-                response.headers['Access-Control-Allow-Origin'] = request_origin
+            response.headers['Access-Control-Allow-Origin'] = request_origin
 
-                # Add CORS headers securely
-                for header, env_var in {
-                    'Access-Control-Allow-Headers': 'CORS_ALLOWED_HEADERS',
-                    'Access-Control-Allow-Methods': 'CORS_ALLOWED_METHODS',
-                    'Access-Control-Allow-Credentials': 'CORS_ALLOW_CREDENTIALS',
-                    'Access-Control-Expose-Headers': 'CORS_EXPOSE_HEADERS'
-                }.items():
-                    value = os.getenv(env_var)
-                    if value:
-                        response.headers[header] = value
+            # Add CORS headers for valid origins
+            cors_headers = {
+                'Access-Control-Allow-Headers': os.getenv('CORS_ALLOWED_HEADERS', ''),
+                'Access-Control-Allow-Methods': os.getenv('CORS_ALLOWED_METHODS', ''),
+                'Access-Control-Allow-Credentials': os.getenv('CORS_ALLOW_CREDENTIALS', ''),
+                'Access-Control-Expose-Headers': os.getenv('CORS_EXPOSE_HEADERS', ''),
+                'Access-Control-Max-Age': str(self.DEFAULT_CORS_MAX_AGE)
+            }
 
-        # Add security headers
-        response.headers.update({
+            # Only add headers with non-empty values
+            response.headers.update(
+                {k: v for k, v in cors_headers.items() if v})
+
+        # Add security headers from our configuration
+        security_headers = {
             'X-Content-Type-Options': self._security_headers.CONTENT_TYPE_OPTIONS,
             'X-Frame-Options': self._security_headers.FRAME_OPTIONS,
             'X-XSS-Protection': self._security_headers.XSS_PROTECTION,
             'Referrer-Policy': self._security_headers.REFERRER_POLICY,
-            'Content-Security-Policy': self._security_headers.CSP,
-            'X-Permitted-Cross-Domain-Policies':
-                self._security_headers.PERMITTED_CROSS_DOMAIN_POLICIES
-        })
+            'X-Permitted-Cross-Domain-Policies': self._security_headers.PERMITTED_CROSS_DOMAIN_POLICIES,
+            'Content-Security-Policy': self._security_headers.CSP
+        }
 
-        # Configure HSTS
+        # Add HSTS header only on HTTPS connections
         if request.is_secure:
-            hsts_header = f"max-age={current_app.config['HSTS_MAX_AGE']}"
-            if current_app.config['INCLUDE_SUBDOMAINS']:
-                hsts_header += "; includeSubDomains"
-            response.headers['Strict-Transport-Security'] = hsts_header
+            security_headers['Strict-Transport-Security'] = self._security_headers.HSTS
 
+        response.headers.update(security_headers)
         return response

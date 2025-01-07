@@ -158,27 +158,27 @@ def create_app(secure_config) -> Flask:
 
     # Validate and set security configurations
     try:
-        # Initialize CORS with security configurations
-        secure_config.initialize_app(app)
 
+        # 1)
         # Validate and set secret key
         secret_key = os.environ.get('FLASK_SECRET_KEY')
         validate_secret_key(secret_key)
         app.secret_key = secret_key
 
+        # Initialize Firebase securely
+        secure_firebase_init()
+        # Initialize CORS with security configurations
+        secure_config.initialize_app(app)
+
+        # Configure secure development environment
+        if os.environ.get('FLASK_ENV') == 'development':
+            configure_development_environment(app)
         # Validate master encryption key
         master_key = os.environ.get('MASTER_ENCRYPTION_KEY')
         if not master_key or len(master_key) < 32:
             raise ValueError(
                 "MASTER_ENCRYPTION_KEY must be at least 32 characters long"
             )
-
-        # Initialize Firebase securely
-        secure_firebase_init()
-
-        # Configure secure development environment
-        if os.environ.get('FLASK_ENV') == 'development':
-            configure_development_environment(app)
 
     except Exception as e:
         app.logger.error(f"Security configuration failed: {e}")
@@ -200,18 +200,28 @@ def configure_development_environment(app: Flask) -> None:
     - Error isolation
     """
     try:
+        # Check if ngrok URL is already configured
         if 'NGROK_URL' in os.environ and os.environ['NGROK_URL']:
-            app.logger.info("Ngrok tunnel already configured")
+            app.logger.info("Using existing ngrok configuration")
+            with app.app_context():
+                app.add_dynamic_origin(os.environ['NGROK_URL'])
             return
 
-        ngrok_manager.init_app(app)
-        ngrok_url = ngrok_manager.start_tunnel(port=5000)
+         # Initialize ngrok
+        ngrok_manager = NgrokManager(app)
 
-        if not ngrok_url.startswith('https://'):
-            raise ValueError("Insecure ngrok URL detected")
+        # Start tunnel and get URL
+        with app.app_context():
+            ngrok_url = ngrok_manager.start_tunnel(port=5000)
+            if not ngrok_url.startswith('https://'):
+                raise ValueError("Insecure ngrok URL detected")
 
-        os.environ['NGROK_URL'] = ngrok_url
+            # Store URL and add to allowed origins
+            os.environ['NGROK_URL'] = ngrok_url
+            app.add_dynamic_origin(ngrok_url)
+
         app.logger.info(f"Secure ngrok tunnel established at {ngrok_url}")
+
     except Exception as e:
         app.logger.error(f"Development configuration failed: {e}")
         raise
