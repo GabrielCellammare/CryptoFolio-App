@@ -86,7 +86,7 @@ class SecurityHeaders:
         "default-src 'self'; "
         "img-src 'self' data: https:; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com; "
         "font-src 'self' https://cdnjs.cloudflare.com; "
         "connect-src 'self' https://*.ngrok-free.app https://*.ngrok.io; "
         "frame-ancestors 'none';"

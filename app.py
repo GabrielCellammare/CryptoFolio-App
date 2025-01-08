@@ -55,6 +55,7 @@ from security.cryptography.cryptography_utils import AESCipher
 from firebase_admin import firestore     # Database operations
 from flask import (
     Blueprint,
+    abort,
     jsonify,
     make_response,
     render_template,
@@ -259,13 +260,21 @@ def login(provider):
         flash('Invalid authentication provider', 'error')
         return redirect(url_for('index'))
 
-    # Store the CSRF token in session before OAuth redirect
-    csrf_token = csrf.generate_token()
+    # Generate token without requiring user_id
+    csrf_token, response = csrf.generate_token(require_user_id=False)
+    session['csrf_token'] = csrf_token
 
-    return oauth.create_client(provider).authorize_redirect(
-        url_for('auth_callback', provider=provider, _external=True), state=csrf_token
+    # Create OAuth client and redirect
+    oauth_client = oauth.create_client(provider)
+    redirect_uri = url_for('auth_callback', provider=provider, _external=True)
+
+    # Get OAuth redirect with state
+    response = oauth_client.authorize_redirect(
+        redirect_uri,
+        state=csrf_token
     )
 
+    return response
 
 # Authentication routes
 
@@ -339,6 +348,11 @@ def auth_callback(provider):
         print(f"Received state: {state}")
         print(f"Stored state: {stored_state}")
         print(f"Session contents: {dict(session)}")
+        # Validate state without requiring JavaScript origin
+        if not state or not stored_state or state != stored_state:
+            app.logger.error(f"State mismatch. Received: {
+                             state}, Stored: {stored_state}")
+            return jsonify({'error': 'Invalid state parameter'}), 401
 
         if state != stored_state:
             raise ValueError("Invalid CSRF state")
@@ -401,6 +415,12 @@ def auth_callback(provider):
             raise ValueError(f"Missing required user information: {
                              ', '.join(missing_fields)}")
 
+        # Set session information
+        session['user_id'] = user_id
+        session['provider'] = provider
+        # Generate new CSRF token for the authenticated session
+        csrf_token, response = csrf.generate_token(require_user_id=False)
+        session['csrf_token'] = csrf_token
         # Generate salt and store user security info
         secure_salt = cipher.generate_salt()
         security_ref = db.collection('user_security').document(user_id)
@@ -446,10 +466,6 @@ def auth_callback(provider):
                 'last_login': firestore.SERVER_TIMESTAMP
             })
 
-        # Set session information
-        session['user_id'] = user_id
-        session['provider'] = provider
-
         # Create audit log for successful login with token metadata
         db.collection('audit_logs').add({
             'user_id': user_id,
@@ -462,8 +478,12 @@ def auth_callback(provider):
             'token_scope': token_metadata['scope']
         })
 
+        # Set secure cookie with new CSRF token
+        response = redirect(url_for('dashboard'))
         flash('Login successful!', 'success')
-        return redirect(url_for('dashboard'))
+
+        flash('Login successful!', 'success')
+        return response
 
     except Exception as e:
         # Log the error securely
@@ -527,7 +547,6 @@ def index():
 
 @ app.route('/dashboard')
 @ login_required
-@ csrf.csrf_protect
 def dashboard():
     """
     Renders main dashboard with encrypted portfolio data.
@@ -1189,7 +1208,6 @@ def update_currency_preference():
 
 @ app.route('/api/csrf/nonce', methods=['GET'])
 @ login_required
-@ csrf.csrf_protect
 def refresh_csrf_nonce():
     """
     Generates new CSRF nonce for frontend requests.
@@ -1208,11 +1226,16 @@ def refresh_csrf_nonce():
     - Audit logging
     """
     try:
+        # Validate token from request
+        token = request.headers.get('X-CSRF-Token')
+        if not token or not csrf._validate_token(token):
+            abort(403, "Invalid CSRF token")
+
         # Generate a new nonce using the CSRF protection instance
         new_nonce = csrf.generate_nonce()
 
         # Get the expiration time for this nonce
-        expiration_time = csrf.used_nonces.get(new_nonce)
+        expiration_time = csrf.used_nonces.get(new_nonce, {}).get('expires')
 
         # Convert timestamp to ISO format for frontend
         expiration_iso = datetime.fromtimestamp(
@@ -1295,7 +1318,6 @@ def navigate_home():
 
 @ app.route('/api/csrf/token', methods=['GET'])
 @ login_required
-@ csrf.csrf_protect
 def get_csrf_token():
     """
     Generates and returns new CSRF token.
@@ -1309,10 +1331,13 @@ def get_csrf_token():
     - HTTP-only flag
     - SameSite policy
     """
-    token = csrf.generate_token()
-    response = make_response(jsonify({'token': token}))
-    response.set_cookie('csrf_token', token, secure=True,
-                        httponly=True, samesite='Lax')
+   # Validate JavaScript origin
+    js_origin = request.headers.get('X-JavaScript-Origin')
+    print("JS ORIGIN:", js_origin)
+    if not js_origin or not csrf._validate_js_origin(js_origin):
+        abort(403, "Invalid request origin")
+
+    token, response = csrf.generate_token()
     return response
 
 
@@ -1320,6 +1345,19 @@ def get_csrf_token():
 Middleware Documentation
 ----------------------
 """
+
+
+@app.before_request
+def log_request_headers():
+    """Log important security headers for debugging"""
+    if request.path.startswith('/api/'):
+        app.logger.debug(f"Request headers for {request.path}:")
+        app.logger.debug(
+            f"X-JavaScript-Origin: {request.headers.get('X-JavaScript-Origin')}")
+        app.logger.debug(
+            f"X-CSRF-Token: {request.headers.get('X-CSRF-Token')}")
+        app.logger.debug(
+            f"X-CSRF-Nonce: {request.headers.get('X-CSRF-Nonce')}")
 
 
 @app.after_request

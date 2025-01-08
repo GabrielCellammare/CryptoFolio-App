@@ -18,7 +18,6 @@
  * @version 1.0.0
  * @license MIT
  */
-
 // Configuration constants for better maintainability and security
 const CONFIG = Object.freeze({
     ENDPOINTS: {
@@ -62,12 +61,121 @@ class SecurityManager {
     #lastRefresh;
     #tokenEndpoint;
     #nonceEndpoint;
+    #tokenCache;
+    #nonceCache;
+    #initialized;
+    #initializationPromise;
+
+    // Cache dei token e nonce con relativi metadati
 
     constructor(tokenEndpoint, nonceEndpoint) {
         this.#tokenEndpoint = tokenEndpoint;
         this.#nonceEndpoint = nonceEndpoint;
         this.#credentials = { token: null, nonce: null };
         this.#lastRefresh = 0;
+        this.#tokenCache = new Map();
+        this.#nonceCache = new Map();
+        this.#initialized = false;
+        this.#initializationPromise = null;
+        setInterval(() => this.#cleanupCache(), 30000)
+    }
+
+
+    async initialize() {
+        // Only initialize once
+        if (this.#initialized) {
+            return;
+        }
+
+        // If already initializing, return the existing promise
+        if (this.#initializationPromise) {
+            return this.#initializationPromise;
+        }
+
+        this.#initializationPromise = (async () => {
+            try {
+                // Fetch initial token
+                const initialToken = await this.#fetchInitialToken();
+                this.#credentials.token = initialToken;
+                this.#tokenCache.set(initialToken, {
+                    timestamp: Date.now()
+                });
+
+                // Fetch initial nonce
+                await this.#fetchNonce();
+
+                this.#initialized = true;
+                this.#initializationPromise = null;
+
+                // Set up automatic refresh
+                this.#setupAutoRefresh();
+            } catch (error) {
+                this.#initializationPromise = null;
+                throw error;
+            }
+        })();
+
+        return this.#initializationPromise;
+    }
+
+    #setupAutoRefresh() {
+        // Refresh security credentials periodically
+        setInterval(async () => {
+            try {
+                const now = Date.now();
+                if (now - this.#lastRefresh > CONFIG.TIMING.CSRF_REFRESH_INTERVAL) {
+                    await this.#fetchToken();
+                    await this.#fetchNonce();
+                    this.#lastRefresh = now;
+                }
+            } catch (error) {
+                console.error('Failed to refresh security credentials:', error);
+            }
+        }, CONFIG.TIMING.TOKEN_CHECK_INTERVAL);
+    }
+
+    async #generateOriginSignature() {
+        const timestamp = Math.floor(Date.now() / 1000);
+
+        // Use ArrayBuffer for consistent binary handling
+        const buffer = new ArrayBuffer(36); // 4 + 32 bytes
+        const view = new DataView(buffer);
+
+        // Write timestamp in network byte order (big-endian)
+        view.setUint32(0, timestamp, false);
+
+        // Generate and write request ID
+        const requestId = crypto.getRandomValues(new Uint8Array(32));
+        new Uint8Array(buffer, 4).set(requestId);
+
+        // Use native base64url encoding
+        return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+    }
+
+    async #fetchInitialToken() {
+        // Initial token fetch only needs origin validation
+        const originSignature = await this.#generateOriginSignature();
+
+        const response = await fetch(this.#tokenEndpoint, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'X-JavaScript-Origin': originSignature,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cache-Control': 'no-cache',
+                'Origin': window.location.origin
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch initial CSRF token');
+        }
+
+        const data = await response.json();
+        return data.token;
     }
 
     /**
@@ -77,9 +185,29 @@ class SecurityManager {
      */
     async #fetchToken() {
         try {
+            // Check if we need initial token
+            if (!this.#credentials.token) {
+                const initialToken = await this.#fetchInitialToken();
+                this.#credentials.token = initialToken;
+                this.#tokenCache.set(initialToken, {
+                    timestamp: Date.now()
+                });
+                return initialToken;
+            }
+            // Cerca un token valido nella cache
+            for (const [token, data] of this.#tokenCache.entries()) {
+                if (Date.now() - data.timestamp < 3000000) {
+                    return token;
+                }
+            }
+
+            // Se non trovato, richiedi nuovo token
+            const originSignature = await this.#generateOriginSignature();
             const response = await fetch(this.#tokenEndpoint, {
+                method: 'GET',
                 credentials: 'same-origin',
                 headers: {
+                    'X-JavaScript-Origin': originSignature,
                     'X-Requested-With': 'XMLHttpRequest',
                     'Cache-Control': 'no-cache',
                     'Origin': window.location.origin
@@ -87,16 +215,23 @@ class SecurityManager {
             });
 
             if (!response.ok) {
-                throw new Error(`Token fetch failed: ${response.status}`);
+                throw new Error('Failed to fetch CSRF token');
             }
 
             const data = await response.json();
-            this.#credentials.token = data.token;
-            return data.token;
+            this.#credentials.token = data.token
+            const token = data.token;
+
+            // Salva il token nella cache
+            this.#tokenCache.set(token, {
+                timestamp: Date.now()
+            });
         } catch (error) {
             console.error('Failed to fetch CSRF token:', error);
             throw new Error('Security token fetch failed');
         }
+
+        return token;
     }
 
     /**
@@ -110,25 +245,41 @@ class SecurityManager {
                 await this.#fetchToken();
             }
 
+            // Richiedi sempre un nuovo nonce
             const response = await fetch(this.#nonceEndpoint, {
+                method: 'GET',
                 credentials: 'same-origin',
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-Token': this.#credentials.token,
-                    'Cache-Control': 'no-cache'
+                    'X-JavaScript-Origin': await this.#generateOriginSignature(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Cache-Control': 'no-cache',
+                    'Origin': window.location.origin
                 }
             });
 
             if (!response.ok) {
-                throw new Error(`Nonce fetch failed: ${response.status}`);
+                throw new Error('Failed to fetch CSRF nonce');
             }
 
             const data = await response.json();
-            this.#credentials.nonce = data.nonce;
+            this.#credentials.nonce = data.nonce
             return data.nonce;
+
         } catch (error) {
             console.error('Failed to fetch nonce:', error);
             throw new Error('Security nonce fetch failed');
+        }
+    }
+
+
+    #cleanupCache() {
+        const now = Date.now();
+        // Rimuovi token scaduti (dopo 1 ora)
+        for (const [token, data] of this.#tokenCache.entries()) {
+            if (now - data.timestamp > 3600000) {
+                this.#tokenCache.delete(token);
+            }
         }
     }
 
@@ -137,6 +288,10 @@ class SecurityManager {
      * @returns {Promise<Object>} Current security credentials
      */
     async getSecurityCredentials() {
+        if (!this.#initialized) {
+            await this.initialize();
+        }
+
         const now = Date.now();
         const needsRefresh = now - this.#lastRefresh >
             (CONFIG.TIMING.CSRF_REFRESH_INTERVAL - CONFIG.TIMING.TOKEN_EXPIRATION_BUFFER) ||
@@ -144,13 +299,29 @@ class SecurityManager {
             !this.#credentials.nonce;
 
         if (needsRefresh) {
-            await this.#fetchToken();
-            this.#lastRefresh = now;
+            try {
+                await this.#fetchToken();
+                this.#lastRefresh = now;
+            } catch (error) {
+                console.error('Failed to refresh security credentials:', error);
+                throw error;
+            }
         }
 
-        await this.#fetchNonce();
+        try {
+            await this.#fetchNonce();
+        } catch (error) {
+            console.error('Failed to fetch nonce:', error);
+            throw error;
+        }
+
         return { ...this.#credentials };
     }
+
+    async getOriginSignature() {
+        return this.#generateOriginSignature();
+    }
+
 }
 
 /**
@@ -306,11 +477,11 @@ class RateLimiter {
 class ApiServiceImpl {
     #securityManager;
     #rateLimiter;
-    #initialized;
     #environment;
+    #allowedOrigins;
+
 
     constructor() {
-        this.#initialized = false;
         this.#environment = document.querySelector('meta[name="environment"]')?.content || 'development';
 
         this.#securityManager = new SecurityManager(
@@ -319,23 +490,35 @@ class ApiServiceImpl {
         );
 
         this.#rateLimiter = new RateLimiter(CONFIG.RATE_LIMIT.MAX_REQUESTS_PER_MINUTE);
+        // Add NGROK support to allowed origins
+        this.#allowedOrigins = new Set([
+            window.location.origin,
+            ...this.#getNgrokOrigins()
+        ]);
+    }
+
+    async initialize() {
+        await this.#securityManager.initialize();
     }
 
     /**
-     * Initializes the API service and security credentials
-     * @returns {Promise<void>}
+     * Get NGROK origins from current URL if in development
+     * @private
      */
-    async initialize() {
-        if (this.#initialized) return;
-
-        try {
-            await this.#securityManager.getSecurityCredentials();
-            this.#initialized = true;
-            console.log('API Service initialized successfully');
-        } catch (error) {
-            console.error('Failed to initialize API Service:', error);
-            throw error;
+    #getNgrokOrigins() {
+        if (this.#environment !== 'development') {
+            return [];
         }
+
+        const origins = [];
+        const hostname = window.location.hostname;
+
+        // Check if current host is NGROK
+        if (hostname.includes('ngrok-free.app') || hostname.includes('ngrok.app')) {
+            origins.push(`https://${hostname}`);
+        }
+
+        return origins;
     }
 
     /**
@@ -344,90 +527,137 @@ class ApiServiceImpl {
      * @param {Object} options Fetch options
      * @returns {Promise<Object>} The response data
      */
+    /**
+ * Makes secure HTTP requests with comprehensive security controls and error handling
+ * @param {string} url - The endpoint URL
+ * @param {Object} options - Fetch options
+ * @returns {Promise<any>} - The parsed response data
+ */
     async safeFetch(url, options = {}) {
+
+        // Ensure security manager is initialized before making any requests
+        await this.#securityManager.initialize();
+        // Generate unique request identifier for tracing
+        const requestId = crypto.randomUUID();
+        // Track concurrent requests to prevent race conditions
+        const requestKey = `${url}:${options.method || 'GET'}`;
+
         try {
-            if (!this.#initialized) {
-                await this.initialize();
+            // First, validate the URL structure for security
+            const urlObj = new URL(url, window.location.origin);
+            if (this.#environment === 'production' && urlObj.protocol !== 'https:') {
+                throw new Error('HTTPS required in production environment');
             }
 
-            this.#validateHttps(url);
+            // Apply rate limiting before proceeding
             this.#rateLimiter.checkRateLimit(url);
 
-            const credentials = await this.#securityManager.getSecurityCredentials();
-            const requestId = crypto.randomUUID();
 
-            const secureOptions = {
-                ...options,
-                credentials: 'same-origin',
-                headers: {
-                    ...options.headers,
-                    'X-CSRF-Token': credentials.token,
-                    'X-CSRF-Nonce': credentials.nonce,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Content-Type': 'application/json',
-                    'X-Request-ID': requestId,
-                    'Cache-Control': 'no-cache',
-                    'Pragma': 'no-cache'
-                },
-                mode: 'same-origin',
-                referrerPolicy: 'same-origin'
+
+            // Ensure we have fresh security credentials
+            const credentials = await this.#securityManager.getSecurityCredentials();
+
+
+            const originSignature = await this.#securityManager.getOriginSignature();
+
+            // Construct secure request headers
+            const securityHeaders = {
+                'X-CSRF-Token': credentials.token,
+                'X-CSRF-Nonce': credentials.nonce,
+                'X-JavaScript-Origin': originSignature,
+                'X-Request-ID': requestId,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Origin': window.location.origin,
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
             };
 
+            // Prepare the final request configuration
+            const secureOptions = {
+                ...options,
+                credentials: 'same-origin', // Ensure cookies are sent
+                headers: {
+                    ...options.headers,
+                    ...securityHeaders
+                }
+            };
+
+            // Execute request with retry logic
             const response = await this.#withRetry(async () => {
-                const response = await fetch(url, secureOptions);
+                // Add small delay between retries to prevent overwhelming server
+                await new Promise(resolve => setTimeout(resolve, 100));
 
-                // Update rate limiter with header information
+                const fetchResponse = await fetch(url, secureOptions);
+
+                // Handle rate limiting for specific endpoints
                 if (url.includes('/api/portfolio/add')) {
-                    this.#rateLimiter.updateFromHeaders(response);
+                    this.#rateLimiter.updateFromHeaders(fetchResponse);
+
+                    if (fetchResponse.status === 429) {
+                        const errorData = await fetchResponse.json();
+                        this.#rateLimiter.handleRateLimitError(errorData);
+                    }
                 }
 
-                // Handle rate limit errors
-                if (response.status === 429) {
-                    const errorData = await response.json();
-                    this.#rateLimiter.handleRateLimitError(errorData);
+                // Special handling for token cleanup
+                if (fetchResponse.status === 403) {
+                    if (url.includes('/api/token/cleanup')) {
+                        console.warn('Token cleanup deferred - continuing operation');
+                        return { status: 'warning', message: 'Token cleanup deferred' };
+                    }
+
+                    // For other 403s, we need to refresh security credentials
+                    if (fetchResponse.headers.get('X-CSRF-Valid') === 'false') {
+                        await this.#securityManager.resetCredentials();
+                        throw { status: 403, description: 'Invalid CSRF token/nonce' };
+                    }
                 }
 
-                // New: Special handling for 403 errors during token cleanup
-                if (response.status === 403 && url.includes('/api/token/cleanup')) {
-                    // Log the error but don't throw - allow the application to continue
-                    console.warn('Token cleanup failed - continuing with operation');
-                    return { status: 'warning', message: 'Token cleanup deferred' };
-                }
-
-                if (response.status === 403) {
-                    // Force a complete re-initialization
-                    this.#initialized = false;
-                    await this.initialize();
-                    throw { status: 403, description: 'Invalid CSRF token' };
-                }
-
-                if (!response.ok) {
-                    const error = new Error(`HTTP error! status: ${response.status}`);
-                    error.status = response.status;
+                // Handle general request failures
+                if (!fetchResponse.ok) {
+                    const error = new Error(`Request failed: ${fetchResponse.status}`);
+                    error.status = fetchResponse.status;
+                    error.response = fetchResponse;
                     throw error;
                 }
 
-                return response.json();
+                // Parse and return the response
+                const contentType = fetchResponse.headers.get('Content-Type');
+                if (contentType && contentType.includes('application/json')) {
+                    return fetchResponse.json();
+                }
+                return fetchResponse.text();
             });
 
             return response;
 
         } catch (error) {
-            // Handle CSRF token errors as before
-            if (error.status === 403 && error.description?.includes('Invalid CSRF token')) {
-                this.#initialized = false;
+            // Enhanced error handling with specific cases
+            if (error.status === 403 && error.description?.includes('Invalid CSRF')) {
+                console.warn('Retrying request with fresh security credentials');
+                await this.#securityManager.resetCredentials();
                 return this.safeFetch(url, options);
             }
 
             if (error.status === 429) {
-                throw new Error('Rate limit exceeded. Please try again later.');
+                const retryAfter = error.response?.headers?.get('Retry-After');
+                throw new Error(`Rate limit exceeded. Please retry after ${retryAfter || 'some time'}.`);
             }
 
-            // Handle other errors as before
-            throw error;
+            // Log failed requests for debugging
+            console.error('Request failed:', {
+                url,
+                method: options.method || 'GET',
+                status: error.status,
+                message: error.message,
+                requestId
+            });
+
+            // Rethrow with additional context
+            throw new Error(`Request failed: ${error.message}`);
         }
     }
-
     /**
      * Validates HTTPS usage in production
      * @private
@@ -508,11 +738,11 @@ class ApiServiceImpl {
     }
 
     async navigateToHome() {
-        await this.initialize();
         return this.safeFetch('/navigate-home', {
             method: 'POST'
         });
     }
+
 }
 
 // Create and export the singleton instance
@@ -521,8 +751,8 @@ export const ApiService = new ApiServiceImpl();
 // Initialize function for global access
 window.initializeSecureTokens = async function () {
     try {
-        await ApiService.initialize();
         console.log('Security tokens initialized successfully');
+        await ApiService.initialize();
     } catch (error) {
         console.error('Failed to initialize security tokens:', error);
         throw error;
