@@ -334,18 +334,7 @@ class CSRFProtection:
             # Check if this is a development environment
             is_dev = os.getenv('FLASK_ENV') == 'development'
 
-            # Handle ngrok URLs in development
-            if is_dev and ('ngrok-free.app' in parsed.netloc or 'ngrok.io' in parsed.netloc):
-                # Verify the ngrok URL is in our allowed origins
-                if request_origin in self._allowed_origins:
-                    return True
-                # Check against dynamic patterns
-                for pattern in self._dynamic_origins:
-                    if re.match(pattern, request_origin):
-                        return True
-                return False
-
-            # Handle local development URLs
+            # Handle local development URLs first
             is_local = (
                 parsed.netloc.startswith('localhost') or
                 parsed.netloc.startswith('127.0.0.1') or
@@ -353,21 +342,40 @@ class CSRFProtection:
             )
 
             if is_local:
+                # In development, we should allow local origins that are in our allowed list
+                if is_dev and request_origin in self._allowed_origins:
+                    return True
+
+                # If not in development or not in allowed origins, reject
                 if not is_dev:
                     self.logger.warning(
-                        f"Local origin {request_origin} rejected in non-development environment")
-                    return False
+                        f"Local origin {
+                            request_origin} rejected in non-development environment"
+                    )
+                return False
 
-                # Additional validation for local origins
-                if token:
-                    token_data = self._token_cache.get(token, {})
-                    if not token_data.get('local_origin_verified'):
-                        return False
+            # Handle ngrok URLs in development
+            if is_dev and ('ngrok-free.app' in parsed.netloc or 'ngrok.io' in parsed.netloc):
+                # First check direct match in allowed origins
+                if request_origin in self._allowed_origins:
+                    return True
 
+                # Then check against dynamic patterns
+                for pattern in self._dynamic_origins:
+                    if re.match(pattern, request_origin):
+                        return True
+                return False
+
+            # For all other origins, check against allowed list first
+            if request_origin in self._allowed_origins:
                 return True
 
-            # For production origins, check against allowed list
-            return request_origin in self._allowed_origins
+            # Finally check against dynamic patterns
+            for pattern in self._dynamic_origins:
+                if re.match(pattern, request_origin):
+                    return True
+
+            return False
 
         except Exception as e:
             self.logger.error(f"Origin security validation failed: {str(e)}")

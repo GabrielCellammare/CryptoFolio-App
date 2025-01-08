@@ -505,27 +505,25 @@ def auth_callback(provider):
         session.pop('oauth_csrf', None)
 
 
-@ app.route('/auth/logout')
-@ login_required
-@ csrf.csrf_protect
+@app.route('/auth/logout', methods=['POST'])
+@login_required
+@csrf.csrf_protect
 def logout():
     """
     Handles user logout process securely.
-
-    Clears session data and redirects to landing page with proper security measures.
-
-    Returns:
-        Response: Redirect to index with success message
-
-    Security features:
-    - Complete session cleanup
-    - CSRF protection
-    - Audit logging
-    - Secure redirect
     """
-    session.clear()
-    flash('Logout successful!', 'success')
-    return redirect(url_for('index'))
+    try:
+        session.clear()
+        return jsonify({
+            'status': 'success',
+            'redirect_url': url_for('index')
+        }), 200  # Explicitly return 200 OK status
+    except Exception as e:
+        app.logger.error(f"Logout error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Logout failed'
+        }), 500
 
 
 """

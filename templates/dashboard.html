@@ -108,7 +108,9 @@
                         <option value="EUR">EUR</option>
                     </select>
                 </div>
-                <a class="nav-item nav-link" href="/auth/logout">Logout</a>
+                <button id="logoutButton" class="nav-item nav-link btn btn-link">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
             </div>
         </div>
     </nav>
@@ -363,6 +365,70 @@
             });
         });
     </script>
+    
+    <script type="module">
+   // Import the API service
+import { ApiService } from '/static/js/api-service.js';
+
+document.addEventListener('DOMContentLoaded', () => {
+    const logoutButton = document.getElementById('logoutButton');
+    const loadingOverlay = document.querySelector('.loading-overlay');
+    const flashMessages = document.getElementById('flashMessages');
+
+    if (logoutButton) {
+        logoutButton.addEventListener('click', handleLogout);
+    } else {
+        console.error('Logout button not found in the document');
+    }
+
+    async function handleLogout() {
+        try {
+            // Show loading overlay
+            loadingOverlay.style.display = 'flex';
+
+            // Initialize API service
+            await ApiService.initialize();
+
+            // Make the logout request
+            const response = await ApiService.safeFetch('/auth/logout', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            // Handle the response directly as JSON
+            if (response && response.status === 'success') {
+                // Successful logout - redirect to the provided URL
+                if (response.redirect_url) {
+                    window.location.replace(response.redirect_url);
+                } else {
+                    // Fallback to index if no redirect URL provided
+                    window.location.replace('/index');
+                }
+            } else {
+                throw new Error(response?.message || 'Logout failed');
+            }
+        } catch (error) {
+            console.error('Logout failed:', error);
+            
+            // Show error message to user
+            if (flashMessages) {
+                flashMessages.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show">
+                        ${error.message || 'Logout failed. Please try again.'}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+            }
+        } finally {
+            // Hide loading overlay
+            loadingOverlay.style.display = 'none';
+        }
+    }
+});
+</script>
 
 </body>
 </html>
