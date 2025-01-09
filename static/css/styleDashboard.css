@@ -358,3 +358,270 @@ body {
         padding: 0.25rem 1.75rem 0.25rem 0.5rem;
     }
 }
+
+#alertContainer {
+    margin-top: 1rem;
+}
+
+.alert {
+    margin-bottom: 0.5rem;
+}
+
+/* API Management Styles */
+.api-token-section {
+    position: relative;
+}
+
+.token-container {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+#alertContainer {
+    margin-top: 1rem;
+}
+
+.alert {
+    margin-bottom: 0.5rem;
+}
+
+/* API Management Styles */
+.api-token-section {
+    position: relative;
+}
+
+.token-container {
+    position: relative;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.token-container:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.token-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.monospace {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.9rem;
+    letter-spacing: -0.5px;
+}
+
+.bg-gradient-dark {
+    background: linear-gradient(135deg, #2a2d3e 0%, #3a3f58 100%);
+}
+
+/* API Documentation Styles */
+.nav-tabs {
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    color: #6c757d;
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    border: none;
+    color: #495057;
+}
+
+.nav-tabs .nav-link.active {
+    border: none;
+    color: #0d6efd;
+    position: relative;
+}
+
+.nav-tabs .nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #0d6efd;
+}
+
+.code-block {
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.code-block pre {
+    margin: 0;
+    padding: 1rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #495057;
+    overflow-x: auto;
+}
+
+.endpoint {
+    padding: 1rem;
+    border-radius: 8px;
+    background-color: white;
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
+}
+
+.endpoint:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.endpoint:last-child {
+    margin-bottom: 0;
+}
+
+.endpoint-title {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+    font-weight: 600;
+}
+
+/* Rate Limiting Styles */
+.progress {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+/* Token Status Styles */
+#tokenStatus {
+    font-size: 0.875rem;
+    padding: 0.5rem 0;
+}
+
+#tokenStatus i {
+    opacity: 0.5;
+}
+
+/* Alert Styling */
+.alert {
+    border: none;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.alert i {
+    font-size: 1.25rem;
+}
+
+/* Custom Scrollbar for Code Blocks */
+.code-block pre::-webkit-scrollbar {
+    height: 8px;
+}
+
+.code-block pre::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+
+.code-block pre::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.code-block pre::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+/* API Status Badge Animation */
+#apiStatus {
+    position: relative;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+#apiStatus::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0.5rem;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #fff;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: translateY(-50%) scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: translateY(-50%) scale(1.5);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: translateY(-50%) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Documentation Link Hover Effect */
+.card-footer .btn-outline-primary {
+    transition: all 0.2s ease;
+}
+
+.card-footer .btn-outline-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.15);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .token-controls {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .token-controls .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .nav-tabs .nav-link {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+    }
+
+    .code-block pre {
+        font-size: 0.75rem;
+    }
+
+    .endpoint {
+        padding: 0.75rem;
+    }
+}
+
+-container {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}

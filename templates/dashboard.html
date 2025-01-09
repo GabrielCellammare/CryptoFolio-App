@@ -279,13 +279,116 @@
                             <!-- Contenitore esistente per gli avvisi temporanei -->
                             <div id="alertContainer"></div>    
                             
-                            <div class="mt-4">
-                                <h6>Quick Start Guide</h6>
-                                <pre class="bg-light p-3 rounded"><code>curl -H "X-API-Key: YOUR_API_KEY" \
-                        -X POST https://your-domain.com/api/token</code></pre>
-                                <small class="text-muted">
-                                    This will return a JWT token valid for 1 hour. Use this token in subsequent requests.
-                                </small>
+                            <div class="api-documentation">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-0">API Integration Guide</h5>
+                                        <span class="badge bg-primary">2025 Edition</span>
+                                    </div>
+                                    <div class="card-body">
+                                        <!-- Introduction -->
+                                        <div class="mb-4">
+                                            <h6 class="fw-bold">Authentication Overview</h6>
+                                            <p class="text-muted">
+                                                Our API uses JWT (JSON Web Token) authentication. Once you generate a token from this dashboard, 
+                                                you can use it to authenticate your requests. Each token is valid for 7 days and includes built-in 
+                                                security measures.
+                                            </p>
+                                        </div>
+                            
+                                        <!-- Quick Start -->
+                                        <div class="api-quick-start mb-4">
+                                            <h6 class="fw-bold mb-3">Getting Started</h6>
+                                            <div class="code-container bg-light p-3 rounded">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <span class="badge bg-secondary">AUTHENTICATION</span>
+                                                    <button class="btn btn-sm btn-outline-secondary copy-btn" data-clipboard-target="#auth-example">
+                                                        <i class="fas fa-copy"></i> Copy
+                                                    </button>
+                                                </div>
+                                                <pre class="mb-0"><code id="auth-example">curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+                                 -H "Content-Type: application/json" \
+                                 https://api.cryptofolio.com/api/v1/portfolio</code></pre>
+                                            </div>
+                                        </div>
+                            
+                                        <!-- Endpoints -->
+                                        <div class="api-endpoints mb-4">
+                                            <h6 class="fw-bold mb-3">Available Endpoints</h6>
+                                            <div class="table-responsive">
+                                                <table class="table table-hover">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Endpoint</th>
+                                                            <th>Method</th>
+                                                            <th>Description</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td><code>api/v1/portfolio</code></td>
+                                                            <td><span class="badge bg-success">GET</span></td>
+                                                            <td>Retrieve your entire portfolio</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><code>api/v1/portfolio</code></td>
+                                                            <td><span class="badge bg-primary">POST</span></td>
+                                                            <td>Add a new cryptocurrency</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                            
+                                        <!-- Request Examples -->
+                                        <div class="api-examples mb-4">
+                                            <h6 class="fw-bold mb-3">Request Examples</h6>
+                                            
+                                            <!-- Add Cryptocurrency -->
+                                            <div class="example-container mb-3">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <span class="badge bg-primary">POST api/v1/portfolio</span>
+                                                    <button class="btn btn-sm btn-outline-secondary copy-btn" data-clipboard-target="#post-example">
+                                                        <i class="fas fa-copy"></i> Copy
+                                                    </button>
+                                                </div>
+                                                <div class="code-container bg-light p-3 rounded">
+                                                    <pre class="mb-0"><code id="post-example">{
+                                "crypto_id": "bitcoin",
+                                "symbol": "BTC",
+                                "amount": 0.5,
+                                "purchase_price": 45000,
+                                "purchase_date": "2025-01-15"
+                            }</code></pre>
+                                                </div>
+                                            </div>
+                            
+                                            <!-- GET Position -->
+                                            <div class="example-container mb-3">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <span class="badge bg-warning text-dark">GET api/v1/portfolio</span>
+                                                    <button class="btn btn-sm btn-outline-secondary copy-btn" data-clipboard-target="#put-example">
+                                                        <i class="fas fa-copy"></i> Copy
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                            
+                                        <!-- Rate Limits -->
+                                        <div class="api-rate-limits">
+                                            <h6 class="fw-bold mb-3">Rate Limits & Quotas</h6>
+                                            <div class="alert alert-info">
+                                                <i class="fas fa-info-circle me-2"></i>
+                                                <strong>Fair Usage Policy:</strong>
+                                                <ul class="mb-0 mt-2">
+                                                    <li>100 requests per hour for authenticated endpoints</li>
+                                                    <li>Two tokens can be generated per day</li>
+                                                    <li>12-hour cooldown period between token generations</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
