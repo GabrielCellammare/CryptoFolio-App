@@ -1904,8 +1904,7 @@ def add_crypto():
 
             return jsonify({
                 'status': 'success',
-                'message': 'Cryptocurrency added successfully',
-                'document_id': new_doc[1].id
+                'message': 'Cryptocurrency added successfully'
             }), 201
 
         except Exception as e:
