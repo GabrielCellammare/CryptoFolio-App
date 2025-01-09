@@ -256,6 +256,7 @@ class SecurityManager {
             });
 
             if (!response.ok) {
+                window.location.reload();
                 throw new Error('Failed to fetch CSRF nonce');
             }
 
