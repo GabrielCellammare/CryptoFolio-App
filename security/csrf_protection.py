@@ -971,7 +971,7 @@ class CSRFProtection:
         origin = request.headers.get('Origin')
         if origin:
             # Use the new secure validation method
-            if not self._validate_origin_secure(origin, token):
+            if not self._validate_origin_secure(origin):
                 self.logger.warning(f"Invalid origin: {origin}")
                 return False
 
@@ -1147,7 +1147,7 @@ class CSRFProtection:
 
                 # Additional origin validation
             origin = request.headers.get('Origin')
-            if origin and not self._validate_origin_secure(origin, token):
+            if origin and not self._validate_origin_secure(origin):
                 abort(403, "Invalid request origin")
 
             return f(*args, **kwargs)
