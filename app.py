@@ -337,25 +337,11 @@ def auth_callback(provider):
             'last_refreshed': firestore.SERVER_TIMESTAMP
         }
 
+        session.clear()
         # Initialize variables we'll need for both providers
         user_id = None
         user_email = None
         username = None
-
-        state = request.args.get('state')
-        stored_state = session.get('csrf_token')
-
-        print(f"Received state: {state}")
-        print(f"Stored state: {stored_state}")
-        print(f"Session contents: {dict(session)}")
-        # Validate state without requiring JavaScript origin
-        if not state or not stored_state or state != stored_state:
-            app.logger.error(f"State mismatch. Received: {
-                             state}, Stored: {stored_state}")
-            return jsonify({'error': 'Invalid state parameter'}), 401
-
-        if state != stored_state:
-            raise ValueError("Invalid CSRF state")
 
         # Handle Google authentication
         if provider == 'google':
