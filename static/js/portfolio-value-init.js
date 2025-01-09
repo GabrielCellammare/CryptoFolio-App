@@ -1,4 +1,5 @@
-import { formatCurrency, getCurrentCurrency } from './utils.js';
+import { formatCurrency } from './utils.js';
+import { ApiService } from './api-service.js'
 
 // La funzione principale che aggiorna il valore del portfolio rimane quasi identica,
 // ma ora utilizza il valore del selettore della valuta se disponibile
@@ -16,7 +17,7 @@ async function updatePortfolioValue() {
             currentCurrency = currencySelect.value;
         } else {
             // Altrimenti, ottieni la valuta dalle preferenze dell'utente
-            currentCurrency = await getCurrentCurrency();
+            currentCurrency = ApiService.getCurrentCurrency();
         }
 
         // Manteniamo la precisione decimale come nell'originale

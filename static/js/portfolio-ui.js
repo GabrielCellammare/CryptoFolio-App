@@ -368,7 +368,6 @@ function setupDeleteHandlers() {
             showLoading();
             try {
                 await ApiService.deleteCrypto(currentCryptoId);
-                showSuccess('Cryptocurrency removed successfully');
                 window.location.reload();
             } catch (error) {
                 console.error('Error:', error);
@@ -434,3 +433,41 @@ function getUpdateData(row) {
         purchase_date: inputs[2].value
     };
 }
+
+window.cancelEdit = function (button) {
+    const row = button.closest('tr');
+    const originalValues = row.dataset.originalValues ? JSON.parse(row.dataset.originalValues) : [];
+
+    // Reset inputs to their original values
+    const editInputs = row.querySelectorAll('.edit-input');
+    editInputs.forEach((input, index) => {
+        if (index < originalValues.length) {
+            input.value = originalValues[index];
+        }
+    });
+
+    // Reset display values to show original values
+    const displayValues = row.querySelectorAll('.display-value');
+    displayValues.forEach((span, index) => {
+        if (index < originalValues.length) {
+            if (editInputs[index].type === 'date') {
+                // Format date for display
+                const date = new Date(originalValues[index]);
+                span.textContent = date.toISOString().split('T')[0];
+            } else {
+                span.textContent = originalValues[index];
+            }
+        }
+    });
+
+    toggleEditMode(row, false);
+
+    // Remove validation styles
+    editInputs.forEach(input => {
+        input.classList.remove('is-invalid');
+        const feedbackDiv = input.nextElementSibling;
+        if (feedbackDiv && feedbackDiv.classList.contains('invalid-feedback')) {
+            feedbackDiv.remove();
+        }
+    });
+};

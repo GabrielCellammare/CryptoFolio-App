@@ -79,6 +79,8 @@ function populateCryptoSelect(cryptos) {
     });
 }
 
+
+
 /**
  * Set up automatic portfolio refresh
  */

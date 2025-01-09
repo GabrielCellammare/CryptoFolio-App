@@ -1,4 +1,5 @@
 import { ApiService } from "./api-service.js";
+import { endpointManager } from './secure-endpoints.js';
 
 /**
  * Manages JWT API tokens with secure handling and cooldown enforcement
@@ -7,11 +8,6 @@ import { ApiService } from "./api-service.js";
 export default class ApiKeyManager {
     // Core configuration object
     #config = {
-        endpoints: {
-            token: '/api/token',
-            status: '/api/token/status',
-            cleanup: '/api/token/cleanup'
-        },
         timeouts: {
             display: 30_000,
             copy: 3_000,
@@ -114,7 +110,8 @@ export default class ApiKeyManager {
             this.#elements.regenerateButton.disabled = true;
             this.#showInfo('Generating new API token...');
 
-            const response = await ApiService.safeFetch(this.#config.endpoints.token, {
+            const endpoint = endpointManager.getEndpoint('SECURITY', 'TOKEN');
+            const response = await ApiService.safeFetch(endpoint, {
                 method: 'POST'
             });
 
@@ -150,7 +147,8 @@ export default class ApiKeyManager {
      */
     async #updateTokenStatus() {
         try {
-            const data = await ApiService.safeFetch(this.#config.endpoints.status, { method: 'GET' });
+            const endpoint = endpointManager.getEndpoint('SECURITY', 'TOKEN_STATUS');
+            const data = await ApiService.safeFetch(endpoint, { method: 'GET' });
 
             if (data.token_status === 'expired') {
                 this.#showPersistentAlert(
@@ -284,7 +282,8 @@ export default class ApiKeyManager {
      */
     async #cleanupExpiredTokens() {
         try {
-            const response = await ApiService.safeFetch(this.#config.endpoints.cleanup, {
+            const endpoint = endpointManager.getEndpoint('SECURITY', 'TOKEN_CLEANUP');
+            const response = await ApiService.safeFetch(endpoint, {
                 method: 'POST'
             });
 

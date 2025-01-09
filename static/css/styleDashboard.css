@@ -71,6 +71,64 @@ body {
     max-width: 350px;
 }
 
+.enhanced-alert {
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    border: none;
+    border-left: 4px solid;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    min-width: 300px;
+    transform: translateX(0);
+    transition: transform 0.15s ease-in-out;
+}
+
+.alert-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.alert-icon {
+    font-size: 1.5rem;
+}
+
+.alert-message {
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Stili specifici per tipo di alert */
+.alert-success {
+    background-color: #d4edda;
+    border-left-color: #28a745;
+    color: #155724;
+}
+
+.alert-success .alert-icon {
+    color: #28a745;
+}
+
+/* Animazione di entrata */
+.alert.fade {
+    transition: opacity 0.15s linear, transform 0.15s ease-in-out;
+}
+
+.alert.fade:not(.show) {
+    transform: translateX(100%);
+}
+
+/* Stile per il pulsante di chiusura */
+.alert .btn-close {
+    padding: 1.05rem 1rem;
+    margin: -1rem -0.5rem -1rem auto;
+}
+
+/* Hover effect */
+.enhanced-alert:hover {
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
 #currencySelect {
     background-color: transparent;
     border: 1px solid rgba(255, 255, 255, 0.1);

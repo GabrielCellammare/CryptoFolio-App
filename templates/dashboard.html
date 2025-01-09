@@ -100,7 +100,7 @@
                 </div>
             </a>
             <div class="navbar-nav ms-auto align-items-center">
-                <span class="nav-item nav-link text-light me-3">Last update: <span id="lastUpdate">{{ last_update }}</span></span>
+                <span class="nav-item nav-link text-light me-3">Last update:  <span id="lastUpdate">{{ last_update }}</span></span>
                 <span class="nav-item nav-link text-light me-3">Welcome, {{ username }}</span>
                 <div class="nav-item me-3">
                     <div class="currency-select-wrapper">
@@ -302,9 +302,6 @@
                                             <div class="code-container bg-light p-3 rounded">
                                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                                     <span class="badge bg-secondary">AUTHENTICATION</span>
-                                                    <button class="btn btn-sm btn-outline-secondary copy-btn" data-clipboard-target="#auth-example">
-                                                        <i class="fas fa-copy"></i> Copy
-                                                    </button>
                                                 </div>
                                                 <pre class="mb-0"><code id="auth-example">curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
                                  -H "Content-Type: application/json" \
@@ -348,9 +345,7 @@
                                             <div class="example-container mb-3">
                                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                                     <span class="badge bg-primary">POST api/v1/portfolio</span>
-                                                    <button class="btn btn-sm btn-outline-secondary copy-btn" data-clipboard-target="#post-example">
-                                                        <i class="fas fa-copy"></i> Copy
-                                                    </button>
+            
                                                 </div>
                                                 <div class="code-container bg-light p-3 rounded">
                                                     <pre class="mb-0"><code id="post-example">{
@@ -367,9 +362,6 @@
                                             <div class="example-container mb-3">
                                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                                     <span class="badge bg-warning text-dark">GET api/v1/portfolio</span>
-                                                    <button class="btn btn-sm btn-outline-secondary copy-btn" data-clipboard-target="#put-example">
-                                                        <i class="fas fa-copy"></i> Copy
-                                                    </button>
                                                 </div>
                                             </div>
                                         </div>

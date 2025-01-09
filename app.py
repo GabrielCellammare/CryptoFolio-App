@@ -602,12 +602,12 @@ def dashboard():
                                    portfolio=[],
                                    total_value=0,
                                    currency='USD',
-                                   last_update=datetime.now().strftime('%Y-%m-%d'),
+                                   last_update=datetime.now().strftime('%Y-%m-%d %H:%M'),
                                    username=user_data.get('username'))
 
         salt = base64.b64decode(security_data['salt'])
         currency = user_data.get('preferred_currency', 'USD')
-        current_time = datetime.now().strftime('%Y-%m-%d')
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 
         # Calculate total documents for pagination
         total_docs = len(list(db.collection('users').document(user_id)
@@ -686,7 +686,7 @@ def dashboard():
                                portfolio=[],
                                total_value=0,
                                currency='USD',
-                               last_update=datetime.now().strftime('%Y-%m-%d'),
+                               last_update=datetime.now().strftime('%Y-%m-%d %H:%M'),
                                username=user_data.get('username'))
 
 

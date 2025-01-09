@@ -19,10 +19,10 @@
  * @license MIT
  */
 // Configuration constants for better maintainability and security
+
+import { endpointManager } from './secure-endpoints.js';
 const CONFIG = Object.freeze({
     ENDPOINTS: {
-        TOKEN: '/api/token',
-        TOKEN_STATUS: '/api/token/status',
         CSRF_TOKEN: '/api/csrf/token',
         CSRF_NONCE: '/api/csrf/nonce'
     },
@@ -62,7 +62,6 @@ class SecurityManager {
     #tokenEndpoint;
     #nonceEndpoint;
     #tokenCache;
-    #nonceCache;
     #initialized;
     #initializationPromise;
 
@@ -74,10 +73,8 @@ class SecurityManager {
         this.#credentials = { token: null, nonce: null };
         this.#lastRefresh = 0;
         this.#tokenCache = new Map();
-        this.#nonceCache = new Map();
         this.#initialized = false;
         this.#initializationPromise = null;
-        setInterval(() => this.#cleanupCache(), 30000)
     }
 
 

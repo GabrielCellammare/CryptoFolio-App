@@ -122,42 +122,6 @@ export function updatePriceLabels(currency) {
     }
 }
 
-/**
- * Get current user's preferred currency with error handling
- * Fetches the currency preference from the server using the /api/preferences/currency endpoint
- * Falls back to USD if there's any error in the process
- * @returns {Promise<string>} Preferred currency code (USD or EUR)
- */
-export async function getCurrentCurrency() {
-    try {
-        // Using the correct API endpoint that matches our Flask route
-        const response = await fetch('/api/preferences/currency');
-
-        // Check if the response was successful
-        if (!response.ok) {
-            // If the server returns an error, throw an exception with details
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch currency preference');
-        }
-
-        // Parse the response data
-        const data = await response.json();
-
-        // Get the currency from the response, using the correct property name
-        // that matches what our Flask endpoint returns
-        const currency = data.currency || 'USD';
-
-        // Ensure the currency is always uppercase for consistency
-        return currency.toUpperCase();
-
-    } catch (error) {
-        // Log the error for debugging purposes
-        console.error('Error fetching currency preference:', error);
-
-        // Return USD as a safe default if anything goes wrong
-        return 'USD';
-    }
-}
 
 /**
  * Show error message
@@ -175,12 +139,26 @@ export function showError(message) {
 
 export function showSuccess(message) {
     const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-success alert-dismissible fade show';
+    alertDiv.className = 'alert alert-success alert-dismissible fade show enhanced-alert';
+
+    // Creiamo il contenuto del messaggio con icona
     alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="alert-content">
+            <i class="fas fa-check-circle alert-icon"></i>
+            <span class="alert-message">${message}</span>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     `;
+
     document.getElementById('flashMessages').appendChild(alertDiv);
+
+    // Rimuovi automaticamente dopo 5 secondi
+    setTimeout(() => {
+        if (alertDiv.parentElement) {
+            alertDiv.classList.remove('show');
+            setTimeout(() => alertDiv.remove(), 150);
+        }
+    }, 5000);
 }
 
 export function showLoading() {
