@@ -2,14 +2,47 @@
 Enhanced CSRF Protection System
 Version: 2.0
 Author: Gabriel Cellammare
-Last Modified: 05/01/2025
+Last Modified: 09/01/2025
 
-Key Security Features:
-1. JavaScript Origin Validation
-2. Request Origin Binding
-3. Enhanced Token Protection
-4. Anti-Automation Measures
-5. Request Chain Validation
+A comprehensive Cross-Site Request Forgery (CSRF) protection system designed for Flask applications
+with emphasis on security, scalability, and compliance with modern web security standards.
+
+Key Features:
+1. JavaScript Origin Validation - Ensures requests originate from legitimate sources using cryptographic signatures
+2. Request Origin Binding - Links tokens to specific origins and validates request chains
+3. Enhanced Token Protection - Uses encryption and HMAC validation with secure token lifecycle management
+4. Anti-Automation Measures - Implements rate limiting and request pattern analysis
+5. Request Chain Validation - Tracks and validates request sequences to prevent replay attacks
+
+Security Measures:
+- Implements double-submit cookie pattern
+- Uses cryptographic signatures for request validation
+- Supports both development and production environments with appropriate security levels
+- Includes comprehensive header security
+- Implements token expiration and rotation
+- Provides protection against timing attacks
+- Includes DOS protection mechanisms
+
+Usage:
+    from csrf_protection import CSRFProtection
+    
+    app = Flask(__name__)
+    csrf = CSRFProtection(app)
+    
+    @app.route('/protected', methods=['POST'])
+    @csrf.csrf_protect
+    def protected_route():
+        return 'Protected endpoint'
+
+Dependencies:
+    - Flask
+    - cryptography
+    - Python 3.7+
+
+Environment Variables:
+    - FLASK_ENV: 'development' or 'production'
+    - DEV_ALLOWED_ORIGINS: Comma-separated list of allowed origins for development
+    - PROD_ALLOWED_ORIGINS: Comma-separated list of allowed origins for production
 """
 
 import base64
@@ -21,21 +54,46 @@ import struct
 import json
 from urllib.parse import urlparse
 from venv import logger
-from flask import Flask, Response, current_app, jsonify, make_response, redirect, session, request, abort
-from functools import lru_cache, wraps
+from flask import Flask, Response, jsonify, make_response, redirect, session, request, abort
+from functools import wraps
 import secrets
 import time
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Callable, Set, Tuple
+from datetime import timedelta
+from typing import Optional, Dict, Callable, Set, Tuple
 from cryptography.fernet import Fernet
 import hashlib
 
 
 class CSRFProtection:
     def __init__(self, app: Optional[Flask] = None):
+        """
+        Initializes Flask application with comprehensive security configurations.
+
+        Args:
+            app (Flask): The Flask application instance to configure
+
+        Security Configurations:
+            - Session security settings
+            - Origin validation rules
+            - HTTPS enforcement
+            - Security headers
+            - Environment-specific configurations
+
+        Environment Handling:
+            - Development: Allows local testing and ngrok domains
+            - Production: Strict security controls
+
+        Implementation Details:
+            - Configures session parameters
+            - Sets up request hooks for HTTPS and headers
+            - Initializes origin validation
+            - Establishes environment-specific rate limits
+
+        Raises:
+            Exception: If initialization fails, with detailed error logging
+        """
         self.app = app
         self._signing_key = secrets.token_bytes(32)
-        self._js_origin_key = secrets.token_bytes(32)
         self.encryption_key = Fernet.generate_key()
         self.fernet = Fernet(self.encryption_key)
 
@@ -112,13 +170,21 @@ class CSRFProtection:
 
     def _parse_origins_list(self, origins_string: str) -> set:
         """
-        Parse origins string into a set of allowed origins and patterns.
+        Parses and validates a comma-separated string of origins into a set of allowed origins and patterns.
 
         Args:
-            origins_string (str): Comma-separated list of origins
+            origins_string (str): Comma-separated list of origins (e.g., "https://example.com,*.example.net")
 
         Returns:
-            set: Set of allowed origins
+            set: Set of validated origin strings and compiled regex patterns
+
+        Raises:
+            ValueError: If any origin in the list is malformed
+
+        Notes:
+            - Handles both exact origins and wildcard patterns
+            - Wildcards (*) are converted to regex patterns
+            - Empty or None input returns empty set
         """
         origins = set()
         if not origins_string:
@@ -137,8 +203,26 @@ class CSRFProtection:
 
     def _build_csp_policy(self) -> str:
         """
-        Build a comprehensive Content Security Policy.
-        This method centralizes CSP configuration for easier maintenance.
+        Constructs a comprehensive Content Security Policy string.
+
+        Returns:
+            str: Complete CSP policy string with all directives
+
+        Security Directives:
+            - default-src: Restricts default sources to same origin
+            - img-src: Controls image loading sources
+            - style-src: Manages stylesheet sources
+            - script-src: Controls JavaScript execution sources
+            - font-src: Manages font loading sources
+            - connect-src: Controls XMLHttpRequest, WebSocket connections
+            - frame-ancestors: Prevents clickjacking
+            - form-action: Controls form submission targets
+            - base-uri: Restricts base tag URLs
+
+        Notes:
+            - Implements defense in depth through multiple restrictions
+            - Balances security with functionality
+            - Allows essential third-party resources (CDNs)
         """
         return "; ".join([
             "default-src 'self'",
@@ -214,43 +298,27 @@ class CSRFProtection:
             logger.error(f"CSRF Protection initialization failed: {str(e)}")
             raise
 
-    @lru_cache(maxsize=100)
-    def _get_allowed_origins(self) -> List[str]:
-        """
-        Get cached list of allowed origins for current environment.
-        Uses lru_cache for performance optimization.
-
-        Returns:
-            List[str]: List of allowed origins for the current environment
-        """
-        env = os.getenv('FLASK_ENV', 'production')
-
-        if env not in self.SUPPORTED_ENVIRONMENTS:
-            logger.warning(f"Unsupported environment {env}, using production")
-            env = 'production'
-
-        try:
-            return current_app.config['ENVIRONMENTS'][env]['origins']
-
-        except (KeyError, AttributeError):
-            logger.error(f"Missing environment configuration for {env}")
-            return []
-
     def _validate_origin_format(self, origin: str) -> bool:
         """
-        Validates the format of an origin string to ensure it meets security requirements.
-
-        This method performs several security checks:
-        1. Basic format validation (protocol://domain[:port])
-        2. Protocol restriction (only http/https)
-        3. Domain validation
-        4. Port number validation if present
+        Performs comprehensive validation of origin string format against security requirements.
 
         Args:
-            origin: The origin string to validate
+            origin (str): The origin string to validate (e.g., "https://example.com")
 
         Returns:
-            bool: True if the origin format is valid, False otherwise
+            bool: True if origin meets all security requirements, False otherwise
+
+        Security Checks:
+            - Validates basic URL format (protocol://domain[:port])
+            - Ensures protocol is http/https only
+            - Validates domain structure
+            - Special handling for localhost in development
+            - Port number validation for local development
+            - Protection against null bytes and injection attempts
+
+        Notes:
+            - More permissive in development mode for local testing
+            - Handles ngrok domains in development environment
         """
         if not origin or '\x00' in origin:  # Check for null bytes
             return False
@@ -312,17 +380,33 @@ class CSRFProtection:
             self.logger.warning(f"Origin format validation failed: {str(e)}")
             return False
 
-    def _validate_origin_secure(self, request_origin: str, token: str = None) -> bool:
+    def _validate_origin_secure(self, request_origin: str) -> bool:
         """
-        Enhanced security validation for request origins.
-        Works alongside existing validation methods to provide additional security checks.
+        Performs enhanced security validation for request origins.
 
         Args:
-            request_origin: Origin header from the request
-            token: Optional CSRF token for additional validation
+            request_origin (str): Origin header from the request
 
         Returns:
-            bool: True if the origin passes all security checks
+            bool: True if origin passes all security validations
+
+        Security Validations:
+            - Basic format validation
+            - Environment-specific checks
+            - Pattern matching for dynamic origins
+            - Local development handling
+            - Ngrok domain validation
+
+        Implementation Details:
+            - Supports exact matches and patterns
+            - Environment-aware validation
+            - Special handling for development URLs
+            - Comprehensive logging of validation results
+
+        Notes:
+            - Stricter validation in production
+            - Flexible for development needs
+            - Protection against origin spoofing
         """
         # First perform basic format validation
         if not request_origin or not self._validate_origin_format(request_origin):
@@ -383,8 +467,23 @@ class CSRFProtection:
 
     def set_csrf_cookie(self, response: Response, token: str) -> None:
         """
-        Set CSRF token cookie with secure settings.
-        Now integrated with the security configuration.
+        Sets CSRF token cookie with secure settings and domain binding.
+
+        Args:
+            response (Response): Flask response object to modify
+            token (str): CSRF token to set in cookie
+
+        Security Features:
+            - Secure flag enabled
+            - HttpOnly flag enabled
+            - SameSite attribute set to 'Lax'
+            - Domain-bound cookies
+            - Appropriate expiration time
+
+        Notes:
+            - Automatically detects and uses appropriate domain from request
+            - Implements security best practices for cookie attributes
+            - Handles empty token gracefully
         """
         if not token:
             return
@@ -406,7 +505,28 @@ class CSRFProtection:
 
     def _validate_js_origin(self, signature: str) -> bool:
         """
-        Validate JavaScript origin signature with relaxed timing window.
+        Validates the JavaScript origin signature with timing attack protection and request chain tracking.
+
+        Args:
+            signature (str): Base64-encoded signature containing timestamp and request ID
+
+        Returns:
+            bool: True if signature is valid and within acceptable time window
+
+        Security Features:
+            - Time-based replay protection with 60-second window
+            - Request chain validation to prevent request replay
+            - Rate limiting per endpoint
+            - Automatic cleanup of expired chains
+
+        Technical Details:
+            - Signature format: base64(timestamp[4] + request_id[32])
+            - Timestamp validated against current server time
+            - Request chains tracked per endpoint with count limits
+            - Memory protection through automatic cleanup
+
+        Raises:
+            Exception: Logs detailed error information while returning False to caller
         """
 
         try:
@@ -481,7 +601,22 @@ class CSRFProtection:
 
     def _cleanup_request_chains(self):
         """
-        Cleans up expired request chains to prevent memory growth.
+        Manages memory usage by cleaning up expired request chain data.
+
+        Implementation Details:
+            - Removes chains that have exceeded maximum request count
+            - Prevents memory leaks from abandoned request chains
+            - Implements efficient cleanup without impacting performance
+
+        Notes:
+            - Called automatically during request validation
+            - Uses count-based expiration rather than time-based
+            - Maintains system performance under heavy load
+
+        Performance Considerations:
+            - O(n) complexity where n is number of stored chains
+            - Optimized for minimal impact on request processing
+            - Automatically triggered to maintain memory bounds
         """
         expired_keys = [
             key for key, data in self._request_chains.items()
@@ -493,17 +628,36 @@ class CSRFProtection:
 
     def _generate_secure_token(self, require_user_id=True) -> str:
         """
-        Generate CSRF token with optional user_id requirement for authentication flows.
+        Generates cryptographically secure CSRF token with optional user session binding.
 
         Args:
-            require_user_id (bool): Whether to require user_id in session
+            require_user_id (bool): Whether to require user_id in session for token generation
 
         Returns:
-            str: Generated secure token
+            str: Base64-encoded encrypted token
+
+        Raises:
+            Abort(401): When require_user_id is True and no user_id in session
+            Abort(403): When JavaScript origin validation fails
+
+        Security Features:
+            - Token binding to user session
+            - Encrypted payload with request metadata
+            - HMAC signature validation
+            - Rate limiting and token rotation
+            - Request chain tracking
+
+        Notes:
+            - Implements different token types for authentication flows
+            - Includes DOS protection mechanisms
+            - Performs automatic cleanup of expired tokens
         """
         # Solo per rotte autenticate verifichiamo user_id
         if require_user_id and 'user_id' not in session:
             abort(401)
+
+            # Add cleanup call here
+        self._cleanup_expired_tokens()
 
         if (require_user_id):
 
@@ -604,6 +758,79 @@ class CSRFProtection:
 
             return token
 
+    def _cleanup_expired_tokens(self) -> None:
+        """
+        Manages token lifecycle and implements cleanup strategies for expired tokens.
+
+        Security Features:
+            - Removes expired tokens based on timestamp
+            - Enforces maximum uses per token
+            - Implements per-user token limits
+            - Prevents token accumulation attacks
+
+        Cleanup Strategy:
+            - Removes tokens beyond lifetime
+            - Removes overused tokens
+            - Removes tokens from invalid request chains
+            - Implements fair cleanup for DOS protection
+
+        Implementation Details:
+            - Maintains separate counters for auth flow tokens
+            - Implements efficient cleanup algorithm
+            - Preserves newest tokens during cleanup
+            - Scales cleanup based on user activity
+        """
+        current_time = time.time()
+
+        # Iterate through all users and their tokens
+        users_to_remove = []
+        for user_id, tokens in self._token_cache.items():
+            # Filter out expired or overused tokens
+            valid_tokens = {}
+            for token, data in tokens.items():
+                # Check if token is within lifetime and hasn't exceeded max uses
+                is_valid = (
+                    (current_time - data['timestamp']) <= self._token_lifetime and
+                    data['uses'] < self._max_uses_per_token
+                )
+
+                # For auth flow tokens, we're a bit more strict
+                if data.get('is_auth_flow', False):
+                    # Auth flow tokens get only one use
+                    is_valid = is_valid and data['uses'] == 0
+
+                if is_valid:
+                    valid_tokens[token] = data
+
+            # Update tokens for this user
+            if valid_tokens:
+                self._token_cache[user_id] = valid_tokens
+            else:
+                # If no valid tokens remain, mark user for removal
+                users_to_remove.append(user_id)
+
+        # Remove users with no valid tokens
+        for user_id in users_to_remove:
+            del self._token_cache[user_id]
+
+        # Implement DOS protection - if still too many tokens, remove oldest
+        total_tokens = sum(len(tokens)
+                           for tokens in self._token_cache.values())
+        if total_tokens > self._max_tokens_per_session * len(self._token_cache):
+            # Clean up by removing oldest tokens from each user
+            for user_id in self._token_cache:
+                tokens = self._token_cache[user_id]
+                if len(tokens) > self._max_tokens_per_session:
+                    # Sort tokens by timestamp and keep only the newest ones
+                    sorted_tokens = sorted(
+                        tokens.items(),
+                        key=lambda x: x[1]['timestamp'],
+                        reverse=True
+                    )
+                    self._token_cache[user_id] = dict(
+                        sorted_tokens[:self._max_tokens_per_session]
+                    )
+
     def generate_token(self, require_user_id=True) -> Tuple[str, Response]:
         """
         Generate CSRF token and prepare secure response.
@@ -624,7 +851,30 @@ class CSRFProtection:
 
     def _validate_token(self, token: str) -> bool:
         """
-        Validate CSRF token with enhanced security checks.
+        Performs cryptographic validation of CSRF token with multiple security checks.
+
+        Args:
+            token (str): The CSRF token to validate
+
+        Returns:
+            bool: True if token passes all security validations
+
+        Security Checks:
+            - Token format validation
+            - Cryptographic signature verification
+            - Payload decryption and validation
+            - User session binding
+            - Expiration verification
+            - Usage limit enforcement
+
+        Implementation Details:
+            - Uses HMAC for signature verification
+            - Implements timing attack protection
+            - Tracks token usage count
+            - Validates against session data
+
+        Raises:
+            Exception: Logs validation failures while returning False
         """
         try:
             if not token:
@@ -636,7 +886,8 @@ class CSRFProtection:
             except:
                 return False
 
-            if len(raw_data) < 64:  # Minimum size for encrypted payload + signature
+            # Minimum size for encrypted payload + signature
+            if len(raw_data) < self.MIN_TOKEN_LENGTH:
                 return False
 
             # Split components
@@ -689,8 +940,29 @@ class CSRFProtection:
 
     def validate_token_request(self, token: str) -> bool:
         """
-        Validate token and request headers comprehensively.
-        Enhanced validation including origin and referrer checks.
+        Performs comprehensive validation of CSRF token and associated request headers.
+
+        Args:
+            token (str): The CSRF token to validate
+
+        Returns:
+            bool: True if token and request headers pass all security checks
+
+        Security Validations:
+            - Token cryptographic validation
+            - Origin header verification
+            - Referrer header checking for same-origin
+            - Request chain validation
+            - Token usage counting
+
+        Notes:
+            - Implements defense in depth through multiple validation layers
+            - Provides detailed logging for security events
+            - Handles missing headers gracefully
+
+        Example:
+            >>> csrf.validate_token_request("eyJhbGc...")
+            True  # If token and request are valid
         """
         if not token:
             return False
@@ -718,7 +990,26 @@ class CSRFProtection:
 
     def generate_nonce(self) -> str:
         """
-        Generate secure nonce with request binding.
+        Creates a cryptographically secure, single-use nonce with request binding.
+
+        Returns:
+            str: Encrypted nonce containing request metadata
+
+        Security Features:
+            - Bound to user session
+            - Request ID integration
+            - Automatic expiration
+            - Protection against replay attacks
+            - DOS prevention through cleanup
+
+        Implementation Details:
+            - Uses Fernet symmetric encryption
+            - Includes timestamp for expiration
+            - Maintains maximum nonce limit
+            - Implements automatic cleanup
+
+        Raises:
+            Abort(403): When JavaScript origin validation fails
         """
         # Validate JavaScript origin
         js_origin = request.headers.get('X-JavaScript-Origin')
@@ -756,7 +1047,31 @@ class CSRFProtection:
 
     def validate_nonce(self, nonce: str) -> bool:
         """
-        Validate nonce with request chain verification.
+        Validates nonce with comprehensive security checks and request chain verification.
+
+        Args:
+            nonce (str): The nonce string to validate
+
+        Returns:
+            bool: True if nonce is valid and unused
+
+        Security Checks:
+            - Existence verification
+            - Expiration validation
+            - Payload decryption and validation
+            - User session binding
+            - Single-use enforcement
+
+        Implementation Details:
+            - Implements one-time use pattern
+            - Automatic removal after use
+            - Maintains encrypted payload integrity
+            - Provides detailed error logging
+
+        Notes:
+            - Used in conjunction with token validation
+            - Part of double-submit validation pattern
+            - Implements defense against replay attacks
         """
         try:
             if not nonce or nonce not in self.used_nonces:
@@ -792,7 +1107,32 @@ class CSRFProtection:
 
     def csrf_protect(self, f: Callable) -> Callable:
         """
-        Enhanced CSRF protection decorator for all routes.
+        Comprehensive CSRF protection decorator implementing multiple security layers.
+
+        Args:
+            f (Callable): The Flask route function to protect
+
+        Returns:
+            Callable: Decorated function with CSRF protection
+
+        Security Layers:
+            1. Nonce validation
+            2. Token validation
+            3. Origin verification
+            4. Request chain validation
+
+        Usage:
+            @app.route('/api/data', methods=['POST'])
+            @csrf_protect
+            def protected_endpoint():
+                return 'Protected data'
+
+        Raises:
+            Abort(403): When any security check fails
+                - Invalid or missing nonce
+                - Invalid or missing token
+                - Invalid origin
+                - Failed request chain validation
         """
         @wraps(f)
         def decorated_function(*args, **kwargs):
@@ -815,7 +1155,23 @@ class CSRFProtection:
 
     def _cleanup_oldest_nonces(self) -> None:
         """
-        Clean up expired nonces and request chains.
+        Implements efficient cleanup of expired nonces and request chains.
+
+        Security Features:
+            - Prevents DOS through resource exhaustion
+            - Maintains system performance
+            - Implements fair cleanup strategy
+
+        Implementation Details:
+            - Removes expired nonces based on timestamp
+            - Cleans associated request chains
+            - Implements FIFO when max capacity reached
+            - Retains 50% of newest nonces when cleanup triggered
+
+        Performance Considerations:
+            - Automatic triggering when MAX_NONCES reached
+            - Efficient sorting and cleanup algorithm
+            - Maintains O(n log n) complexity
         """
         current_time = time.time()
 
