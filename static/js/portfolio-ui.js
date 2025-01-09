@@ -2,12 +2,27 @@
 
 import { ApiService } from './api-service.js';
 import InputValidator from './input-validator.js';
-import { showError, showSuccess, showLoading, hideLoading } from './utils.js';
+import { showError, showSuccess, showLoading, hideLoading, safePageReload } from './utils.js';
 
 export function setupUIHandlers() {
     setupAddCryptoForm();
     setupEditHandlers();
     setupDeleteHandlers();
+}
+
+async function handleOperation(operation, successMessage) {
+    showLoading();
+    try {
+        await operation();
+        showSuccess(successMessage);
+
+        // Utilizziamo safePageReload invece del reload diretto
+        safePageReload();
+    } catch (error) {
+        console.error('Operation failed:', error);
+        showError(error.message);
+        hideLoading();
+    }
 }
 
 /**
@@ -175,14 +190,16 @@ function setupAddCryptoForm() {
             };
 
 
-
-            await ApiService.addCrypto(cryptoData);
-            showSuccess('Cryptocurrency added successfully');
-            // Instead of full page reload, fetch and update only the portfolio data
-            window.location.reload();
-            // Reset form
-            document.getElementById('addCryptoForm').reset();
-            $('#crypto-select').val(null).trigger('change');
+            await handleOperation(async () => {
+                await ApiService.addCrypto(cryptoData);
+                // Instead of full page reload, fetch and update only the portfolio data
+                window.location.reload();
+                // Reset form
+                document.getElementById('addCryptoForm').reset();
+                $('#crypto-select').val(null).trigger('change');
+            },
+                'Cryptocurrency added successfully'
+            );
         } catch (error) {
             console.error('Error:', error);
             showError(error.message);
@@ -255,43 +272,46 @@ function setupEditHandlers() {
 
         if (!isValid) return;
 
-        showLoading();
-
-        try {
-            // Force security credentials refresh before save
-            await ApiService.initialize();
-            // Small delay to ensure token propagation
-            await new Promise(resolve => setTimeout(resolve, 100));
-            const cryptoId = row.dataset.cryptoId;
-            const updateData = getUpdateData(row);
-            await ApiService.updateCrypto(cryptoId, updateData);
-            showSuccess('Cryptocurrency updated successfully');
-            window.location.reload();
-        } catch (error) {
-            console.error('Save failed:', {
-                error: error.message,
-                status: error.status
-            });
-
-            if (error.status === 403) {
-                // Instead of immediate retry, force a new token fetch
+        await handleOperation(async () => {
+            try {
+                // Force security credentials refresh before save
                 await ApiService.initialize();
-                // Clear any cached credentials
-                showError('Please try saving again - security tokens refreshed');
-                return; // Don't toggle edit mode off, let user retry
-            } else {
-                showError(error.message);
-                toggleEditMode(row, false);
-            }
-        } finally {
-            hideLoading();
-        }
-    };
+                // Small delay to ensure token propagation
+                await new Promise(resolve => setTimeout(resolve, 100));
+                const cryptoId = row.dataset.cryptoId;
+                const updateData = getUpdateData(row);
+                await ApiService.updateCrypto(cryptoId, updateData);
+                window.location.reload();
+            } catch (error) {
+                console.error('Save failed:', {
+                    error: error.message,
+                    status: error.status
+                });
 
-    // Cancel edit handler
-    window.cancelEdit = function (button) {
-        const row = button.closest('tr');
-        toggleEditMode(row, false);
+
+                if (error.status === 403) {
+                    // Instead of immediate retry, force a new token fetch
+                    await ApiService.initialize();
+                    // Clear any cached credentials
+                    showError('Please try saving again - security tokens refreshed');
+                    return; // Don't toggle edit mode off, let user retry
+                } else {
+                    showError(error.message);
+                    toggleEditMode(row, false);
+                }
+            } finally {
+                hideLoading();
+            }
+
+
+            // Cancel edit handler
+            window.cancelEdit = function (button) {
+                const row = button.closest('tr');
+                toggleEditMode(row, false);
+            };
+        },
+            'Cryptocurrency updated successfully'
+        );
     };
 
 
@@ -304,6 +324,18 @@ let currentCryptoId = null;
 window.removeCrypto = function (cryptoId) {
     currentCryptoId = cryptoId;
     const modal = document.getElementById('deleteConfirmationModal');
+
+    // Gestiamo la conferma di eliminazione
+    document.getElementById('confirmDelete').onclick = async () => {
+        modal.classList.remove('active');
+        await handleOperation(
+            async () => {
+                await ApiService.deleteCrypto(currentCryptoId);
+            },
+            'Cryptocurrency removed successfully'
+        );
+    };
+
     modal.classList.add('active');
 };
 

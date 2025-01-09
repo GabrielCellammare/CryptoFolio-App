@@ -8,6 +8,9 @@
  */
 
 
+let activeLoadingOperations = 0;
+let reloadPending = false;
+
 export function formatCurrency(amount, currency = 'USD') {
     if (typeof amount !== 'number' || isNaN(amount)) {
         console.warn('Invalid amount provided to formatCurrency:', amount);
@@ -181,9 +184,32 @@ export function showSuccess(message) {
 }
 
 export function showLoading() {
+    activeLoadingOperations++;
     document.querySelector('.loading-overlay').style.display = 'flex';
 }
 
 export function hideLoading() {
-    document.querySelector('.loading-overlay').style.display = 'none';
+    activeLoadingOperations--;
+    // Nascondi la loading overlay solo quando tutte le operazioni sono completate
+    if (activeLoadingOperations <= 0) {
+        activeLoadingOperations = 0;
+        if (!reloadPending) {
+            document.querySelector('.loading-overlay').style.display = 'none';
+        }
+    }
+}
+
+
+export function safePageReload() {
+    reloadPending = true;
+    showLoading();
+    // Attendiamo che tutte le operazioni pendenti siano completate
+    const checkOperations = () => {
+        if (activeLoadingOperations <= 1) { // 1 perché questa è un'operazione attiva
+            window.location.reload();
+        } else {
+            setTimeout(checkOperations, 100);
+        }
+    };
+    checkOperations();
 }

@@ -373,6 +373,7 @@
     <script type="module">
    // Import the API service
 import { ApiService } from '/static/js/api-service.js';
+import { showError, showSuccess, showLoading, hideLoading, safePageReload } from '/static/js/utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const logoutButton = document.getElementById('logoutButton');
@@ -387,8 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleLogout() {
         try {
-            // Show loading overlay
-            loadingOverlay.style.display = 'flex';
+            showLoading();
 
             // Initialize API service
             await ApiService.initialize();
@@ -426,6 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
             }
+            hideLoading();
         } finally {
             // Hide loading overlay
             loadingOverlay.style.display = 'none';
