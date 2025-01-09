@@ -197,6 +197,7 @@ export default class ApiKeyManager {
     #isValidTokenFormat(token) {
         // Verifica che il token sia una stringa JWT valida
         const jwtPattern = /^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$/;
+
         return jwtPattern.test(token);
     }
 

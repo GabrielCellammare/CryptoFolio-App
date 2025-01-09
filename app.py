@@ -1407,7 +1407,7 @@ Modified: 05/01/2024
 """
 
 
-tokenJWTHandling = TokenJWTHandling(db)
+tokenJWTHandling = TokenJWTHandling(db, cipher)
 
 portfolio_api = Blueprint('portfolio_api', __name__)
 
