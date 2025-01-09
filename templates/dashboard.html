@@ -99,18 +99,22 @@
                     <span class="brand-text">CryptoFolio</span>
                 </div>
             </a>
-            <div class="navbar-nav ms-auto">
-                <span class="nav-item nav-link text-light">Last update: <span id="lastUpdate">{{ last_update }}</span></span>
-                <span class="nav-item nav-link text-light">Welcome, {{ username }}</span>
-                <div class="nav-item">
-                    <select id="currencySelect" class="form-select form-select-sm">
-                        <option value="USD">USD</option>
-                        <option value="EUR">EUR</option>
-                    </select>
+            <div class="navbar-nav ms-auto align-items-center">
+                <span class="nav-item nav-link text-light me-3">Last update: <span id="lastUpdate">{{ last_update }}</span></span>
+                <span class="nav-item nav-link text-light me-3">Welcome, {{ username }}</span>
+                <div class="nav-item me-3">
+                    <div class="currency-select-wrapper">
+                        <select id="currencySelect" class="form-select form-select-sm">
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                        </select>
+                    </div>
                 </div>
-                <button id="logoutButton" class="nav-item nav-link btn btn-link">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </button>
+                <div class="nav-item">
+                    <button id="logoutButton" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
             </div>
         </div>
     </nav>
