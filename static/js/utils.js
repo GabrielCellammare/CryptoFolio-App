@@ -147,7 +147,6 @@ export function showSuccess(message) {
             <i class="fas fa-check-circle alert-icon"></i>
             <span class="alert-message">${message}</span>
         </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     `;
 
     document.getElementById('flashMessages').appendChild(alertDiv);
