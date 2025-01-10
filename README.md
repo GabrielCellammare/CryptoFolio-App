@@ -1,3 +1,28 @@
+# **CryptoFolio**: Tieni traccia delle tue criptovalute in modo semplice e sicuro
+
+## SAOS 2024-2025: Caso di studio della materia di **Sicurezza delle Architetture Orientate ai Servizi** - Prof. Giulio Mallardi
+## Laurea Magistrale in Sicurezza informatica - Università degli studi di Bari "Aldo Moro" - Dipartimento d'Informatica
+
+## Author
+
+- [@GabrielCellammare](https://github.com/GabrielCellammare)
+
+**CryptoFolio** è un'applicazione web completa e incentrata sulla sicurezza, progettata per aiutare gli utenti a tenere traccia e a gestire i loro investimenti in criptovalute, con particolare attenzione alla protezione dei dati e all'autenticazione sicura. Basato su **Flask** , con le moderne politiche di sicurezza offre un robusto set di funzionalità mantenendo rigorosi controlli di sicurezza.
+
+## Caratteristiche principali
+L'**applicazione** consente agli utenti di:
+
+1. Tracciare le proprie **criptovalute** e i loro valori di mercato attuali
+2. Monitorare le prestazioni del **portfolio** e le metriche di profitto/perdita
+3. *Aggiungere, aggiornare e rimuovere* posizioni in **criptovalute**
+4. Visualizzare le **analisi** del portfolio
+5. Accedere ai prezzi delle criptovalute in tempo reale grazie all'integrazione delle API di [CoinGecko](https://www.coingecko.com/ "CoinGecko")
+6. Gestire il **portfolio** in modo sicuro attraverso l'autenticazione** OAuth 2.0**
+7. Interagire con il proprio portfolio attraverso **un'API Restful** 
+8. Ottenere il **controvalore** del proprio portfolio in diverse valute sfrutando i tassi di conversione aggiornati in tempo reale attraverso [Exchangerate](https://www.exchangerate-api.com/ "Exchangerate")
+
+
+
 ## Documentazione API CryptoFolio
 
 ### Introduzione
@@ -235,7 +260,32 @@ R: Riceverai un errore 429 con un header `Retry-After` che indica dopo quanti se
 
 R: Al momento i prezzi sono forniti solo in USD. La conversione in altre valute deve essere gestita lato client. È necessario cambiare la valuta dalla dashboard per poter ricevere il controvalore correttamente attraverso l'Api.
 
+
+## Installation
+
+Install my-project with npm
+
+```bash
+  npm install my-project
+  cd my-project
+```
+
+
+## Deployment
+
+To deploy this project run
+
+```bash
+  npm run deploy
+```
+
+## Documentation
+
+[Documentation](https://linktodocumentation)
+
+
 ## Fonti
 
  - [Bearer Token](https://stackoverflow.com/questions/25838183/what-is-the-oauth-2-0-bearer-token-exactly)
  - [JWT e Bearer Token](https://www.linkedin.com/pulse/jwt-e-bearer-token-facciamo-chiarezza-guido-spadotto/)
+
