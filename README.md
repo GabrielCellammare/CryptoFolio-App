@@ -24,8 +24,9 @@ L'**applicazione** consente agli utenti di:
 ## Architettura tecnica
 
 L'architettura del sistema si presenta in tale modo
+Anteprima ![image](https://github.com/user-attachments/assets/b5db5d12-471b-4d9f-9635-99695da2baed)
 
-[CryptoFolio(Project).pdf](https://github.com/user-attachments/files/18382420/CryptoFolio.Project.pdf)
+Link all'architettura completa: [CryptoFolio(Project).pdf](https://github.com/user-attachments/files/18382420/CryptoFolio.Project.pdf)
 
 
 ## Route
