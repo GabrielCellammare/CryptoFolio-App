@@ -440,41 +440,6 @@ class CryptoCache:
             logger.error(f"Error in get_crypto_prices: {str(e)}")
             return {}
 
-    def get_exchange_rate(self, from_currency: str = 'USD', to_currency: str = 'EUR') -> float:
-        """
-        Get exchange rate between two currencies
-
-        Args:
-            from_currency (str): Source currency code (default: USD)
-            to_currency (str): Target currency code (default: EUR)
-
-        Returns:
-            float: Exchange rate from source to target currency
-                  Returns 1.0 if request fails
-        """
-        try:
-            cache_key = f"exchange_rate_{from_currency}_{to_currency}"
-            cached_rate = self.get(cache_key)
-
-            if cached_rate is not None and isinstance(cached_rate, (int, float)):
-                return float(cached_rate)
-
-            response = requests.get(
-                f'https://api.exchangerate-api.com/v4/latest/{
-                    from_currency.upper()}',
-                timeout=DEFAULT_TIMEOUT
-            )
-            response.raise_for_status()
-            rates = response.json()['rates']
-            rate = float(rates.get(to_currency.upper(), 1.0))
-
-            self.set(cache_key, rate)
-            return rate
-
-        except (RequestException, ValueError, KeyError) as e:
-            logger.error(f"Exchange rate error: {str(e)}")
-            return 1.0
-
     def get(self, key: str) -> Optional[Dict]:
         """
         Retrieve and validate cached data

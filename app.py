@@ -1955,7 +1955,7 @@ def add_crypto():
         }), 400
 
 
-app.register_blueprint(portfolio_api, url_prefix='/api/v1')  # Add this line
+app.register_blueprint(portfolio_api, url_prefix='/api/v1')
 
 if __name__ == '__main__':
     app.run(debug=True)
