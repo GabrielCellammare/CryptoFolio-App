@@ -190,3 +190,130 @@ export function safePageReload() {
     };
     checkOperations();
 }
+
+import ApiKeyManager from './api-key-manager.js';
+document.addEventListener('DOMContentLoaded', () => {
+    const apiKeyManager = new ApiKeyManager();
+    apiKeyManager.initialize().catch(error => {
+        console.error('Failed to initialize API Key Manager:', error);
+    });
+});
+// Import the API service
+import { ApiService } from './api-service.js';
+
+document.addEventListener('DOMContentLoaded', () => {
+    const logoutButton = document.getElementById('logoutButton');
+    const loadingOverlay = document.querySelector('.loading-overlay');
+    const flashMessages = document.getElementById('flashMessages');
+
+    if (logoutButton) {
+        logoutButton.addEventListener('click', handleLogout);
+    } else {
+        console.error('Logout button not found in the document');
+    }
+
+    async function handleLogout() {
+        try {
+            showLoading();
+
+            // Initialize API service
+            await ApiService.initialize();
+
+            // Make the logout request
+            const response = await ApiService.safeFetch('/auth/logout', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            // Handle the response directly as JSON
+            if (response && response.status === 'success') {
+                // Successful logout - redirect to the provided URL
+                if (response.redirect_url) {
+                    window.location.replace(response.redirect_url);
+                } else {
+                    // Fallback to index if no redirect URL provided
+                    window.location.replace('/index');
+                }
+            } else {
+                throw new Error(response?.message || 'Logout failed');
+            }
+        } catch (error) {
+            console.error('Logout failed:', error);
+
+            // Show error message to user
+            if (flashMessages) {
+                flashMessages.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show">
+                        ${error.message || 'Logout failed. Please try again.'}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+            }
+            hideLoading();
+        } finally {
+            // Hide loading overlay
+            loadingOverlay.style.display = 'none';
+        }
+    }
+});
+
+
+// Prevent navigation using browser back/forward buttons
+window.addEventListener('load', function () {
+    window.history.pushState({ page: 'dashboard' }, '', '');
+
+    window.addEventListener('popstate', function (event) {
+        window.history.pushState({ page: 'dashboard' }, '', '');
+        showNavigationWarning();
+    });
+});
+
+function showNavigationWarning() {
+    const alertHtml = `
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            Please use the navigation buttons provided instead of browser controls.
+        </div>
+    `;
+
+    const flashMessages = document.getElementById('flashMessages');
+    flashMessages.innerHTML = alertHtml;
+}
+
+// Make navigateToHome available globally
+window.navigateToHome = async function () {
+    // Show loading overlay
+    document.querySelector('.loading-overlay').style.display = 'flex';
+
+    try {
+        // First ensure API service is initialized
+        await ApiService.initialize();
+
+        // Make the secure navigation request
+        const response = await ApiService.navigateToHome();
+
+        // Check if we received a redirect URL
+        if (response.redirect_url) {
+            window.location.href = response.redirect_url;
+        } else {
+            // Default to home if no specific redirect provided
+            window.location.href = '/';
+        }
+
+    } catch (error) {
+        console.error('Navigation failed:', error);
+        // Hide loading overlay
+        document.querySelector('.loading-overlay').style.display = 'none';
+
+        // Show error message
+        const flashMessages = document.getElementById('flashMessages');
+        flashMessages.innerHTML = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                Navigation failed. Please try again.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+    }
+};
