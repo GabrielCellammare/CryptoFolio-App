@@ -9,7 +9,7 @@ Core Features:
 1. Authentication & Authorization
    - OAuth 2.0 integration with Google and GitHub
    - CSRF token protection
-   - Rate limiting and request throttling 
+   - Rate limiting and request throttling
    - Secure session management
    - JWT-based API authentication
 
@@ -32,7 +32,7 @@ Core Features:
 4. Secure Architecture:
    1. Authentication Layer: OAuth and session management
    2. Security Layer: Encryption, CSRF, rate limiting
-   3. Business Logic Layer: Portfolio operations 
+   3. Business Logic Layer: Portfolio operations
    4. Data Access Layer: Secure Firebase interactions
    5. API Layer: Protected REST endpoints
 
@@ -47,7 +47,7 @@ Security Considerations:
 
 Dependencies:
 - flask: Web framework
-- authlib: OAuth implementation  
+- authlib: OAuth implementation
 - firebase_admin: Database operations
 - cryptography: Encryption operations
 - secure_byte_array: Protected memory management
@@ -58,6 +58,7 @@ Last Modified: 10/01/2025
 """
 
 # Standard library imports - organized by functionality
+from logging import Logger
 from utils.token_jwt_handling import AuthError, TokenJWTHandling
 from datetime import datetime, timedelta, timezone
 from difflib import restore
@@ -76,7 +77,6 @@ from flask import (
     Blueprint,
     abort,
     jsonify,
-    make_response,
     render_template,
     request,
     session,
@@ -296,7 +296,7 @@ def login(provider):
     - Session state management
     """
     if provider not in ['google', 'github']:
-        flash('Invalid authentication provider', 'error')
+        flash('Authentication failed')
         return redirect(url_for('index'))
 
     # Generate token without requiring user_id
@@ -505,8 +505,6 @@ def auth_callback(provider):
 
         # Set secure cookie with new CSRF token
         response = redirect(url_for('dashboard'))
-        flash('Login successful!', 'success')
-
         flash('Login successful!', 'success')
         return response
 
