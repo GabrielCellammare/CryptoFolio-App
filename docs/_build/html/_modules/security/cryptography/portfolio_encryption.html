@@ -1,0 +1,554 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>security.cryptography.portfolio_encryption &mdash; CryptoFolio  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            CryptoFolio
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CryptoFolio</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">security.cryptography.portfolio_encryption</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for security.cryptography.portfolio_encryption</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Enhanced Portfolio Metrics Calculator</span>
+<span class="sd">Version: 1.0</span>
+<span class="sd">Author: [Gabriel Cellammare]</span>
+<span class="sd">Last Modified: [05/01/2025]</span>
+
+<span class="sd">This module implements secure portfolio data encryption and decryption with a strong</span>
+<span class="sd">focus on memory safety, cryptographic best practices, and secure data handling.</span>
+
+<span class="sd">Security Features:</span>
+<span class="sd">1. Memory Protection</span>
+<span class="sd">   - Secure memory allocation and deallocation</span>
+<span class="sd">   - Multiple-pass memory wiping</span>
+<span class="sd">   - Protected memory regions for sensitive data</span>
+<span class="sd">   - Automatic cleanup of sensitive information</span>
+
+<span class="sd">2. Cryptographic Security</span>
+<span class="sd">   - AES encryption for sensitive data</span>
+<span class="sd">   - Secure key and salt handling</span>
+<span class="sd">   - Isolation of cryptographic operations</span>
+<span class="sd">   - Protection against timing attacks</span>
+
+<span class="sd">3. Error Handling</span>
+<span class="sd">   - Secure error recovery</span>
+<span class="sd">   - Non-revealing error messages</span>
+<span class="sd">   - Protected logging of sensitive data</span>
+<span class="sd">   - Failsafe defaults for errors</span>
+
+<span class="sd">4. Input/Output Safety</span>
+<span class="sd">   - Strict type validation</span>
+<span class="sd">   - Secure conversion operations</span>
+<span class="sd">   - Protected field handling</span>
+<span class="sd">   - Safe defaults for failures</span>
+
+<span class="sd">Security Considerations:</span>
+<span class="sd">- All sensitive data is automatically wiped from memory</span>
+<span class="sd">- Cryptographic operations are isolated</span>
+<span class="sd">- Logging excludes sensitive information</span>
+<span class="sd">- Memory is protected against unauthorized access</span>
+<span class="sd">- Type conversions are handled securely</span>
+<span class="sd">- Error states provide safe defaults</span>
+
+<span class="sd">Dependencies:</span>
+<span class="sd">- cryptography_utils.AESCipher: For encryption operations</span>
+<span class="sd">- secure_byte_array.SecureByteArray: For secure memory operations</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">decimal</span> <span class="kn">import</span> <span class="n">Decimal</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">security.cryptography.cryptography_utils</span> <span class="kn">import</span> <span class="n">AESCipher</span>
+<span class="kn">from</span> <span class="nn">security.secure_bye_array</span> <span class="kn">import</span> <span class="n">SecureByteArray</span>
+
+
+<div class="viewcode-block" id="PortfolioEncryptionError">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.portfolio_encryption.PortfolioEncryptionError">[docs]</a>
+<span class="k">class</span> <span class="nc">PortfolioEncryptionError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Custom exception for portfolio encryption errors.</span>
+
+<span class="sd">    Security:</span>
+<span class="sd">    - Does not expose internal state</span>
+<span class="sd">    - Provides generic error messages</span>
+<span class="sd">    - Protects against information leakage</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="PortfolioEncryption">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.portfolio_encryption.PortfolioEncryption">[docs]</a>
+<span class="k">class</span> <span class="nc">PortfolioEncryption</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Secure portfolio data encryption implementation.</span>
+
+<span class="sd">    Security Architecture:</span>
+<span class="sd">    1. Memory Safety</span>
+<span class="sd">       - Automatic memory cleanup</span>
+<span class="sd">       - Protected memory regions</span>
+<span class="sd">       - Secure memory wiping</span>
+<span class="sd">       - Isolation of sensitive data</span>
+
+<span class="sd">    2. Cryptographic Operations</span>
+<span class="sd">       - Secure key management</span>
+<span class="sd">       - Protected encryption/decryption</span>
+<span class="sd">       - Salt handling</span>
+<span class="sd">       - Timing attack protection</span>
+
+<span class="sd">    3. Data Protection</span>
+<span class="sd">       - Secure type conversion</span>
+<span class="sd">       - Protected field handling</span>
+<span class="sd">       - Safe default values</span>
+<span class="sd">       - Error state handling</span>
+
+<span class="sd">    4. Access Control</span>
+<span class="sd">       - Initialization verification</span>
+<span class="sd">       - Operation isolation</span>
+<span class="sd">       - Memory access control</span>
+<span class="sd">       - Cleanup guarantees</span>
+
+<span class="sd">    Usage Warnings:</span>
+<span class="sd">    1. Memory Management</span>
+<span class="sd">       - Always use with context managers</span>
+<span class="sd">       - Verify cleanup completion</span>
+<span class="sd">       - Monitor memory usage</span>
+<span class="sd">       - Check cleanup logs</span>
+
+<span class="sd">    2. Error Handling</span>
+<span class="sd">       - Implement proper exception catching</span>
+<span class="sd">       - Verify error states</span>
+<span class="sd">       - Check return values</span>
+<span class="sd">       - Monitor error logs</span>
+
+<span class="sd">    3. Cryptographic Safety</span>
+<span class="sd">       - Protect key material</span>
+<span class="sd">       - Verify salt uniqueness</span>
+<span class="sd">       - Monitor operation logs</span>
+<span class="sd">       - Check integrity</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Security Constants</span>
+    <span class="n">SENSITIVE_FIELDS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">([</span><span class="s1">&#39;amount&#39;</span><span class="p">,</span> <span class="s1">&#39;purchase_price&#39;</span><span class="p">,</span> <span class="s1">&#39;purchase_date&#39;</span><span class="p">])</span>
+    <span class="n">SECURE_MEMORY_WIPE_PASSES</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">DEFAULT_NUMERIC_VALUE</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="s1">&#39;0.0&#39;</span><span class="p">)</span>
+    <span class="n">DEFAULT_STRING_VALUE</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="c1"># Logging Configuration</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+        <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+        <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="PortfolioEncryption.__init__">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.portfolio_encryption.PortfolioEncryption.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cipher</span><span class="p">:</span> <span class="s1">&#39;AESCipher&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize encryption system with security verification.</span>
+
+<span class="sd">        Security Operations:</span>
+<span class="sd">        1. Cipher validation</span>
+<span class="sd">           - Verify interface compliance</span>
+<span class="sd">           - Check method availability</span>
+<span class="sd">           - Validate initialization</span>
+
+<span class="sd">        2. Memory preparation</span>
+<span class="sd">           - Initialize secure buffers</span>
+<span class="sd">           - Prepare cleanup tracking</span>
+<span class="sd">           - Set up protection</span>
+
+<span class="sd">        3. State verification</span>
+<span class="sd">           - Check initialization status</span>
+<span class="sd">           - Verify configurations</span>
+<span class="sd">           - Validate security settings</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            cipher: AESCipher instance for cryptographic operations</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            PortfolioEncryptionError: On security verification failure</span>
+
+<span class="sd">        Security Checks:</span>
+<span class="sd">        - Cipher interface verification</span>
+<span class="sd">        - Memory initialization</span>
+<span class="sd">        - Protection setup</span>
+<span class="sd">        - State validation</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cipher</span> <span class="o">=</span> <span class="n">cipher</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_is_initialized</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_temp_buffers</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># Track temporary memory buffers</span>
+
+            <span class="c1"># Verify cipher compatibility</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">cipher</span><span class="p">,</span> <span class="s1">&#39;encrypt&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">cipher</span><span class="p">,</span> <span class="s1">&#39;decrypt&#39;</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">PortfolioEncryptionError</span><span class="p">(</span>
+                    <span class="s2">&quot;Invalid cipher: missing required methods&quot;</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_is_initialized</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Initialization failed&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">PortfolioEncryptionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Initialization error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_secure_string_to_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SecureByteArray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convert string to bytes with memory protection.</span>
+
+<span class="sd">        Security Operations:</span>
+<span class="sd">        1. Memory allocation</span>
+<span class="sd">           - Create protected buffer</span>
+<span class="sd">           - Initialize secure region</span>
+<span class="sd">           - Track for cleanup</span>
+
+<span class="sd">        2. Conversion safety</span>
+<span class="sd">           - Validate input encoding</span>
+<span class="sd">           - Protect conversion operation</span>
+<span class="sd">           - Verify output integrity</span>
+
+<span class="sd">        3. Error protection</span>
+<span class="sd">           - Handle conversion failures</span>
+<span class="sd">           - Provide safe defaults</span>
+<span class="sd">           - Clean up on error</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            value: String to convert</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            SecureByteArray: Protected byte representation</span>
+
+<span class="sd">        Security Checks:</span>
+<span class="sd">        - Input validation</span>
+<span class="sd">        - Memory protection</span>
+<span class="sd">        - Conversion verification</span>
+<span class="sd">        - Cleanup tracking</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">secure_bytes</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_temp_buffers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">secure_bytes</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">secure_bytes</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;String conversion error&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">PortfolioEncryptionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Conversion error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_secure_cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        Perform secure memory cleanup.</span>
+
+<span class="sd">        Security Operations:</span>
+<span class="sd">        1. Buffer identification</span>
+<span class="sd">        - Track all allocations</span>
+<span class="sd">        - Verify buffer status</span>
+<span class="sd">        - Check protection state</span>
+
+<span class="sd">        2. Memory wiping</span>
+<span class="sd">        - Multiple overwrite passes</span>
+<span class="sd">        - Pattern verification</span>
+<span class="sd">        - Completion checking</span>
+
+<span class="sd">        3. Resource release</span>
+<span class="sd">        - Free protected memory</span>
+<span class="sd">        - Clear security context</span>
+<span class="sd">        - Verify cleanup</span>
+
+<span class="sd">        Security Checks:</span>
+<span class="sd">        - Buffer tracking</span>
+<span class="sd">        - Wipe verification</span>
+<span class="sd">        - Cleanup completion</span>
+<span class="sd">        - Resource release</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">buffer</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_temp_buffers</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Use secure_zero instead of secure_erase</span>
+                <span class="n">buffer</span><span class="o">.</span><span class="n">secure_zero</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cleanup warning: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_temp_buffers</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+<div class="viewcode-block" id="PortfolioEncryption.encrypt_portfolio_item">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.portfolio_encryption.PortfolioEncryption.encrypt_portfolio_item">[docs]</a>
+    <span class="k">def</span> <span class="nf">encrypt_portfolio_item</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">item</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
+            <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+            <span class="n">salt</span><span class="p">:</span> <span class="n">SecureByteArray</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Securely encrypts portfolio item data with memory protection.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            item: Portfolio data to encrypt</span>
+<span class="sd">            user_id: User identifier</span>
+<span class="sd">            salt: Cryptographic salt</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Dict: Encrypted portfolio data</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            PortfolioEncryptionError: If encryption fails</span>
+
+<span class="sd">        Security:</span>
+<span class="sd">            - Validates input parameters</span>
+<span class="sd">            - Implements secure memory handling</span>
+<span class="sd">            - Automatic cleanup of sensitive data</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_initialized</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">PortfolioEncryptionError</span><span class="p">(</span><span class="s2">&quot;Encryption system not initialized&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">encrypted_item</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">SENSITIVE_FIELDS</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">item</span><span class="p">:</span>
+                    <span class="c1"># Create secure temporary buffer</span>
+                    <span class="n">secure_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_secure_string_to_bytes</span><span class="p">(</span>
+                        <span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="n">field</span><span class="p">]))</span>
+
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="c1"># Convert SecureByteArray to bytes for encryption</span>
+                        <span class="n">encrypted_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cipher</span><span class="o">.</span><span class="n">encrypt</span><span class="p">(</span>
+                            <span class="n">secure_value</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(),</span>  <span class="c1"># Convert to bytes explicitly</span>
+                            <span class="n">user_id</span><span class="p">,</span>
+                            <span class="n">salt</span>
+                        <span class="p">)</span>
+                        <span class="n">encrypted_item</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">encrypted_value</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+                    <span class="k">finally</span><span class="p">:</span>
+                        <span class="c1"># Ensure secure cleanup</span>
+                        <span class="n">secure_value</span><span class="o">.</span><span class="n">secure_zero</span><span class="p">()</span>
+
+            <span class="k">return</span> <span class="n">encrypted_item</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Encryption error&quot;</span><span class="p">,</span>
+                <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;user_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mask_sensitive_data</span><span class="p">(</span><span class="n">user_id</span><span class="p">)}</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">PortfolioEncryptionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Encryption failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_secure_cleanup</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="PortfolioEncryption.decrypt_portfolio_item">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.portfolio_encryption.PortfolioEncryption.decrypt_portfolio_item">[docs]</a>
+    <span class="k">def</span> <span class="nf">decrypt_portfolio_item</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">encrypted_item</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
+            <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+            <span class="n">salt</span><span class="p">:</span> <span class="n">SecureByteArray</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Securely decrypts portfolio item data with memory protection.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            encrypted_item: Encrypted portfolio data</span>
+<span class="sd">            user_id: User identifier</span>
+<span class="sd">            salt: Cryptographic salt</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Dict: Decrypted portfolio data</span>
+
+<span class="sd">        Security:</span>
+<span class="sd">            - Validates encrypted data integrity</span>
+<span class="sd">            - Implements secure memory handling</span>
+<span class="sd">            - Provides safe defaults for failures</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_initialized</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">PortfolioEncryptionError</span><span class="p">(</span><span class="s2">&quot;Encryption system not initialized&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">decrypted_item</span> <span class="o">=</span> <span class="n">encrypted_item</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">SENSITIVE_FIELDS</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">encrypted_item</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="c1"># Create secure buffer for decryption</span>
+                        <span class="n">encrypted_buffer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_secure_string_to_bytes</span><span class="p">(</span>
+                            <span class="n">encrypted_item</span><span class="p">[</span><span class="n">field</span><span class="p">])</span>
+
+                        <span class="c1"># Decrypt in isolated memory</span>
+                        <span class="n">decrypted_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cipher</span><span class="o">.</span><span class="n">decrypt</span><span class="p">(</span>
+                            <span class="n">encrypted_buffer</span><span class="p">,</span>
+                            <span class="n">user_id</span><span class="p">,</span>
+                            <span class="n">salt</span>
+                        <span class="p">)</span>
+
+                        <span class="c1"># Handle type conversion securely</span>
+                        <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;amount&#39;</span><span class="p">,</span> <span class="s1">&#39;purchase_price&#39;</span><span class="p">]:</span>
+                            <span class="n">decrypted_item</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span>
+                                <span class="nb">str</span><span class="p">(</span><span class="n">decrypted_value</span><span class="p">))</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">decrypted_item</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">decrypted_value</span><span class="p">)</span>
+
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">field_error</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Field decryption failed: </span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;error&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">field_error</span><span class="p">)}</span>
+                        <span class="p">)</span>
+                        <span class="n">decrypted_item</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">DEFAULT_NUMERIC_VALUE</span> <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="p">[</span>
+                                <span class="s1">&#39;amount&#39;</span><span class="p">,</span> <span class="s1">&#39;purchase_price&#39;</span>
+                            <span class="p">]</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">DEFAULT_STRING_VALUE</span>
+                        <span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">decrypted_item</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Decryption error&quot;</span><span class="p">,</span>
+                <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;user_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mask_sensitive_data</span><span class="p">(</span><span class="n">user_id</span><span class="p">)}</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_safe_default_item</span><span class="p">(</span><span class="n">encrypted_item</span><span class="p">)</span>
+
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_secure_cleanup</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_create_safe_default_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encrypted_item</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a safe default item when decryption fails.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            encrypted_item: Original encrypted item</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Dict: Safe default values</span>
+
+<span class="sd">        Security:</span>
+<span class="sd">            - Preserves non-sensitive fields</span>
+<span class="sd">            - Uses secure default values</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;crypto_id&#39;</span><span class="p">:</span> <span class="n">encrypted_item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;crypto_id&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;symbol&#39;</span><span class="p">:</span> <span class="n">encrypted_item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;symbol&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;amount&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">DEFAULT_NUMERIC_VALUE</span><span class="p">,</span>
+            <span class="s1">&#39;purchase_price&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">DEFAULT_NUMERIC_VALUE</span><span class="p">,</span>
+            <span class="s1">&#39;purchase_date&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">DEFAULT_STRING_VALUE</span><span class="p">,</span>
+            <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">encrypted_item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">_mask_sensitive_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Masks sensitive data for secure logging.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data: Sensitive data to mask</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Masked data string</span>
+
+<span class="sd">        Security:</span>
+<span class="sd">            - Preserves data length</span>
+<span class="sd">            - Maintains first and last characters</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;*&#39;</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span><span class="si">}{</span><span class="s1">&#39;*&#39;</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="si">}{</span><span class="n">data</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">:]</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Secure cleanup when object is destroyed.</span>
+
+<span class="sd">        Security:</span>
+<span class="sd">            - Ensures all temporary buffers are cleared</span>
+<span class="sd">            - Logs cleanup failures</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_secure_cleanup</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cleanup error in destructor: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

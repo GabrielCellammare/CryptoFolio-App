@@ -1,0 +1,335 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>utils.portfolio_utils &mdash; CryptoFolio  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            CryptoFolio
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">CryptoFolio</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">utils.portfolio_utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for utils.portfolio_utils</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Enhanced Portfolio Metrics Calculator</span>
+<span class="sd">Version: 2.0</span>
+<span class="sd">Author: [Gabriel Cellammare]</span>
+<span class="sd">Last Modified: [05/01/2025]</span>
+
+<span class="sd">This module provides precise financial calculations for cryptocurrency portfolio analysis</span>
+<span class="sd">with comprehensive error handling, input validation, and proper decimal arithmetic.</span>
+
+<span class="sd">Financial Calculation Features:</span>
+<span class="sd">1. Decimal-based precise numerical handling</span>
+<span class="sd">2. Comprehensive error handling</span>
+<span class="sd">3. Robust input validation</span>
+<span class="sd">4. Proper logging</span>
+<span class="sd">5. Currency validation</span>
+<span class="sd">6. Threshold-based zero handling</span>
+<span class="sd">7. Controlled numerical precision</span>
+<span class="sd">8. Explicit error states</span>
+
+<span class="sd">Dependencies:</span>
+<span class="sd">- decimal: For precise numerical calculations</span>
+<span class="sd">- logging: For proper error tracking</span>
+<span class="sd">- typing: For type hints</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">decimal</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">decimal</span> <span class="kn">import</span> <span class="n">Decimal</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
+
+<span class="c1"># Configure logging</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+    <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span>
+<span class="p">)</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># Constants for financial calculations</span>
+<span class="n">PRECISION</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="s1">&#39;0.00000001&#39;</span><span class="p">)</span>  <span class="c1"># 8 decimal places for crypto</span>
+<span class="n">ZERO_THRESHOLD</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="s1">&#39;0.000000001&#39;</span><span class="p">)</span>  <span class="c1"># Threshold for &quot;zero&quot; comparisons</span>
+<span class="n">ROUNDING_PLACES</span> <span class="o">=</span> <span class="mi">8</span>  <span class="c1"># Number of decimal places to round to</span>
+
+
+<div class="viewcode-block" id="Currency">
+<a class="viewcode-back" href="../../index.html#utils.portfolio_utils.Currency">[docs]</a>
+<span class="k">class</span> <span class="nc">Currency</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Valid currency denominations&quot;&quot;&quot;</span>
+    <span class="n">USD</span> <span class="o">=</span> <span class="s2">&quot;USD&quot;</span>
+    <span class="n">EUR</span> <span class="o">=</span> <span class="s2">&quot;EUR&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="PortfolioCalculationError">
+<a class="viewcode-back" href="../../index.html#utils.portfolio_utils.PortfolioCalculationError">[docs]</a>
+<span class="k">class</span> <span class="nc">PortfolioCalculationError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base exception for portfolio calculation errors&quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="InvalidInputError">
+<a class="viewcode-back" href="../../index.html#utils.portfolio_utils.InvalidInputError">[docs]</a>
+<span class="k">class</span> <span class="nc">InvalidInputError</span><span class="p">(</span><span class="n">PortfolioCalculationError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception for invalid input data&quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="CurrencyError">
+<a class="viewcode-back" href="../../index.html#utils.portfolio_utils.CurrencyError">[docs]</a>
+<span class="k">class</span> <span class="nc">CurrencyError</span><span class="p">(</span><span class="n">PortfolioCalculationError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception for currency-related errors&quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="validate_numeric_input">
+<a class="viewcode-back" href="../../index.html#utils.portfolio_utils.validate_numeric_input">[docs]</a>
+<span class="k">def</span> <span class="nf">validate_numeric_input</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">],</span>
+                           <span class="n">field_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Decimal</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validate and convert numeric input to Decimal.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        value: The value to validate</span>
+<span class="sd">        field_name: Name of the field for error messages</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Decimal: The validated and converted value</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        InvalidInputError: If value is invalid</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">decimal_value</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">decimal_value</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">InvalidInputError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">field_name</span><span class="si">}</span><span class="s2"> cannot be negative: </span><span class="si">{</span><span class="n">decimal_value</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">decimal_value</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span><span class="n">PRECISION</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="n">decimal</span><span class="o">.</span><span class="n">InvalidOperation</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">InvalidInputError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Invalid </span><span class="si">{</span><span class="n">field_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">. Error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="validate_currency">
+<a class="viewcode-back" href="../../index.html#utils.portfolio_utils.validate_currency">[docs]</a>
+<span class="k">def</span> <span class="nf">validate_currency</span><span class="p">(</span><span class="n">currency</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validate currency denomination.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        currency: Currency code to validate</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: Validated currency code</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        CurrencyError: If currency is invalid</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Currency</span><span class="p">[</span><span class="n">currency</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span><span class="o">.</span><span class="n">value</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">CurrencyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid currency: </span><span class="si">{</span><span class="n">currency</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="calculate_portfolio_metrics">
+<a class="viewcode-back" href="../../index.html#utils.portfolio_utils.calculate_portfolio_metrics">[docs]</a>
+<span class="k">def</span> <span class="nf">calculate_portfolio_metrics</span><span class="p">(</span>
+    <span class="n">portfolio_item</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">]],</span>
+    <span class="n">current_price</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">],</span>
+    <span class="n">currency</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;USD&#39;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Union</span><span class="p">[</span><span class="n">Decimal</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate Financial Metrics for Portfolio Position with precise decimal arithmetic.</span>
+
+<span class="sd">    Processes a portfolio position and calculates key financial metrics</span>
+<span class="sd">    including current value, profit/loss, and percentage returns.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        portfolio_item: Portfolio position containing:</span>
+<span class="sd">            - amount: Asset quantity</span>
+<span class="sd">            - purchase_price: Entry price</span>
+<span class="sd">        current_price: Current market price</span>
+<span class="sd">        currency: Currency denomination (default: &#39;USD&#39;)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: Financial metrics including:</span>
+<span class="sd">            - current_price: Market price</span>
+<span class="sd">            - current_value: Position value</span>
+<span class="sd">            - profit_loss: Absolute P/L</span>
+<span class="sd">            - profit_loss_percentage: Relative P/L</span>
+<span class="sd">            - currency: Denomination currency</span>
+<span class="sd">            - error: Error message if calculation failed</span>
+
+<span class="sd">    Financial Safety:</span>
+<span class="sd">    - Decimal arithmetic for precision</span>
+<span class="sd">    - Comprehensive input validation</span>
+<span class="sd">    - Specific error handling</span>
+<span class="sd">    - Proper logging</span>
+<span class="sd">    - Currency validation</span>
+<span class="sd">    - Threshold-based zero handling</span>
+<span class="sd">    - Controlled rounding</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;current_price&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s1">&#39;current_value&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s1">&#39;profit_loss&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s1">&#39;profit_loss_percentage&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s1">&#39;currency&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s1">&#39;error&#39;</span><span class="p">:</span> <span class="kc">None</span>
+    <span class="p">}</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Validate currency first</span>
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;currency&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">validate_currency</span><span class="p">(</span><span class="n">currency</span><span class="p">)</span>
+
+        <span class="c1"># Validate and convert inputs</span>
+        <span class="n">amount</span> <span class="o">=</span> <span class="n">validate_numeric_input</span><span class="p">(</span>
+            <span class="n">portfolio_item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;amount&#39;</span><span class="p">),</span> <span class="s1">&#39;amount&#39;</span>
+        <span class="p">)</span>
+        <span class="n">purchase_price</span> <span class="o">=</span> <span class="n">validate_numeric_input</span><span class="p">(</span>
+            <span class="n">portfolio_item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;purchase_price&#39;</span><span class="p">),</span> <span class="s1">&#39;purchase_price&#39;</span>
+        <span class="p">)</span>
+        <span class="n">validated_current_price</span> <span class="o">=</span> <span class="n">validate_numeric_input</span><span class="p">(</span>
+            <span class="n">current_price</span><span class="p">,</span> <span class="s1">&#39;current_price&#39;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Position value calculations with precise decimal arithmetic</span>
+        <span class="n">current_value</span> <span class="o">=</span> <span class="p">(</span><span class="n">amount</span> <span class="o">*</span> <span class="n">validated_current_price</span><span class="p">)</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span><span class="n">PRECISION</span><span class="p">)</span>
+        <span class="n">purchase_value</span> <span class="o">=</span> <span class="p">(</span><span class="n">amount</span> <span class="o">*</span> <span class="n">purchase_price</span><span class="p">)</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span><span class="n">PRECISION</span><span class="p">)</span>
+
+        <span class="c1"># Profit/Loss calculations with threshold checking</span>
+        <span class="n">profit_loss</span> <span class="o">=</span> <span class="p">(</span><span class="n">current_value</span> <span class="o">-</span> <span class="n">purchase_value</span><span class="p">)</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span><span class="n">PRECISION</span><span class="p">)</span>
+
+        <span class="c1"># Calculate percentage with threshold protection</span>
+        <span class="k">if</span> <span class="n">purchase_value</span> <span class="o">&gt;</span> <span class="n">ZERO_THRESHOLD</span><span class="p">:</span>
+            <span class="n">profit_loss_percentage</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">((</span><span class="n">current_value</span> <span class="o">/</span> <span class="n">purchase_value</span><span class="p">)</span> <span class="o">-</span> <span class="n">Decimal</span><span class="p">(</span><span class="s1">&#39;1&#39;</span><span class="p">))</span> <span class="o">*</span>
+                <span class="n">Decimal</span><span class="p">(</span><span class="s1">&#39;100&#39;</span><span class="p">)</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span><span class="n">PRECISION</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">profit_loss_percentage</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="s1">&#39;0&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Update result with calculated values</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+            <span class="s1">&#39;current_price&#39;</span><span class="p">:</span> <span class="n">validated_current_price</span><span class="p">,</span>
+            <span class="s1">&#39;current_value&#39;</span><span class="p">:</span> <span class="n">current_value</span><span class="p">,</span>
+            <span class="s1">&#39;profit_loss&#39;</span><span class="p">:</span> <span class="n">profit_loss</span><span class="p">,</span>
+            <span class="s1">&#39;profit_loss_percentage&#39;</span><span class="p">:</span> <span class="n">profit_loss_percentage</span><span class="p">,</span>
+            <span class="s1">&#39;error&#39;</span><span class="p">:</span> <span class="kc">None</span>
+        <span class="p">})</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Successfully calculated metrics for portfolio position: &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;amount=</span><span class="si">{</span><span class="n">amount</span><span class="si">}</span><span class="s2">, current_price=</span><span class="si">{</span><span class="n">validated_current_price</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">except</span> <span class="n">InvalidInputError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid input error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Invalid input: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="k">except</span> <span class="n">CurrencyError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Currency error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Currency error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unexpected error in calculate_portfolio_metrics: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Calculation error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="k">return</span> <span class="n">result</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,456 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>doc_generator &mdash; CryptoFolio  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            CryptoFolio
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CryptoFolio</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Module code</a></li>
+      <li class="breadcrumb-item active">doc_generator</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for doc_generator</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Documentation Generator Security Framework</span>
+<span class="sd">Version: 1.0</span>
+<span class="sd">Author: Gabriel Cellammare</span>
+<span class="sd">Last Modified: 05/01/2025</span>
+
+<span class="sd">This module implements a secure and robust documentation generation system with</span>
+<span class="sd">a strong focus on module discovery protection, configuration security, and</span>
+<span class="sd">safe file system operations.</span>
+
+<span class="sd">Security Features:</span>
+<span class="sd">1. File System Protection</span>
+<span class="sd">   - Secure path traversal prevention</span>
+<span class="sd">   - Protected file operations</span>
+<span class="sd">   - Safe directory creation</span>
+<span class="sd">   - Path validation and sanitization</span>
+
+<span class="sd">2. Module Security</span>
+<span class="sd">   - Protected module discovery</span>
+<span class="sd">   - Secure import handling</span>
+<span class="sd">   - Module isolation</span>
+<span class="sd">   - Safe module resolution</span>
+
+<span class="sd">3. Documentation Security</span>
+<span class="sd">   - Protected configuration generation</span>
+<span class="sd">   - Secure theme handling</span>
+<span class="sd">   - Safe template management</span>
+<span class="sd">   - Output isolation</span>
+
+<span class="sd">4. Configuration Management</span>
+<span class="sd">   - Protected variable handling</span>
+<span class="sd">   - Secure initialization</span>
+<span class="sd">   - Error isolation</span>
+<span class="sd">   - Safe defaults</span>
+
+<span class="sd">Security Considerations:</span>
+<span class="sd">- All file paths are validated and sanitized</span>
+<span class="sd">- Module imports are protected</span>
+<span class="sd">- Configuration files are isolated</span>
+<span class="sd">- Development artifacts are protected</span>
+<span class="sd">- Error states provide safe defaults</span>
+<span class="sd">- Directory traversal is prevented</span>
+<span class="sd">- Module resolution is secured</span>
+<span class="sd">- Output paths are protected</span>
+
+<span class="sd">Dependencies:</span>
+<span class="sd">- sphinx: Documentation generation framework</span>
+<span class="sd">- pdoc: Alternative documentation generator</span>
+<span class="sd">- pathlib: Secure path operations</span>
+<span class="sd">- importlib: Protected module importing</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">import</span> <span class="nn">pdoc</span>
+<span class="kn">from</span> <span class="nn">sphinx.application</span> <span class="kn">import</span> <span class="n">Sphinx</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span> <span class="nn">importlib.util</span>
+
+
+<div class="viewcode-block" id="DocGenerator">
+<a class="viewcode-back" href="../index.html#doc_generator.DocGenerator">[docs]</a>
+<span class="k">class</span> <span class="nc">DocGenerator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A class that automates documentation generation from Python source files.</span>
+
+<span class="sd">    This class provides functionality to:</span>
+<span class="sd">    1. Discover Python modules in a project directory</span>
+<span class="sd">    2. Generate documentation using either Sphinx or pdoc</span>
+<span class="sd">    3. Handle configuration and setup for documentation generation</span>
+<span class="sd">    4. Provide error handling and fallback options</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        project_dir (Path): Root directory containing Python source files</span>
+<span class="sd">        output_dir (Path): Directory where documentation will be generated</span>
+<span class="sd">        has_rtd_theme (bool): Flag indicating if sphinx_rtd_theme is available</span>
+<span class="sd">        python_files (Dict[str, Path]): Mapping of module names to file paths</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="DocGenerator.__init__">
+<a class="viewcode-back" href="../index.html#doc_generator.DocGenerator.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">project_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the documentation generator with project and output directories.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            project_dir: Root directory containing Python source files</span>
+<span class="sd">            output_dir: Directory where documentation will be generated</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If no Python files are found in the project directory</span>
+<span class="sd">            TypeError: If input parameters are not str or Path objects</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">project_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">project_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">has_rtd_theme</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span>
+            <span class="s1">&#39;sphinx_rtd_theme&#39;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+        <span class="c1"># Trova tutti i file Python nel progetto</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">python_files</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discover_python_files</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">python_files</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No Python files found in: </span><span class="si">{</span><span class="n">project_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_discover_python_files</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Discover and catalog all Python files in the project directory.</span>
+
+<span class="sd">        This method walks through the project directory tree and:</span>
+<span class="sd">        1. Identifies all .py files</span>
+<span class="sd">        2. Excludes files in venv, build, and __pycache__ directories</span>
+<span class="sd">        3. Converts file paths to module names</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Dict[str, Path]: Dictionary mapping module names to their file paths</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            {&#39;mypackage.module&#39;: Path(&#39;/path/to/mypackage/module.py&#39;)}</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">python_files</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">project_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s1">&#39;**/*.py&#39;</span><span class="p">):</span>
+            <span class="c1"># Ignora i file nelle directory venv e build</span>
+            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">part</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;venv&#39;</span><span class="p">,</span> <span class="s1">&#39;build&#39;</span><span class="p">,</span> <span class="s1">&#39;__pycache__&#39;</span><span class="p">]):</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Converti il percorso del file in un nome di modulo</span>
+            <span class="n">relative_path</span> <span class="o">=</span> <span class="n">file_path</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project_dir</span><span class="p">)</span>
+            <span class="n">module_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">relative_path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+                              <span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">,</span> <span class="s1">&#39;.&#39;</span><span class="p">)</span>
+
+            <span class="n">python_files</span><span class="p">[</span><span class="n">module_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">file_path</span>
+
+        <span class="k">return</span> <span class="n">python_files</span>
+
+<div class="viewcode-block" id="DocGenerator.setup_sphinx">
+<a class="viewcode-back" href="../index.html#doc_generator.DocGenerator.setup_sphinx">[docs]</a>
+    <span class="k">def</span> <span class="nf">setup_sphinx</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set up Sphinx configuration and create necessary directory structure.</span>
+
+<span class="sd">        This method:</span>
+<span class="sd">        1. Creates required Sphinx directories</span>
+<span class="sd">        2. Generates conf.py with project configuration</span>
+<span class="sd">        3. Creates index.rst with module documentation structure</span>
+<span class="sd">        4. Configures theme and extensions</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            IOError: If unable to create necessary files or directories</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sphinx_dirs</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;_static&#39;</span><span class="p">,</span> <span class="s1">&#39;_templates&#39;</span><span class="p">,</span>
+                       <span class="s1">&#39;_build/html&#39;</span><span class="p">,</span> <span class="s1">&#39;_build/doctrees&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">dir_name</span> <span class="ow">in</span> <span class="n">sphinx_dirs</span><span class="p">:</span>
+            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span> <span class="o">/</span> <span class="n">dir_name</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Determina il tema</span>
+        <span class="n">theme_name</span> <span class="o">=</span> <span class="s1">&#39;sphinx_rtd_theme&#39;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_rtd_theme</span> <span class="k">else</span> <span class="s1">&#39;alabaster&#39;</span>
+        <span class="n">theme_extension</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">import sphinx_rtd_theme</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_rtd_theme</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># Crea conf.py con configurazione migliorata</span>
+        <span class="n">conf_content</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">import os</span>
+<span class="s1">import sys</span>
+<span class="s1">sys.path.insert(0, os.path.abspath(&#39;..&#39;))</span>
+<span class="si">{</span><span class="n">theme_extension</span><span class="si">}</span>
+
+<span class="s1">project = &#39;CryptoFolio&#39;</span>
+<span class="s1">copyright = &#39;2024&#39;</span>
+<span class="s1">author = &#39;Gabriel Cellammare&#39;</span>
+
+<span class="s1">extensions = [</span>
+<span class="s1">    &#39;sphinx.ext.autodoc&#39;,</span>
+<span class="s1">    &#39;sphinx.ext.napoleon&#39;,</span>
+<span class="s1">    &#39;sphinx.ext.viewcode&#39;,</span>
+<span class="s1">    &#39;sphinx.ext.githubpages&#39;,</span>
+<span class="s1">]</span>
+
+<span class="s1">autodoc_member_order = &#39;bysource&#39;</span>
+<span class="s1">add_module_names = False</span>
+<span class="s1">html_theme = &#39;</span><span class="si">{</span><span class="n">theme_name</span><span class="si">}</span><span class="s1">&#39;</span>
+<span class="s1">html_static_path = [&#39;_static&#39;]</span>
+
+<span class="s1"># Migliora la formattazione del codice</span>
+<span class="s1">pygments_style = &#39;sphinx&#39;</span>
+<span class="s1">&#39;&#39;&#39;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span> <span class="o">/</span> <span class="s1">&#39;conf.py&#39;</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">conf_content</span><span class="p">)</span>
+
+        <span class="c1"># Crea index.rst con riferimenti a tutti i moduli</span>
+        <span class="n">modules_content</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">module_name</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">python_files</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="n">modules_content</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="si">{</span><span class="n">module_name</span><span class="si">}</span>
+<span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="n">module_name</span><span class="p">)</span><span class="si">}</span>
+
+<span class="s1">.. automodule:: </span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span>
+<span class="s1">   :members:</span>
+<span class="s1">   :undoc-members:</span>
+<span class="s1">   :show-inheritance:</span>
+<span class="s1">   :special-members: __init__</span>
+<span class="s1">&#39;&#39;&#39;</span><span class="p">)</span>
+
+        <span class="n">index_content</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">Welcome to Project Documentation of CryptoFolio</span>
+<span class="s1">==============================</span>
+
+<span class="s1">Contents</span>
+<span class="s1">--------</span>
+
+<span class="s1">.. toctree::</span>
+<span class="s1">   :maxdepth: 2</span>
+<span class="s1">   :caption: Modules:</span>
+
+<span class="s1">   modules</span>
+
+<span class="s1">Detailed Module Documentation</span>
+<span class="s1">---------------------------</span>
+
+<span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">linesep</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">modules_content</span><span class="p">)</span><span class="si">}</span>
+
+<span class="s1">Indices and tables</span>
+<span class="s1">==================</span>
+
+<span class="s1">* :ref:`genindex`</span>
+<span class="s1">* :ref:`modindex`</span>
+<span class="s1">* :ref:`search`</span>
+<span class="s1">&#39;&#39;&#39;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span> <span class="o">/</span> <span class="s1">&#39;index.rst&#39;</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">index_content</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DocGenerator.generate_sphinx_docs">
+<a class="viewcode-back" href="../index.html#doc_generator.DocGenerator.generate_sphinx_docs">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_sphinx_docs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate Sphinx documentation for all discovered Python files.</span>
+
+<span class="sd">        This method:</span>
+<span class="sd">        1. Sets up Sphinx configuration</span>
+<span class="sd">        2. Builds HTML documentation</span>
+<span class="sd">        3. Handles errors and provides theme fallback</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If documentation generation fails after fallback attempts</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">setup_sphinx</span><span class="p">()</span>
+
+            <span class="c1"># Aggiungi la directory del progetto al path di Python</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project_dir</span><span class="p">))</span>
+
+            <span class="n">app</span> <span class="o">=</span> <span class="n">Sphinx</span><span class="p">(</span>
+                <span class="n">srcdir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span><span class="p">),</span>
+                <span class="n">confdir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span><span class="p">),</span>
+                <span class="n">outdir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span> <span class="o">/</span> <span class="s1">&#39;_build/html&#39;</span><span class="p">),</span>
+                <span class="n">doctreedir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span> <span class="o">/</span> <span class="s1">&#39;_build/doctrees&#39;</span><span class="p">),</span>
+                <span class="n">buildername</span><span class="o">=</span><span class="s1">&#39;html&#39;</span><span class="p">,</span>
+                <span class="n">freshenv</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Generating documentation for the following modules:&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">module_name</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">python_files</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - </span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">app</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning during Sphinx build: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_rtd_theme</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Retrying with default theme...&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">has_rtd_theme</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">generate_sphinx_docs</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span></div>
+
+
+<div class="viewcode-block" id="DocGenerator.generate_pdoc_docs">
+<a class="viewcode-back" href="../index.html#doc_generator.DocGenerator.generate_pdoc_docs">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_pdoc_docs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate pdoc documentation for all discovered Python files.</span>
+
+<span class="sd">        This method:</span>
+<span class="sd">        1. Adds project directory to Python path</span>
+<span class="sd">        2. Generates HTML documentation using pdoc</span>
+<span class="sd">        3. Outputs documentation to specified directory</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If pdoc documentation generation fails</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project_dir</span><span class="p">))</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Generating documentation for the following modules:&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">module_name</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">python_files</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - </span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">pdoc</span><span class="o">.</span><span class="n">pdoc</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">python_files</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="n">output_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="DocGenerator.run">
+<a class="viewcode-back" href="../index.html#doc_generator.DocGenerator.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">doc_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;sphinx&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute the documentation generation process.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            doc_type: Type of documentation to generate (&#39;sphinx&#39; or &#39;pdoc&#39;)</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: Unsupported documentation type</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Starting documentation generation...&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Source directory: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">project_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output directory: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Documentation type: </span><span class="si">{</span><span class="n">doc_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">doc_type</span> <span class="o">==</span> <span class="s1">&#39;sphinx&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">generate_sphinx_docs</span><span class="p">()</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Documentation generated successfully at: </span><span class="si">{</span>
+<span class="w">                  </span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/_build/html/index.html&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">doc_type</span> <span class="o">==</span> <span class="s1">&#39;pdoc&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">generate_pdoc_docs</span><span class="p">()</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Documentation generated successfully at: </span><span class="si">{</span>
+<span class="w">                  </span><span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/index.html&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported documentation type: </span><span class="si">{</span><span class="n">doc_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../index.html#doc_generator.main">[docs]</a>
+<span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Command-line interface for the documentation generator.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">&quot;Usage: python doc_generator.py &lt;project_dir&gt; &lt;output_dir&gt; [doc_type]&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;doc_type can be &#39;sphinx&#39; (default) or &#39;pdoc&#39;&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">project_dir</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">output_dir</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">doc_type</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">3</span> <span class="k">else</span> <span class="s1">&#39;sphinx&#39;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">generator</span> <span class="o">=</span> <span class="n">DocGenerator</span><span class="p">(</span><span class="n">project_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">)</span>
+        <span class="n">generator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">doc_type</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error generating documentation: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+    <span class="c1"># python doc_generator.py . ./docs</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

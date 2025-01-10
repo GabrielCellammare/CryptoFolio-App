@@ -1,0 +1,667 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>configuration.config &mdash; CryptoFolio  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            CryptoFolio
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">CryptoFolio</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">configuration.config</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for configuration.config</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">CryptoCache: Advanced Security Framework for Flask Applications</span>
+<span class="sd">Version: 1.0</span>
+<span class="sd">Author: Gabriel Cellammare</span>
+<span class="sd">Last Modified: 05/01/2025</span>
+
+<span class="sd">This module implements a comprehensive security framework for Flask applications with</span>
+<span class="sd">defense-in-depth measures and robust security controls. It provides multi-layered</span>
+<span class="sd">protection against various attack vectors while ensuring data integrity and secure</span>
+<span class="sd">cross-origin communications.</span>
+
+<span class="sd">Core Security Features:</span>
+<span class="sd">1. Origin Validation</span>
+<span class="sd">   * Strict origin validation with DNS rebinding protection</span>
+<span class="sd">   * Null byte injection prevention</span>
+<span class="sd">   * IP-based origin validation</span>
+<span class="sd">   * Protocol enforcement</span>
+
+<span class="sd">2. Environment Security</span>
+<span class="sd">   * Secure environment variable handling</span>
+<span class="sd">   * Runtime modification prevention</span>
+<span class="sd">   * Default security fallbacks</span>
+<span class="sd">   * Configuration immutability</span>
+
+<span class="sd">3. CORS Protection</span>
+<span class="sd">   * Header injection prevention</span>
+<span class="sd">   * Strict CORS policy enforcement</span>
+<span class="sd">   * Secure credential handling</span>
+<span class="sd">   * Cache poisoning protection</span>
+
+<span class="sd">4. Audit &amp; Logging</span>
+<span class="sd">   * Secure audit logging</span>
+<span class="sd">   * Log sanitization</span>
+<span class="sd">   * Rotation policies</span>
+<span class="sd">   * Sensitive data masking</span>
+
+<span class="sd">Security Considerations:</span>
+<span class="sd">- All environment variables must be securely configured</span>
+<span class="sd">- SSL/TLS must be properly configured on the server</span>
+<span class="sd">- Regular security audits should be performed</span>
+<span class="sd">- Security updates should be monitored and applied</span>
+
+<span class="sd">Dependencies:</span>
+<span class="sd">- flask&gt;=2.0.0: Web framework</span>
+<span class="sd">- urllib3&gt;=2.0.0: HTTP client</span>
+<span class="sd">- cryptography&gt;=41.0.0: Cryptographic operations</span>
+<span class="sd">- python-dotenv&gt;=1.0.0: Environment management</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">secrets</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">lru_cache</span>
+<span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">urlparse</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span> <span class="nn">flask</span> <span class="kn">import</span> <span class="n">current_app</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">Flask</span><span class="p">,</span> <span class="n">Response</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">cryptography.fernet</span> <span class="kn">import</span> <span class="n">Fernet</span>
+<span class="kn">from</span> <span class="nn">logging.handlers</span> <span class="kn">import</span> <span class="n">RotatingFileHandler</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">timezone</span>
+<span class="kn">import</span> <span class="nn">hashlib</span>
+<span class="kn">import</span> <span class="nn">hmac</span>
+
+
+<div class="viewcode-block" id="SecurityError">
+<a class="viewcode-back" href="../../index.html#configuration.config.SecurityError">[docs]</a>
+<span class="k">class</span> <span class="nc">SecurityError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base exception for security-related errors.&quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="ConfigurationError">
+<a class="viewcode-back" href="../../index.html#configuration.config.ConfigurationError">[docs]</a>
+<span class="k">class</span> <span class="nc">ConfigurationError</span><span class="p">(</span><span class="n">SecurityError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Specific exception for configuration security issues.&quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="SecurityHeaders">
+<a class="viewcode-back" href="../../index.html#configuration.config.SecurityHeaders">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">SecurityHeaders</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Immutable security headers configuration.&quot;&quot;&quot;</span>
+    <span class="n">HSTS</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;max-age=31536000; includeSubDomains&quot;</span><span class="p">)</span>
+    <span class="n">CONTENT_TYPE_OPTIONS</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;nosniff&quot;</span><span class="p">)</span>
+    <span class="n">FRAME_OPTIONS</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;DENY&quot;</span><span class="p">)</span>
+    <span class="n">XSS_PROTECTION</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;1; mode=block&quot;</span><span class="p">)</span>
+    <span class="n">REFERRER_POLICY</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;strict-origin-when-cross-origin&quot;</span><span class="p">)</span>
+    <span class="n">PERMITTED_CROSS_DOMAIN_POLICIES</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">)</span>
+    <span class="n">CSP</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="p">(</span>
+        <span class="s2">&quot;default-src &#39;self&#39;; &quot;</span>
+        <span class="s2">&quot;img-src &#39;self&#39; data: https:; &quot;</span>
+        <span class="s2">&quot;style-src &#39;self&#39; &#39;unsafe-inline&#39; https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; &quot;</span>
+        <span class="s2">&quot;script-src &#39;self&#39; &#39;unsafe-inline&#39; &#39;unsafe-eval&#39; https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com; &quot;</span>
+        <span class="s2">&quot;font-src &#39;self&#39; https://cdnjs.cloudflare.com; &quot;</span>
+        <span class="s2">&quot;connect-src &#39;self&#39; https://*.ngrok-free.app https://*.ngrok.io; &quot;</span>
+        <span class="s2">&quot;frame-ancestors &#39;none&#39;;&quot;</span>
+    <span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="EnvironmentConfig">
+<a class="viewcode-back" href="../../index.html#configuration.config.EnvironmentConfig">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">EnvironmentConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Immutable environment-specific configuration.&quot;&quot;&quot;</span>
+    <span class="n">origins</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">max_requests</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+    <span class="n">request_window</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">3600</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="SecureConfig">
+<a class="viewcode-back" href="../../index.html#configuration.config.SecureConfig">[docs]</a>
+<span class="k">class</span> <span class="nc">SecureConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enhanced secure configuration manager for Flask applications.</span>
+
+<span class="sd">    This class manages secure configuration settings including CORS policies,</span>
+<span class="sd">    security headers, and environment-specific settings. It implements multiple</span>
+<span class="sd">    layers of security controls and validation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">DEFAULT_CORS_MAX_AGE</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3600</span>  <span class="c1"># 1 hour</span>
+    <span class="n">DEFAULT_HSTS_MAX_AGE</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">31536000</span>  <span class="c1"># 1 year</span>
+    <span class="n">SUPPORTED_ENVIRONMENTS</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s1">&#39;development&#39;</span><span class="p">,</span> <span class="s1">&#39;production&#39;</span><span class="p">})</span>
+
+    <span class="c1"># Secure pattern matching for origins</span>
+    <span class="n">ORIGIN_PATTERN</span><span class="p">:</span> <span class="n">re</span><span class="o">.</span><span class="n">Pattern</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+        <span class="sa">r</span><span class="s1">&#39;^https?://(?:&#39;</span>
+        <span class="c1"># Handle wildcard subdomains</span>
+        <span class="sa">r</span><span class="s1">&#39;(?:\*\.)?(?:[a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?::\d{1,5})?|&#39;</span>
+        <span class="sa">r</span><span class="s1">&#39;localhost(?::\d{1,5})?|&#39;</span>
+        <span class="sa">r</span><span class="s1">&#39;127\.0\.0\.1(?::\d{1,5})?|&#39;</span>
+        <span class="sa">r</span><span class="s1">&#39;\[::1\](?::\d{1,5})?&#39;</span>
+        <span class="sa">r</span><span class="s1">&#39;)$&#39;</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="SecureConfig.__init__">
+<a class="viewcode-back" href="../../index.html#configuration.config.SecureConfig.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize secure configuration with audit logging and encryption.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_setup_secure_logging</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_init_crypto</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request_history</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_initialized</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_allowed_origins</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># Store allowed origins here</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_origins</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># Store dynamic patterns (like *.ngrok-free.app)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_security_headers</span> <span class="o">=</span> <span class="n">SecurityHeaders</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_init_crypto</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize cryptographic components for secure operations.</span>
+
+<span class="sd">        Sets up encryption keys and HMAC for secure data handling.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_encryption_key</span> <span class="o">=</span> <span class="n">Fernet</span><span class="o">.</span><span class="n">generate_key</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fernet</span> <span class="o">=</span> <span class="n">Fernet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_encryption_key</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hmac_key</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_bytes</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_setup_secure_logging</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Configure secure logging with rotation and sanitization.</span>
+
+<span class="sd">        Implements:</span>
+<span class="sd">        - Log rotation to prevent disk space exhaustion</span>
+<span class="sd">        - Secure file permissions</span>
+<span class="sd">        - Sanitized log formatting</span>
+<span class="sd">        - Sensitive data masking</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log_formatter</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span>
+            <span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - [SECURED] </span><span class="si">%(message)s</span><span class="s1">&#39;</span>
+        <span class="p">)</span>
+
+        <span class="n">file_handler</span> <span class="o">=</span> <span class="n">RotatingFileHandler</span><span class="p">(</span>
+            <span class="s1">&#39;secure_app.log&#39;</span><span class="p">,</span>
+            <span class="n">maxBytes</span><span class="o">=</span><span class="mi">10485760</span><span class="p">,</span>  <span class="c1"># 10MB</span>
+            <span class="n">backupCount</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;a&#39;</span><span class="p">,</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span>
+        <span class="p">)</span>
+        <span class="n">file_handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">log_formatter</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;secure_config&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">file_handler</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_generate_hmac</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate HMAC for data integrity verification.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data: Input string to generate HMAC for</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Hexadecimal HMAC digest</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">hmac</span><span class="o">.</span><span class="n">new</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_hmac_key</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span>
+            <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_validate_origin_secure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Enhanced origin validation with support for local development.</span>
+
+<span class="sd">        This method validates origins while allowing local development addresses.</span>
+<span class="sd">        It implements several security checks while maintaining developer friendliness.</span>
+
+<span class="sd">        Security measures:</span>
+<span class="sd">        - Pattern matching for valid URLs and IP addresses</span>
+<span class="sd">        - Special handling for localhost and loopback addresses</span>
+<span class="sd">        - Development environment detection</span>
+<span class="sd">        - DNS rebinding protection</span>
+<span class="sd">        - Null byte injection prevention</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            origin: Origin URL to validate</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if origin is valid and secure</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">origin</span> <span class="ow">or</span> <span class="s1">&#39;</span><span class="se">\x00</span><span class="s1">&#39;</span> <span class="ow">in</span> <span class="n">origin</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Generate HMAC for origin validation</span>
+            <span class="n">origin_hmac</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_hmac</span><span class="p">(</span><span class="n">origin</span><span class="p">)</span>
+
+            <span class="c1"># For wildcard origins in allowed list, convert to regex pattern</span>
+            <span class="n">allowed_origins</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_allowed_origins</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">allowed_origin</span> <span class="ow">in</span> <span class="n">allowed_origins</span><span class="p">:</span>
+                <span class="k">if</span> <span class="s1">&#39;*&#39;</span> <span class="ow">in</span> <span class="n">allowed_origin</span><span class="p">:</span>
+                    <span class="n">pattern</span> <span class="o">=</span> <span class="n">allowed_origin</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="s1">&#39;[^.]+&#39;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">origin</span><span class="p">):</span>
+                        <span class="k">return</span> <span class="kc">True</span>
+
+            <span class="c1"># If no wildcard match, use standard pattern matching</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">ORIGIN_PATTERN</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">origin</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">parsed</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">origin</span><span class="p">)</span>
+
+            <span class="c1"># Protocol validation</span>
+            <span class="k">if</span> <span class="n">parsed</span><span class="o">.</span><span class="n">scheme</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s1">&#39;http&#39;</span><span class="p">,</span> <span class="s1">&#39;https&#39;</span><span class="p">}:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Special handling for local development</span>
+            <span class="n">is_local</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;localhost&#39;</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;127.0.0.1&#39;</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;[::1]&#39;</span><span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
+                <span class="c1"># Solo permetti indirizzi locali in ambiente di sviluppo</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;FLASK_ENV&#39;</span><span class="p">)</span> <span class="o">!=</span> <span class="s1">&#39;development&#39;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;Local address rejected in non-development environment&quot;</span>
+                    <span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+
+                <span class="c1"># Verifica la porta se presente</span>
+                <span class="k">if</span> <span class="s1">&#39;:&#39;</span> <span class="ow">in</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">port</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">&lt;=</span> <span class="n">port</span> <span class="o">&lt;=</span> <span class="mi">65535</span><span class="p">):</span>
+                            <span class="k">return</span> <span class="kc">False</span>
+                    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="kc">False</span>
+
+                <span class="k">return</span> <span class="kc">True</span>
+
+            <span class="c1"># Per origini non locali, applica la validazione standard</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span> <span class="ow">or</span> <span class="s1">&#39;.&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Path validation</span>
+            <span class="k">if</span> <span class="n">parsed</span><span class="o">.</span><span class="n">path</span> <span class="ow">and</span> <span class="n">parsed</span><span class="o">.</span><span class="n">path</span> <span class="o">!=</span> <span class="s1">&#39;/&#39;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Store HMAC for future verification</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_request_history</span><span class="p">[</span><span class="n">origin</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;hmac&#39;</span><span class="p">:</span> <span class="n">origin_hmac</span><span class="p">,</span>
+                <span class="s1">&#39;timestamp&#39;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+            <span class="p">}</span>
+
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Origin validation failed: </span><span class="si">{</span>
+<span class="w">                                </span><span class="bp">self</span><span class="o">.</span><span class="n">_sanitize_value</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">_check_rate_limit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Implement rate limiting for origins.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            origin: Origin to check</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if within rate limits</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+        <span class="n">window_start</span> <span class="o">=</span> <span class="n">now</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">seconds</span><span class="o">=</span><span class="mi">3600</span><span class="p">)</span>
+
+        <span class="c1"># Clean up old entries</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request_history</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request_history</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">v</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">window_start</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Check rate limit</span>
+        <span class="n">origin_requests</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="mi">1</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request_history</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">v</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">window_start</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">origin_requests</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_env_config</span><span class="o">.</span><span class="n">max_requests</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_sanitize_value</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sanitize values to prevent injection attacks.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            value: Input string to sanitize</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Sanitized string safe for logging and processing</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[^\w\-\.]&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_validate_env_variables</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate and secure environment variables.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ConfigurationError: If environment variables are invalid or insecure</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">required_vars</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;DEV_ALLOWED_ORIGINS&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+            <span class="s1">&#39;PROD_ALLOWED_ORIGINS&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+            <span class="s1">&#39;CORS_MAX_AGE&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+            <span class="s1">&#39;HSTS_MAX_AGE&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+            <span class="s1">&#39;INCLUDE_SUBDOMAINS&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+            <span class="s1">&#39;CORS_ALLOWED_HEADERS&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+            <span class="s1">&#39;CORS_ALLOWED_METHODS&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+            <span class="s1">&#39;CORS_ALLOW_CREDENTIALS&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+            <span class="s1">&#39;CORS_EXPOSE_HEADERS&#39;</span><span class="p">:</span> <span class="nb">str</span>
+        <span class="p">}</span>
+
+        <span class="k">for</span> <span class="n">var_name</span><span class="p">,</span> <span class="n">expected_type</span> <span class="ow">in</span> <span class="n">required_vars</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">var_name</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Missing required variable: </span><span class="si">{</span><span class="n">var_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Encrypt sensitive values</span>
+            <span class="k">if</span> <span class="s1">&#39;CREDENTIALS&#39;</span> <span class="ow">in</span> <span class="n">var_name</span> <span class="ow">or</span> <span class="s1">&#39;KEY&#39;</span> <span class="ow">in</span> <span class="n">var_name</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fernet</span><span class="o">.</span><span class="n">encrypt</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">expected_type</span> <span class="o">==</span> <span class="nb">int</span><span class="p">:</span>
+                    <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Invalid type for </span><span class="si">{</span><span class="n">var_name</span><span class="si">}</span><span class="s2">: expected </span><span class="si">{</span><span class="n">expected_type</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+<div class="viewcode-block" id="SecureConfig.initialize_app">
+<a class="viewcode-back" href="../../index.html#configuration.config.SecureConfig.initialize_app">[docs]</a>
+    <span class="k">def</span> <span class="nf">initialize_app</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">:</span> <span class="n">Flask</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_validate_env_variables</span><span class="p">()</span>
+
+            <span class="c1"># Parse allowed origins during initialization</span>
+            <span class="n">dev_origins</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_origins_list</span><span class="p">(</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;DEV_ALLOWED_ORIGINS&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+            <span class="n">prod_origins</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_origins_list</span><span class="p">(</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;PROD_ALLOWED_ORIGINS&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+
+            <span class="c1"># Store based on environment</span>
+            <span class="n">current_env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;FLASK_ENV&#39;</span><span class="p">,</span> <span class="s1">&#39;production&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_allowed_origins</span> <span class="o">=</span> <span class="n">dev_origins</span> <span class="k">if</span> <span class="n">current_env</span> <span class="o">==</span> <span class="s1">&#39;development&#39;</span> <span class="k">else</span> <span class="n">prod_origins</span>
+
+            <span class="c1"># Create environment configurations with the parsed origins</span>
+            <span class="n">environments</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;development&#39;</span><span class="p">:</span> <span class="n">EnvironmentConfig</span><span class="p">(</span>
+                    <span class="n">origins</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">dev_origins</span><span class="p">),</span>
+                    <span class="n">max_requests</span><span class="o">=</span><span class="mi">100</span>
+                <span class="p">),</span>
+                <span class="s1">&#39;production&#39;</span><span class="p">:</span> <span class="n">EnvironmentConfig</span><span class="p">(</span>
+                    <span class="n">origins</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">prod_origins</span><span class="p">),</span>
+                    <span class="n">max_requests</span><span class="o">=</span><span class="mi">1000</span>
+                <span class="p">)</span>
+            <span class="p">}</span>
+
+            <span class="c1"># Store in app config</span>
+            <span class="n">app</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;ENVIRONMENTS&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">environments</span>
+
+            <span class="c1"># Register dynamic origin handler</span>
+            <span class="k">def</span> <span class="nf">add_dynamic_origin</span><span class="p">(</span><span class="n">origin</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">origin</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_origin_format</span><span class="p">(</span><span class="n">origin</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_allowed_origins</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">origin</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Added dynamic origin: </span><span class="si">{</span><span class="n">origin</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">app</span><span class="o">.</span><span class="n">add_dynamic_origin</span> <span class="o">=</span> <span class="n">add_dynamic_origin</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_initialized</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Secure configuration initialized for environment: </span><span class="si">{</span><span class="n">current_env</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Initialization failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">SecurityError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Configuration initialization failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_parse_origins_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">origins_string</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse origins string into a set of allowed origins and patterns.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">origins</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">origins_string</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">origins</span>
+
+        <span class="k">for</span> <span class="n">origin</span> <span class="ow">in</span> <span class="n">origins_string</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+            <span class="n">origin</span> <span class="o">=</span> <span class="n">origin</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">origin</span><span class="p">:</span>
+                <span class="k">if</span> <span class="s1">&#39;*&#39;</span> <span class="ow">in</span> <span class="n">origin</span><span class="p">:</span>
+                    <span class="c1"># Store wildcard patterns separately</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_origins</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">origin</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="s1">&#39;.*&#39;</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">origins</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">origin</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">origins</span>
+
+    <span class="k">def</span> <span class="nf">_validate_origin_format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate origin format without checking against allowed list.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">origin</span> <span class="ow">or</span> <span class="s1">&#39;</span><span class="se">\x00</span><span class="s1">&#39;</span> <span class="ow">in</span> <span class="n">origin</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parsed</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">origin</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">scheme</span> <span class="ow">in</span> <span class="p">{</span><span class="s1">&#39;http&#39;</span><span class="p">,</span> <span class="s1">&#39;https&#39;</span><span class="p">}</span> <span class="ow">and</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span> <span class="ow">and</span>
+                <span class="ow">not</span> <span class="n">parsed</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">_check_origin_allowed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check if an origin is allowed, including dynamic patterns.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Direct match</span>
+        <span class="k">if</span> <span class="n">origin</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_allowed_origins</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="c1"># Check against dynamic patterns</span>
+        <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_origins</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">origin</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">_parse_origins</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">origins_string</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse and validate origin strings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            origins_string: Comma-separated list of origins</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            List[str]: List of validated origins</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">origins_string</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">origins_string</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="n">origins</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">origin</span> <span class="ow">in</span> <span class="n">origins_string</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+            <span class="n">origin</span> <span class="o">=</span> <span class="n">origin</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">origin</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_origin_secure</span><span class="p">(</span><span class="n">origin</span><span class="p">):</span>
+                <span class="n">origins</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">origin</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid origin rejected: </span><span class="si">{</span><span class="n">origin</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">origins</span>
+
+<div class="viewcode-block" id="SecureConfig.get_allowed_origins">
+<a class="viewcode-back" href="../../index.html#configuration.config.SecureConfig.get_allowed_origins">[docs]</a>
+    <span class="nd">@lru_cache</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">get_allowed_origins</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get cached list of allowed origins for current environment.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            List[str]: List of allowed origins</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;FLASK_ENV&#39;</span><span class="p">,</span> <span class="s1">&#39;production&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">env</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_ENVIRONMENTS</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Unsupported environment </span><span class="si">{</span><span class="n">env</span><span class="si">}</span><span class="s2">, using production&quot;</span>
+            <span class="p">)</span>
+            <span class="n">env</span> <span class="o">=</span> <span class="s1">&#39;production&#39;</span>
+
+        <span class="k">return</span> <span class="n">current_app</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;ENVIRONMENTS&#39;</span><span class="p">][</span><span class="n">env</span><span class="p">]</span><span class="o">.</span><span class="n">origins</span></div>
+
+
+<div class="viewcode-block" id="SecureConfig.add_security_headers">
+<a class="viewcode-back" href="../../index.html#configuration.config.SecureConfig.add_security_headers">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_security_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">:</span> <span class="n">Response</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Response</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add comprehensive security headers to response.&quot;&quot;&quot;</span>
+        <span class="n">request_origin</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Origin&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">request_origin</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_origin_format</span><span class="p">(</span><span class="n">request_origin</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid origin format: </span><span class="si">{</span><span class="n">request_origin</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">response</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_origin_allowed</span><span class="p">(</span><span class="n">request_origin</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Origin not allowed: </span><span class="si">{</span><span class="n">request_origin</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">response</span>
+
+            <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s1">&#39;Access-Control-Allow-Origin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">request_origin</span>
+
+            <span class="c1"># Add CORS headers for valid origins</span>
+            <span class="n">cors_headers</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;Access-Control-Allow-Headers&#39;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;CORS_ALLOWED_HEADERS&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
+                <span class="s1">&#39;Access-Control-Allow-Methods&#39;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;CORS_ALLOWED_METHODS&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
+                <span class="s1">&#39;Access-Control-Allow-Credentials&#39;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;CORS_ALLOW_CREDENTIALS&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
+                <span class="s1">&#39;Access-Control-Expose-Headers&#39;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;CORS_EXPOSE_HEADERS&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
+                <span class="s1">&#39;Access-Control-Max-Age&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">DEFAULT_CORS_MAX_AGE</span><span class="p">)</span>
+            <span class="p">}</span>
+
+            <span class="c1"># Only add headers with non-empty values</span>
+            <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">cors_headers</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span><span class="p">})</span>
+
+        <span class="c1"># Add security headers from our configuration</span>
+        <span class="n">security_headers</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;X-Content-Type-Options&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_security_headers</span><span class="o">.</span><span class="n">CONTENT_TYPE_OPTIONS</span><span class="p">,</span>
+            <span class="s1">&#39;X-Frame-Options&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_security_headers</span><span class="o">.</span><span class="n">FRAME_OPTIONS</span><span class="p">,</span>
+            <span class="s1">&#39;X-XSS-Protection&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_security_headers</span><span class="o">.</span><span class="n">XSS_PROTECTION</span><span class="p">,</span>
+            <span class="s1">&#39;Referrer-Policy&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_security_headers</span><span class="o">.</span><span class="n">REFERRER_POLICY</span><span class="p">,</span>
+            <span class="s1">&#39;X-Permitted-Cross-Domain-Policies&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_security_headers</span><span class="o">.</span><span class="n">PERMITTED_CROSS_DOMAIN_POLICIES</span><span class="p">,</span>
+            <span class="s1">&#39;Content-Security-Policy&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_security_headers</span><span class="o">.</span><span class="n">CSP</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Add HSTS header only on HTTPS connections</span>
+        <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">is_secure</span><span class="p">:</span>
+            <span class="n">security_headers</span><span class="p">[</span><span class="s1">&#39;Strict-Transport-Security&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_security_headers</span><span class="o">.</span><span class="n">HSTS</span>
+
+        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">security_headers</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

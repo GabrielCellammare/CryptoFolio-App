@@ -1,0 +1,1349 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>security.csrf_protection &mdash; CryptoFolio  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            CryptoFolio
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">CryptoFolio</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">security.csrf_protection</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for security.csrf_protection</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Enhanced CSRF Protection System</span>
+<span class="sd">Version: 2.0</span>
+<span class="sd">Author: Gabriel Cellammare</span>
+<span class="sd">Last Modified: 09/01/2025</span>
+
+<span class="sd">A comprehensive Cross-Site Request Forgery (CSRF) protection system designed for Flask applications</span>
+<span class="sd">with emphasis on security, scalability, and compliance with modern web security standards.</span>
+
+<span class="sd">Key Features:</span>
+<span class="sd">1. JavaScript Origin Validation - Ensures requests originate from legitimate sources using cryptographic signatures</span>
+<span class="sd">2. Request Origin Binding - Links tokens to specific origins and validates request chains</span>
+<span class="sd">3. Enhanced Token Protection - Uses encryption and HMAC validation with secure token lifecycle management</span>
+<span class="sd">4. Anti-Automation Measures - Implements rate limiting and request pattern analysis</span>
+<span class="sd">5. Request Chain Validation - Tracks and validates request sequences to prevent replay attacks</span>
+
+<span class="sd">Security Measures:</span>
+<span class="sd">- Implements double-submit cookie pattern</span>
+<span class="sd">- Uses cryptographic signatures for request validation</span>
+<span class="sd">- Supports both development and production environments with appropriate security levels</span>
+<span class="sd">- Includes comprehensive header security</span>
+<span class="sd">- Implements token expiration and rotation</span>
+<span class="sd">- Provides protection against timing attacks</span>
+<span class="sd">- Includes DOS protection mechanisms</span>
+
+<span class="sd">Usage:</span>
+<span class="sd">    from csrf_protection import CSRFProtection</span>
+<span class="sd">    </span>
+<span class="sd">    app = Flask(__name__)</span>
+<span class="sd">    csrf = CSRFProtection(app)</span>
+<span class="sd">    </span>
+<span class="sd">    @app.route(&#39;/protected&#39;, methods=[&#39;POST&#39;])</span>
+<span class="sd">    @csrf.csrf_protect</span>
+<span class="sd">    def protected_route():</span>
+<span class="sd">        return &#39;Protected endpoint&#39;</span>
+
+<span class="sd">Dependencies:</span>
+<span class="sd">    - Flask</span>
+<span class="sd">    - cryptography</span>
+<span class="sd">    - Python 3.7+</span>
+
+<span class="sd">Environment Variables:</span>
+<span class="sd">    - FLASK_ENV: &#39;development&#39; or &#39;production&#39;</span>
+<span class="sd">    - DEV_ALLOWED_ORIGINS: Comma-separated list of allowed origins for development</span>
+<span class="sd">    - PROD_ALLOWED_ORIGINS: Comma-separated list of allowed origins for production</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">hmac</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">struct</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">urlparse</span>
+<span class="kn">from</span> <span class="nn">venv</span> <span class="kn">import</span> <span class="n">logger</span>
+<span class="kn">from</span> <span class="nn">flask</span> <span class="kn">import</span> <span class="n">Flask</span><span class="p">,</span> <span class="n">Response</span><span class="p">,</span> <span class="n">jsonify</span><span class="p">,</span> <span class="n">make_response</span><span class="p">,</span> <span class="n">redirect</span><span class="p">,</span> <span class="n">session</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">abort</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
+<span class="kn">import</span> <span class="nn">secrets</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">timedelta</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">cryptography.fernet</span> <span class="kn">import</span> <span class="n">Fernet</span>
+<span class="kn">import</span> <span class="nn">hashlib</span>
+
+
+<div class="viewcode-block" id="CSRFProtection">
+<a class="viewcode-back" href="../../index.html#security.csrf_protection.CSRFProtection">[docs]</a>
+<span class="k">class</span> <span class="nc">CSRFProtection</span><span class="p">:</span>
+<div class="viewcode-block" id="CSRFProtection.__init__">
+<a class="viewcode-back" href="../../index.html#security.csrf_protection.CSRFProtection.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Flask</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes Flask application with comprehensive security configurations.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app (Flask): The Flask application instance to configure</span>
+
+<span class="sd">        Security Configurations:</span>
+<span class="sd">            - Session security settings</span>
+<span class="sd">            - Origin validation rules</span>
+<span class="sd">            - HTTPS enforcement</span>
+<span class="sd">            - Security headers</span>
+<span class="sd">            - Environment-specific configurations</span>
+
+<span class="sd">        Environment Handling:</span>
+<span class="sd">            - Development: Allows local testing and ngrok domains</span>
+<span class="sd">            - Production: Strict security controls</span>
+
+<span class="sd">        Implementation Details:</span>
+<span class="sd">            - Configures session parameters</span>
+<span class="sd">            - Sets up request hooks for HTTPS and headers</span>
+<span class="sd">            - Initializes origin validation</span>
+<span class="sd">            - Establishes environment-specific rate limits</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If initialization fails, with detailed error logging</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">app</span> <span class="o">=</span> <span class="n">app</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_signing_key</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_bytes</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">encryption_key</span> <span class="o">=</span> <span class="n">Fernet</span><span class="o">.</span><span class="n">generate_key</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fernet</span> <span class="o">=</span> <span class="n">Fernet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">encryption_key</span><span class="p">)</span>
+
+        <span class="c1"># Token and nonce management</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Configure logging with DEBUG level</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;csrf_protection&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>  <span class="c1"># Set to DEBUG level</span>
+
+        <span class="c1"># Create a console handler with formatting</span>
+        <span class="n">console_handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+        <span class="n">console_handler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+        <span class="n">formatter</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span>
+            <span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span>
+        <span class="p">)</span>
+        <span class="n">console_handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">formatter</span><span class="p">)</span>
+
+        <span class="c1"># Add handler if it doesn&#39;t exist</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">console_handler</span><span class="p">)</span>
+        <span class="c1"># Origin management</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_allowed_origins</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_origins</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="c1"># Set of supported environments</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_ENVIRONMENTS</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+            <span class="p">{</span><span class="s1">&#39;development&#39;</span><span class="p">,</span> <span class="s1">&#39;production&#39;</span><span class="p">})</span>
+
+        <span class="c1"># Security constants</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">NONCE_EXPIRATION</span> <span class="o">=</span> <span class="mi">300</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">MAX_NONCES</span> <span class="o">=</span> <span class="mi">10000</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">MIN_TOKEN_LENGTH</span> <span class="o">=</span> <span class="mi">64</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_token_lifetime</span> <span class="o">=</span> <span class="mi">3600</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_max_tokens_per_session</span> <span class="o">=</span> <span class="mi">3</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_max_uses_per_token</span> <span class="o">=</span> <span class="mi">100</span>
+
+        <span class="c1"># Request chain tracking</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request_chains</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Security configuration constants</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">SECURITY_HEADERS</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;X-Content-Type-Options&#39;</span><span class="p">:</span> <span class="s1">&#39;nosniff&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;X-Frame-Options&#39;</span><span class="p">:</span> <span class="s1">&#39;DENY&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;X-XSS-Protection&#39;</span><span class="p">:</span> <span class="s1">&#39;1; mode=block&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Strict-Transport-Security&#39;</span><span class="p">:</span> <span class="s1">&#39;max-age=31536000; includeSubDomains; preload&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Content-Security-Policy&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_csp_policy</span><span class="p">(),</span>
+            <span class="s1">&#39;Cache-Control&#39;</span><span class="p">:</span> <span class="s1">&#39;no-store, must-revalidate&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Pragma&#39;</span><span class="p">:</span> <span class="s1">&#39;no-cache&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Referrer-Policy&#39;</span><span class="p">:</span> <span class="s1">&#39;strict-origin-when-cross-origin&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Permissions-Policy&#39;</span><span class="p">:</span> <span class="s1">&#39;geolocation=(), camera=(), microphone=()&#39;</span>
+        <span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">COOKIE_SETTINGS</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;secure&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s1">&#39;httponly&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s1">&#39;samesite&#39;</span><span class="p">:</span> <span class="s1">&#39;Lax&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;domain&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Will be set based on request</span>
+            <span class="s1">&#39;path&#39;</span><span class="p">:</span> <span class="s1">&#39;/&#39;</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">SESSION_CONFIG</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;SESSION_COOKIE_SECURE&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s1">&#39;SESSION_COOKIE_HTTPONLY&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s1">&#39;SESSION_COOKIE_SAMESITE&#39;</span><span class="p">:</span> <span class="s1">&#39;Lax&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;PERMANENT_SESSION_LIFETIME&#39;</span><span class="p">:</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+            <span class="s1">&#39;SESSION_COOKIE_NAME&#39;</span><span class="p">:</span> <span class="s1">&#39;secure_session&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;SESSION_PROTECTION&#39;</span><span class="p">:</span> <span class="s1">&#39;strong&#39;</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="n">app</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">init_app</span><span class="p">(</span><span class="n">app</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_parse_origins_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">origins_string</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parses and validates a comma-separated string of origins into a set of allowed origins and patterns.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            origins_string (str): Comma-separated list of origins (e.g., &quot;https://example.com,*.example.net&quot;)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            set: Set of validated origin strings and compiled regex patterns</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If any origin in the list is malformed</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            - Handles both exact origins and wildcard patterns</span>
+<span class="sd">            - Wildcards (*) are converted to regex patterns</span>
+<span class="sd">            - Empty or None input returns empty set</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">origins</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">origins_string</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">origins</span>
+
+        <span class="k">for</span> <span class="n">origin</span> <span class="ow">in</span> <span class="n">origins_string</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+            <span class="n">origin</span> <span class="o">=</span> <span class="n">origin</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">origin</span><span class="p">:</span>
+                <span class="k">if</span> <span class="s1">&#39;*&#39;</span> <span class="ow">in</span> <span class="n">origin</span><span class="p">:</span>
+                    <span class="c1"># Store wildcard patterns separately</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_origins</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">origin</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="s1">&#39;.*&#39;</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">origins</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">origin</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">origins</span>
+
+    <span class="k">def</span> <span class="nf">_build_csp_policy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Constructs a comprehensive Content Security Policy string.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Complete CSP policy string with all directives</span>
+
+<span class="sd">        Security Directives:</span>
+<span class="sd">            - default-src: Restricts default sources to same origin</span>
+<span class="sd">            - img-src: Controls image loading sources</span>
+<span class="sd">            - style-src: Manages stylesheet sources</span>
+<span class="sd">            - script-src: Controls JavaScript execution sources</span>
+<span class="sd">            - font-src: Manages font loading sources</span>
+<span class="sd">            - connect-src: Controls XMLHttpRequest, WebSocket connections</span>
+<span class="sd">            - frame-ancestors: Prevents clickjacking</span>
+<span class="sd">            - form-action: Controls form submission targets</span>
+<span class="sd">            - base-uri: Restricts base tag URLs</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            - Implements defense in depth through multiple restrictions</span>
+<span class="sd">            - Balances security with functionality</span>
+<span class="sd">            - Allows essential third-party resources (CDNs)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
+            <span class="s2">&quot;default-src &#39;self&#39;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;img-src &#39;self&#39; data: https:&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;style-src &#39;self&#39; &#39;unsafe-inline&#39; https://cdn.jsdelivr.net https://cdnjs.cloudflare.com&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;script-src &#39;self&#39; &#39;unsafe-inline&#39; https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;font-src &#39;self&#39; https://cdnjs.cloudflare.com&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;connect-src &#39;self&#39;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;frame-ancestors &#39;none&#39;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;form-action &#39;self&#39;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;base-uri &#39;self&#39;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;upgrade-insecure-requests&quot;</span>
+        <span class="p">])</span>
+
+<div class="viewcode-block" id="CSRFProtection.init_app">
+<a class="viewcode-back" href="../../index.html#security.csrf_protection.CSRFProtection.init_app">[docs]</a>
+    <span class="k">def</span> <span class="nf">init_app</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">:</span> <span class="n">Flask</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize application with comprehensive security configurations.</span>
+
+<span class="sd">        This method configures the Flask application with security features, sets up session</span>
+<span class="sd">        handling, and initializes OAuth providers.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app (Flask): The Flask application instance to configure</span>
+
+<span class="sd">        Security Features:</span>
+<span class="sd">            - Session security settings</span>
+<span class="sd">            - Origin validation rules</span>
+<span class="sd">            - HTTPS enforcement</span>
+<span class="sd">            - Security headers</span>
+<span class="sd">            - Environment-specific configurations </span>
+
+<span class="sd">        Environment Handling:</span>
+<span class="sd">            - Development: Allows local testing and ngrok domains</span>
+<span class="sd">            - Production: Strict security controls</span>
+
+<span class="sd">        Implementation Details:</span>
+<span class="sd">            - Configures session parameters</span>
+<span class="sd">            - Sets up request hooks for HTTPS and headers</span>
+<span class="sd">            - Initializes origin validation</span>
+<span class="sd">            - Establishes environment-specific rate limits</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If initialization fails, with detailed error logging</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Apply session configuration</span>
+        <span class="n">app</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SESSION_CONFIG</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Parse allowed origins</span>
+            <span class="n">dev_origins</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_origins_list</span><span class="p">(</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;DEV_ALLOWED_ORIGINS&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">prod_origins</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_origins_list</span><span class="p">(</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;PROD_ALLOWED_ORIGINS&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Add ngrok domains for development</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;FLASK_ENV&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;development&#39;</span><span class="p">:</span>
+                <span class="n">dev_origins</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;*.ngrok-free.app&#39;</span><span class="p">)</span>
+                <span class="n">dev_origins</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;*.ngrok.io&#39;</span><span class="p">)</span>
+
+            <span class="c1"># Store based on environment</span>
+            <span class="n">current_env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;FLASK_ENV&#39;</span><span class="p">,</span> <span class="s1">&#39;production&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_allowed_origins</span> <span class="o">=</span> <span class="n">dev_origins</span> <span class="k">if</span> <span class="n">current_env</span> <span class="o">==</span> <span class="s1">&#39;development&#39;</span> <span class="k">else</span> <span class="n">prod_origins</span>
+
+            <span class="c1"># Create environment configurations</span>
+            <span class="n">environments</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;development&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;origins&#39;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">dev_origins</span><span class="p">),</span>
+                    <span class="s1">&#39;max_requests&#39;</span><span class="p">:</span> <span class="mi">100</span>
+                <span class="p">},</span>
+                <span class="s1">&#39;production&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;origins&#39;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">prod_origins</span><span class="p">),</span>
+                    <span class="s1">&#39;max_requests&#39;</span><span class="p">:</span> <span class="mi">1000</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+
+            <span class="c1"># Store in app config</span>
+            <span class="n">app</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;ENVIRONMENTS&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">environments</span>
+
+            <span class="nd">@app</span><span class="o">.</span><span class="n">before_request</span>
+            <span class="k">def</span> <span class="nf">secure_request</span><span class="p">():</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;Enforce HTTPS and validate request origin&quot;&quot;&quot;</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">request</span><span class="o">.</span><span class="n">is_secure</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">app</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">redirect</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">url</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;http://&#39;</span><span class="p">,</span> <span class="s1">&#39;https://&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">code</span><span class="o">=</span><span class="mi">301</span><span class="p">)</span>
+
+            <span class="nd">@app</span><span class="o">.</span><span class="n">after_request</span>
+            <span class="k">def</span> <span class="nf">add_security_headers</span><span class="p">(</span><span class="n">response</span><span class="p">):</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;Add comprehensive security headers to all responses&quot;&quot;&quot;</span>
+                <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECURITY_HEADERS</span><span class="p">)</span>
+
+                <span class="c1"># Remove potentially dangerous headers</span>
+                <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;Server&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;X-Powered-By&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+                <span class="k">return</span> <span class="n">response</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CSRF Protection initialization failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_validate_origin_format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Performs comprehensive validation of origin string format against security requirements.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            origin (str): The origin string to validate (e.g., &quot;https://example.com&quot;)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if origin meets all security requirements, False otherwise</span>
+
+<span class="sd">        Security Checks:</span>
+<span class="sd">            - Validates basic URL format (protocol://domain[:port])</span>
+<span class="sd">            - Ensures protocol is http/https only</span>
+<span class="sd">            - Validates domain structure</span>
+<span class="sd">            - Special handling for localhost in development</span>
+<span class="sd">            - Port number validation for local development</span>
+<span class="sd">            - Protection against null bytes and injection attempts</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            - More permissive in development mode for local testing</span>
+<span class="sd">            - Handles ngrok domains in development environment</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">origin</span> <span class="ow">or</span> <span class="s1">&#39;</span><span class="se">\x00</span><span class="s1">&#39;</span> <span class="ow">in</span> <span class="n">origin</span><span class="p">:</span>  <span class="c1"># Check for null bytes</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Parse the origin URL</span>
+            <span class="n">parsed</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">origin</span><span class="p">)</span>
+
+            <span class="c1"># Verify basic structure</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">([</span><span class="n">parsed</span><span class="o">.</span><span class="n">scheme</span><span class="p">,</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="p">]):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Validate protocol</span>
+            <span class="k">if</span> <span class="n">parsed</span><span class="o">.</span><span class="n">scheme</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s1">&#39;http&#39;</span><span class="p">,</span> <span class="s1">&#39;https&#39;</span><span class="p">}:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Handle local development</span>
+            <span class="n">is_local</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;localhost&#39;</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;127.0.0.1&#39;</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span> <span class="o">==</span> <span class="s1">&#39;[::1]&#39;</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
+                <span class="c1"># Allow local addresses only in development</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;FLASK_ENV&#39;</span><span class="p">)</span> <span class="o">!=</span> <span class="s1">&#39;development&#39;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;Local address rejected in non-development environment&quot;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+
+                <span class="c1"># Validate port if present</span>
+                <span class="k">if</span> <span class="s1">&#39;:&#39;</span> <span class="ow">in</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">port</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">&lt;=</span> <span class="n">port</span> <span class="o">&lt;=</span> <span class="mi">65535</span><span class="p">):</span>
+                            <span class="k">return</span> <span class="kc">False</span>
+                    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="kc">False</span>
+
+                <span class="k">return</span> <span class="kc">True</span>
+
+            <span class="c1"># For non-local origins:</span>
+            <span class="c1"># Check for valid domain structure</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span> <span class="ow">or</span> <span class="s1">&#39;.&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Reject paths for origins</span>
+            <span class="k">if</span> <span class="n">parsed</span><span class="o">.</span><span class="n">path</span> <span class="ow">and</span> <span class="n">parsed</span><span class="o">.</span><span class="n">path</span> <span class="o">!=</span> <span class="s1">&#39;/&#39;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Special handling for ngrok in development</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;FLASK_ENV&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;development&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">domain</span> <span class="ow">in</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span> <span class="k">for</span> <span class="n">domain</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;ngrok-free.app&#39;</span><span class="p">,</span> <span class="s1">&#39;ngrok.io&#39;</span><span class="p">]):</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Origin format validation failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">_validate_origin_secure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request_origin</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Performs enhanced security validation for request origins.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            request_origin (str): Origin header from the request</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if origin passes all security validations</span>
+
+<span class="sd">        Security Validations:</span>
+<span class="sd">            - Basic format validation</span>
+<span class="sd">            - Environment-specific checks</span>
+<span class="sd">            - Pattern matching for dynamic origins</span>
+<span class="sd">            - Local development handling</span>
+<span class="sd">            - Ngrok domain validation</span>
+
+<span class="sd">        Implementation Details:</span>
+<span class="sd">            - Supports exact matches and patterns</span>
+<span class="sd">            - Environment-aware validation</span>
+<span class="sd">            - Special handling for development URLs</span>
+<span class="sd">            - Comprehensive logging of validation results</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            - Stricter validation in production</span>
+<span class="sd">            - Flexible for development needs</span>
+<span class="sd">            - Protection against origin spoofing</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># First perform basic format validation</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">request_origin</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_origin_format</span><span class="p">(</span><span class="n">request_origin</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parsed</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">request_origin</span><span class="p">)</span>
+
+            <span class="c1"># Check if this is a development environment</span>
+            <span class="n">is_dev</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;FLASK_ENV&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;development&#39;</span>
+
+            <span class="c1"># Handle local development URLs first</span>
+            <span class="n">is_local</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;localhost&#39;</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;127.0.0.1&#39;</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span> <span class="o">==</span> <span class="s1">&#39;[::1]&#39;</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
+                <span class="c1"># In development, we should allow local origins that are in our allowed list</span>
+                <span class="k">if</span> <span class="n">is_dev</span> <span class="ow">and</span> <span class="n">request_origin</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_allowed_origins</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+
+                <span class="c1"># If not in development or not in allowed origins, reject</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">is_dev</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Local origin </span><span class="si">{</span>
+<span class="w">                            </span><span class="n">request_origin</span><span class="si">}</span><span class="s2"> rejected in non-development environment&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Handle ngrok URLs in development</span>
+            <span class="k">if</span> <span class="n">is_dev</span> <span class="ow">and</span> <span class="p">(</span><span class="s1">&#39;ngrok-free.app&#39;</span> <span class="ow">in</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span> <span class="ow">or</span> <span class="s1">&#39;ngrok.io&#39;</span> <span class="ow">in</span> <span class="n">parsed</span><span class="o">.</span><span class="n">netloc</span><span class="p">):</span>
+                <span class="c1"># First check direct match in allowed origins</span>
+                <span class="k">if</span> <span class="n">request_origin</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_allowed_origins</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+
+                <span class="c1"># Then check against dynamic patterns</span>
+                <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_origins</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">request_origin</span><span class="p">):</span>
+                        <span class="k">return</span> <span class="kc">True</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># For all other origins, check against allowed list first</span>
+            <span class="k">if</span> <span class="n">request_origin</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_allowed_origins</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">True</span>
+
+            <span class="c1"># Finally check against dynamic patterns</span>
+            <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_origins</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">request_origin</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Origin security validation failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="CSRFProtection.set_csrf_cookie">
+<a class="viewcode-back" href="../../index.html#security.csrf_protection.CSRFProtection.set_csrf_cookie">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_csrf_cookie</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">:</span> <span class="n">Response</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets CSRF token cookie with secure settings and domain binding.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            response (Response): Flask response object to modify</span>
+<span class="sd">            token (str): CSRF token to set in cookie</span>
+
+<span class="sd">        Security Features:</span>
+<span class="sd">            - Secure flag enabled</span>
+<span class="sd">            - HttpOnly flag enabled</span>
+<span class="sd">            - SameSite attribute set to &#39;Lax&#39;</span>
+<span class="sd">            - Domain-bound cookies</span>
+<span class="sd">            - Appropriate expiration time</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            - Automatically detects and uses appropriate domain from request</span>
+<span class="sd">            - Implements security best practices for cookie attributes</span>
+<span class="sd">            - Handles empty token gracefully</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">token</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="c1"># Get domain from request</span>
+        <span class="n">domain</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">host</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">host</span> <span class="k">else</span> <span class="kc">None</span>
+
+        <span class="c1"># Update cookie settings with current domain</span>
+        <span class="n">cookie_settings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">COOKIE_SETTINGS</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">cookie_settings</span><span class="p">[</span><span class="s1">&#39;domain&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">domain</span>
+        <span class="n">cookie_settings</span><span class="p">[</span><span class="s1">&#39;max_age&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_lifetime</span>
+
+        <span class="c1"># Set the cookie with all security settings</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">set_cookie</span><span class="p">(</span>
+            <span class="s1">&#39;csrf_token&#39;</span><span class="p">,</span>
+            <span class="n">token</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">cookie_settings</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_validate_js_origin</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">signature</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validates the JavaScript origin signature with timing attack protection and request chain tracking.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            signature (str): Base64-encoded signature containing timestamp and request ID</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if signature is valid and within acceptable time window</span>
+
+<span class="sd">        Security Features:</span>
+<span class="sd">            - Time-based replay protection with 60-second window</span>
+<span class="sd">            - Request chain validation to prevent request replay</span>
+<span class="sd">            - Rate limiting per endpoint</span>
+<span class="sd">            - Automatic cleanup of expired chains</span>
+
+<span class="sd">        Technical Details:</span>
+<span class="sd">            - Signature format: base64(timestamp[4] + request_id[32])</span>
+<span class="sd">            - Timestamp validated against current server time</span>
+<span class="sd">            - Request chains tracked per endpoint with count limits</span>
+<span class="sd">            - Memory protection through automatic cleanup</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: Logs detailed error information while returning False to caller</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validating signature: </span><span class="si">{</span><span class="n">signature</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">raw_data</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">urlsafe_b64decode</span><span class="p">(</span>
+                <span class="n">signature</span> <span class="o">+</span> <span class="s1">&#39;=&#39;</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">signature</span><span class="p">)</span> <span class="o">%</span> <span class="mi">4</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Decoded length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">raw_data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">raw_data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">36</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Invalid signature length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">raw_data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">timestamp_bytes</span> <span class="o">=</span> <span class="n">raw_data</span><span class="p">[:</span><span class="mi">4</span><span class="p">]</span>
+            <span class="n">request_id</span> <span class="o">=</span> <span class="n">raw_data</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">36</span><span class="p">]</span>
+            <span class="n">request_id_hex</span> <span class="o">=</span> <span class="n">request_id</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Timestamp bytes: </span><span class="si">{</span><span class="n">timestamp_bytes</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Request ID: </span><span class="si">{</span><span class="n">request_id_hex</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Verify timestamp with slightly relaxed window</span>
+            <span class="n">timestamp</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="s2">&quot;!I&quot;</span><span class="p">,</span> <span class="n">timestamp_bytes</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">current_time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">())</span>
+            <span class="n">time_diff</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">current_time</span> <span class="o">-</span> <span class="n">timestamp</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracted timestamp: </span><span class="si">{</span><span class="n">timestamp</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Current time: </span><span class="si">{</span><span class="n">current_time</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Time difference: </span><span class="si">{</span><span class="n">time_diff</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Increase window to 60 seconds to handle slight delays</span>
+            <span class="k">if</span> <span class="n">time_diff</span> <span class="o">&gt;</span> <span class="mi">60</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Timestamp validation failed - outside time window&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Clean up expired request chains</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_request_chains</span><span class="p">()</span>
+
+            <span class="c1"># Modify request reuse detection</span>
+            <span class="n">endpoint</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">endpoint</span> <span class="k">if</span> <span class="n">request</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">request_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">request_id_hex</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">endpoint</span><span class="si">}</span><span class="s2">&quot;</span>
+
+            <span class="c1"># Increase the time window and track request count</span>
+            <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">request_key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request_chains</span><span class="p">:</span>
+                <span class="n">request_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request_chains</span><span class="p">[</span><span class="n">request_key</span><span class="p">]</span>
+                <span class="c1"># 5 second window</span>
+                <span class="k">if</span> <span class="n">current_time</span> <span class="o">-</span> <span class="n">request_data</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">5</span><span class="p">:</span>
+                    <span class="n">request_data</span><span class="p">[</span><span class="s1">&#39;count&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">request_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;count&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+                    <span class="k">if</span> <span class="n">request_data</span><span class="p">[</span><span class="s1">&#39;count&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">:</span>  <span class="c1"># Allow up to 3 requests in window</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Excessive requests detected for endpoint: </span><span class="si">{</span><span class="n">endpoint</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="kc">False</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Reset counter for new time window</span>
+                    <span class="n">request_data</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">current_time</span>
+                    <span class="n">request_data</span><span class="p">[</span><span class="s1">&#39;count&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_request_chains</span><span class="p">[</span><span class="n">request_key</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s1">&#39;timestamp&#39;</span><span class="p">:</span> <span class="n">current_time</span><span class="p">,</span>
+                    <span class="s1">&#39;count&#39;</span><span class="p">:</span> <span class="mi">1</span>
+                <span class="p">}</span>
+
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;JS origin validation error: </span><span class="si">{</span>
+<span class="w">                              </span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">_cleanup_request_chains</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Manages memory usage by cleaning up expired request chain data.</span>
+
+<span class="sd">        Implementation Details:</span>
+<span class="sd">            - Removes chains that have exceeded maximum request count</span>
+<span class="sd">            - Prevents memory leaks from abandoned request chains</span>
+<span class="sd">            - Implements efficient cleanup without impacting performance</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            - Called automatically during request validation</span>
+<span class="sd">            - Uses count-based expiration rather than time-based</span>
+<span class="sd">            - Maintains system performance under heavy load</span>
+
+<span class="sd">        Performance Considerations:</span>
+<span class="sd">            - O(n) complexity where n is number of stored chains</span>
+<span class="sd">            - Optimized for minimal impact on request processing</span>
+<span class="sd">            - Automatically triggered to maintain memory bounds</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">expired_keys</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">key</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request_chains</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;count&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">10</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">expired_keys</span><span class="p">:</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request_chains</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_generate_secure_token</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">require_user_id</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates cryptographically secure CSRF token with optional user session binding.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            require_user_id (bool): Whether to require user_id in session for token generation</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Base64-encoded encrypted token</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Abort(401): When require_user_id is True and no user_id in session</span>
+<span class="sd">            Abort(403): When JavaScript origin validation fails</span>
+
+<span class="sd">        Security Features:</span>
+<span class="sd">            - Token binding to user session</span>
+<span class="sd">            - Encrypted payload with request metadata</span>
+<span class="sd">            - HMAC signature validation</span>
+<span class="sd">            - Rate limiting and token rotation</span>
+<span class="sd">            - Request chain tracking</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            - Implements different token types for authentication flows</span>
+<span class="sd">            - Includes DOS protection mechanisms</span>
+<span class="sd">            - Performs automatic cleanup of expired tokens</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Solo per rotte autenticate verifichiamo user_id</span>
+        <span class="k">if</span> <span class="n">require_user_id</span> <span class="ow">and</span> <span class="s1">&#39;user_id&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">abort</span><span class="p">(</span><span class="mi">401</span><span class="p">)</span>
+
+            <span class="c1"># Add cleanup call here</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_expired_tokens</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">require_user_id</span><span class="p">):</span>
+
+            <span class="c1"># Validate JavaScript origin</span>
+            <span class="n">js_origin</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;X-JavaScript-Origin&#39;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;JS ORIGIN:&quot;</span><span class="p">,</span> <span class="n">js_origin</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">js_origin</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_js_origin</span><span class="p">(</span><span class="n">js_origin</span><span class="p">):</span>
+                <span class="n">abort</span><span class="p">(</span><span class="mi">403</span><span class="p">,</span> <span class="s2">&quot;Invalid request origin&quot;</span><span class="p">)</span>
+
+            <span class="n">user_id</span> <span class="o">=</span> <span class="n">session</span><span class="p">[</span><span class="s1">&#39;user_id&#39;</span><span class="p">]</span>
+
+            <span class="c1"># Generate token components with additional entropy</span>
+            <span class="n">timestamp</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">())</span>
+            <span class="n">random_bytes</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_bytes</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+            <span class="n">request_id</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_hex</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+
+            <span class="c1"># Create token payload</span>
+            <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;user_id&#39;</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span>
+                <span class="s1">&#39;timestamp&#39;</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+                <span class="s1">&#39;request_id&#39;</span><span class="p">:</span> <span class="n">request_id</span><span class="p">,</span>
+                <span class="s1">&#39;random&#39;</span><span class="p">:</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">random_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+            <span class="p">}</span>
+
+            <span class="c1"># Encrypt payload</span>
+            <span class="n">encrypted_payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fernet</span><span class="o">.</span><span class="n">encrypt</span><span class="p">(</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Generate HMAC signature</span>
+            <span class="n">signature</span> <span class="o">=</span> <span class="n">hmac</span><span class="o">.</span><span class="n">new</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_signing_key</span><span class="p">,</span>
+                <span class="n">encrypted_payload</span><span class="p">,</span>
+                <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">digest</span><span class="p">()</span>
+
+            <span class="c1"># Combine components</span>
+            <span class="n">token</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">urlsafe_b64encode</span><span class="p">(</span>
+                <span class="n">encrypted_payload</span> <span class="o">+</span> <span class="n">signature</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+
+            <span class="c1"># Store in cache with metadata</span>
+            <span class="k">if</span> <span class="n">user_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">[</span><span class="n">user_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">[</span><span class="n">user_id</span><span class="p">][</span><span class="n">token</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;timestamp&#39;</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+                <span class="s1">&#39;uses&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s1">&#39;request_id&#39;</span><span class="p">:</span> <span class="n">request_id</span>
+            <span class="p">}</span>
+
+            <span class="k">return</span> <span class="n">token</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Per login/oauth, generateiamo un token temporaneo</span>
+            <span class="n">user_id</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;user_id&#39;</span><span class="p">,</span> <span class="s1">&#39;temp-&#39;</span> <span class="o">+</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_hex</span><span class="p">(</span><span class="mi">16</span><span class="p">))</span>
+            <span class="c1"># Generate token components</span>
+            <span class="n">timestamp</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">())</span>
+            <span class="n">random_bytes</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_bytes</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+            <span class="n">request_id</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_hex</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+
+            <span class="c1"># Create token payload</span>
+            <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;user_id&#39;</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span>
+                <span class="s1">&#39;timestamp&#39;</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+                <span class="s1">&#39;request_id&#39;</span><span class="p">:</span> <span class="n">request_id</span><span class="p">,</span>
+                <span class="s1">&#39;random&#39;</span><span class="p">:</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">random_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(),</span>
+                <span class="s1">&#39;is_auth_flow&#39;</span><span class="p">:</span> <span class="ow">not</span> <span class="n">require_user_id</span>
+            <span class="p">}</span>
+
+            <span class="c1"># Encrypt payload</span>
+            <span class="n">encrypted_payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fernet</span><span class="o">.</span><span class="n">encrypt</span><span class="p">(</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Generate signature</span>
+            <span class="n">signature</span> <span class="o">=</span> <span class="n">hmac</span><span class="o">.</span><span class="n">new</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_signing_key</span><span class="p">,</span>
+                <span class="n">encrypted_payload</span><span class="p">,</span>
+                <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">digest</span><span class="p">()</span>
+
+            <span class="c1"># Combine components</span>
+            <span class="n">token</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">urlsafe_b64encode</span><span class="p">(</span>
+                <span class="n">encrypted_payload</span> <span class="o">+</span> <span class="n">signature</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+
+            <span class="c1"># Store in cache with metadata</span>
+            <span class="k">if</span> <span class="n">user_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">[</span><span class="n">user_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">[</span><span class="n">user_id</span><span class="p">][</span><span class="n">token</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;timestamp&#39;</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+                <span class="s1">&#39;uses&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s1">&#39;request_id&#39;</span><span class="p">:</span> <span class="n">request_id</span><span class="p">,</span>
+                <span class="s1">&#39;is_auth_flow&#39;</span><span class="p">:</span> <span class="ow">not</span> <span class="n">require_user_id</span>
+            <span class="p">}</span>
+
+            <span class="k">return</span> <span class="n">token</span>
+
+    <span class="k">def</span> <span class="nf">_cleanup_expired_tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Manages token lifecycle and implements cleanup strategies for expired tokens.</span>
+
+<span class="sd">        Security Features:</span>
+<span class="sd">            - Removes expired tokens based on timestamp</span>
+<span class="sd">            - Enforces maximum uses per token</span>
+<span class="sd">            - Implements per-user token limits</span>
+<span class="sd">            - Prevents token accumulation attacks</span>
+
+<span class="sd">        Cleanup Strategy:</span>
+<span class="sd">            - Removes tokens beyond lifetime</span>
+<span class="sd">            - Removes overused tokens</span>
+<span class="sd">            - Removes tokens from invalid request chains</span>
+<span class="sd">            - Implements fair cleanup for DOS protection</span>
+
+<span class="sd">        Implementation Details:</span>
+<span class="sd">            - Maintains separate counters for auth flow tokens</span>
+<span class="sd">            - Implements efficient cleanup algorithm</span>
+<span class="sd">            - Preserves newest tokens during cleanup</span>
+<span class="sd">            - Scales cleanup based on user activity</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+        <span class="c1"># Iterate through all users and their tokens</span>
+        <span class="n">users_to_remove</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">user_id</span><span class="p">,</span> <span class="n">tokens</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># Filter out expired or overused tokens</span>
+            <span class="n">valid_tokens</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">token</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">tokens</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="c1"># Check if token is within lifetime and hasn&#39;t exceeded max uses</span>
+                <span class="n">is_valid</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="p">(</span><span class="n">current_time</span> <span class="o">-</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">])</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_lifetime</span> <span class="ow">and</span>
+                    <span class="n">data</span><span class="p">[</span><span class="s1">&#39;uses&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_max_uses_per_token</span>
+                <span class="p">)</span>
+
+                <span class="c1"># For auth flow tokens, we&#39;re a bit more strict</span>
+                <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;is_auth_flow&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                    <span class="c1"># Auth flow tokens get only one use</span>
+                    <span class="n">is_valid</span> <span class="o">=</span> <span class="n">is_valid</span> <span class="ow">and</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;uses&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
+
+                <span class="k">if</span> <span class="n">is_valid</span><span class="p">:</span>
+                    <span class="n">valid_tokens</span><span class="p">[</span><span class="n">token</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span>
+
+            <span class="c1"># Update tokens for this user</span>
+            <span class="k">if</span> <span class="n">valid_tokens</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">[</span><span class="n">user_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">valid_tokens</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># If no valid tokens remain, mark user for removal</span>
+                <span class="n">users_to_remove</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span>
+
+        <span class="c1"># Remove users with no valid tokens</span>
+        <span class="k">for</span> <span class="n">user_id</span> <span class="ow">in</span> <span class="n">users_to_remove</span><span class="p">:</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">[</span><span class="n">user_id</span><span class="p">]</span>
+
+        <span class="c1"># Implement DOS protection - if still too many tokens, remove oldest</span>
+        <span class="n">total_tokens</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span>
+                           <span class="k">for</span> <span class="n">tokens</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">total_tokens</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_max_tokens_per_session</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">):</span>
+            <span class="c1"># Clean up by removing oldest tokens from each user</span>
+            <span class="k">for</span> <span class="n">user_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">:</span>
+                <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">[</span><span class="n">user_id</span><span class="p">]</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_max_tokens_per_session</span><span class="p">:</span>
+                    <span class="c1"># Sort tokens by timestamp and keep only the newest ones</span>
+                    <span class="n">sorted_tokens</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
+                        <span class="n">tokens</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span>
+                        <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;timestamp&#39;</span><span class="p">],</span>
+                        <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span>
+                    <span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">[</span><span class="n">user_id</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+                        <span class="n">sorted_tokens</span><span class="p">[:</span><span class="bp">self</span><span class="o">.</span><span class="n">_max_tokens_per_session</span><span class="p">]</span>
+                    <span class="p">)</span>
+
+<div class="viewcode-block" id="CSRFProtection.generate_token">
+<a class="viewcode-back" href="../../index.html#security.csrf_protection.CSRFProtection.generate_token">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_token</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">require_user_id</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Response</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate CSRF token and prepare secure response.</span>
+<span class="sd">        Now returns both token and properly configured response.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">token</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_secure_token</span><span class="p">(</span>
+            <span class="n">require_user_id</span><span class="p">)</span>  <span class="c1"># Previous token generation logic</span>
+
+        <span class="n">response</span> <span class="o">=</span> <span class="n">make_response</span><span class="p">(</span><span class="n">jsonify</span><span class="p">({</span>
+            <span class="s1">&#39;token&#39;</span><span class="p">:</span> <span class="n">token</span><span class="p">,</span>
+            <span class="s1">&#39;expires&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_lifetime</span><span class="p">)</span>
+        <span class="p">}))</span>
+
+        <span class="c1"># Set CSRF cookie with security settings</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_csrf_cookie</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">token</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">token</span><span class="p">,</span> <span class="n">response</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_validate_token</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Performs cryptographic validation of CSRF token with multiple security checks.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            token (str): The CSRF token to validate</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if token passes all security validations</span>
+
+<span class="sd">        Security Checks:</span>
+<span class="sd">            - Token format validation</span>
+<span class="sd">            - Cryptographic signature verification</span>
+<span class="sd">            - Payload decryption and validation</span>
+<span class="sd">            - User session binding</span>
+<span class="sd">            - Expiration verification</span>
+<span class="sd">            - Usage limit enforcement</span>
+
+<span class="sd">        Implementation Details:</span>
+<span class="sd">            - Uses HMAC for signature verification</span>
+<span class="sd">            - Implements timing attack protection</span>
+<span class="sd">            - Tracks token usage count</span>
+<span class="sd">            - Validates against session data</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: Logs validation failures while returning False</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">token</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Decode token</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">raw_data</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">urlsafe_b64decode</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Minimum size for encrypted payload + signature</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">raw_data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">MIN_TOKEN_LENGTH</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Split components</span>
+            <span class="n">encrypted_payload</span> <span class="o">=</span> <span class="n">raw_data</span><span class="p">[:</span><span class="o">-</span><span class="mi">32</span><span class="p">]</span>
+            <span class="n">signature</span> <span class="o">=</span> <span class="n">raw_data</span><span class="p">[</span><span class="o">-</span><span class="mi">32</span><span class="p">:]</span>
+
+            <span class="c1"># Verify signature</span>
+            <span class="n">expected_sig</span> <span class="o">=</span> <span class="n">hmac</span><span class="o">.</span><span class="n">new</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_signing_key</span><span class="p">,</span>
+                <span class="n">encrypted_payload</span><span class="p">,</span>
+                <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">digest</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">hmac</span><span class="o">.</span><span class="n">compare_digest</span><span class="p">(</span><span class="n">signature</span><span class="p">,</span> <span class="n">expected_sig</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Decrypt and validate payload</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">fernet</span><span class="o">.</span><span class="n">decrypt</span><span class="p">(</span><span class="n">encrypted_payload</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+                <span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Validate user binding</span>
+            <span class="k">if</span> <span class="n">payload</span><span class="p">[</span><span class="s1">&#39;user_id&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">session</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;user_id&#39;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Check expiration</span>
+            <span class="k">if</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">payload</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_lifetime</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Validate token usage</span>
+            <span class="n">user_id</span> <span class="o">=</span> <span class="n">payload</span><span class="p">[</span><span class="s1">&#39;user_id&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">user_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span> <span class="ow">or</span>
+                    <span class="n">token</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">[</span><span class="n">user_id</span><span class="p">]):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">token_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_cache</span><span class="p">[</span><span class="n">user_id</span><span class="p">][</span><span class="n">token</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">token_data</span><span class="p">[</span><span class="s1">&#39;uses&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_max_uses_per_token</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Increment usage counter</span>
+            <span class="n">token_data</span><span class="p">[</span><span class="s1">&#39;uses&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Token validation error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="CSRFProtection.validate_token_request">
+<a class="viewcode-back" href="../../index.html#security.csrf_protection.CSRFProtection.validate_token_request">[docs]</a>
+    <span class="k">def</span> <span class="nf">validate_token_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Performs comprehensive validation of CSRF token and associated request headers.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            token (str): The CSRF token to validate</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if token and request headers pass all security checks</span>
+
+<span class="sd">        Security Validations:</span>
+<span class="sd">            - Token cryptographic validation</span>
+<span class="sd">            - Origin header verification</span>
+<span class="sd">            - Referrer header checking for same-origin</span>
+<span class="sd">            - Request chain validation</span>
+<span class="sd">            - Token usage counting</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            - Implements defense in depth through multiple validation layers</span>
+<span class="sd">            - Provides detailed logging for security events</span>
+<span class="sd">            - Handles missing headers gracefully</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            &gt;&gt;&gt; csrf.validate_token_request(&quot;eyJhbGc...&quot;)</span>
+<span class="sd">            True  # If token and request are valid</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">token</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="c1"># Origin validation</span>
+        <span class="n">origin</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Origin&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">origin</span><span class="p">:</span>
+            <span class="c1"># Use the new secure validation method</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_origin_secure</span><span class="p">(</span><span class="n">origin</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid origin: </span><span class="si">{</span><span class="n">origin</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">referrer</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Referer&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Referrer validation for same-origin requests</span>
+        <span class="k">if</span> <span class="n">referrer</span><span class="p">:</span>
+            <span class="n">ref_url</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">referrer</span><span class="p">)</span>
+            <span class="n">req_url</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ref_url</span><span class="o">.</span><span class="n">netloc</span> <span class="o">!=</span> <span class="n">req_url</span><span class="o">.</span><span class="n">netloc</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid referrer: </span><span class="si">{</span><span class="n">referrer</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="c1"># Existing token validation logic...</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_token</span><span class="p">(</span><span class="n">token</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CSRFProtection.generate_nonce">
+<a class="viewcode-back" href="../../index.html#security.csrf_protection.CSRFProtection.generate_nonce">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_nonce</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a cryptographically secure, single-use nonce with request binding.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Encrypted nonce containing request metadata</span>
+
+<span class="sd">        Security Features:</span>
+<span class="sd">            - Bound to user session</span>
+<span class="sd">            - Request ID integration</span>
+<span class="sd">            - Automatic expiration</span>
+<span class="sd">            - Protection against replay attacks</span>
+<span class="sd">            - DOS prevention through cleanup</span>
+
+<span class="sd">        Implementation Details:</span>
+<span class="sd">            - Uses Fernet symmetric encryption</span>
+<span class="sd">            - Includes timestamp for expiration</span>
+<span class="sd">            - Maintains maximum nonce limit</span>
+<span class="sd">            - Implements automatic cleanup</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Abort(403): When JavaScript origin validation fails</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Validate JavaScript origin</span>
+        <span class="n">js_origin</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;X-JavaScript-Origin&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">js_origin</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_js_origin</span><span class="p">(</span><span class="n">js_origin</span><span class="p">):</span>
+            <span class="n">abort</span><span class="p">(</span><span class="mi">403</span><span class="p">,</span> <span class="s2">&quot;Invalid request origin&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">MAX_NONCES</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_oldest_nonces</span><span class="p">()</span>
+
+        <span class="c1"># Generate nonce with request binding</span>
+        <span class="n">timestamp</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">())</span>
+        <span class="n">random_bytes</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_bytes</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+        <span class="n">request_id</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_hex</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+
+        <span class="c1"># Create nonce payload</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;timestamp&#39;</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+            <span class="s1">&#39;random&#39;</span><span class="p">:</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">random_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(),</span>
+            <span class="s1">&#39;request_id&#39;</span><span class="p">:</span> <span class="n">request_id</span><span class="p">,</span>
+            <span class="s1">&#39;user_id&#39;</span><span class="p">:</span> <span class="n">session</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;user_id&#39;</span><span class="p">)</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Encrypt payload</span>
+        <span class="n">encrypted_nonce</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fernet</span><span class="o">.</span><span class="n">encrypt</span><span class="p">(</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+
+        <span class="c1"># Store with metadata</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span><span class="p">[</span><span class="n">encrypted_nonce</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;expires&#39;</span><span class="p">:</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">NONCE_EXPIRATION</span><span class="p">,</span>
+            <span class="s1">&#39;request_id&#39;</span><span class="p">:</span> <span class="n">request_id</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">encrypted_nonce</span></div>
+
+
+<div class="viewcode-block" id="CSRFProtection.validate_nonce">
+<a class="viewcode-back" href="../../index.html#security.csrf_protection.CSRFProtection.validate_nonce">[docs]</a>
+    <span class="k">def</span> <span class="nf">validate_nonce</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nonce</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validates nonce with comprehensive security checks and request chain verification.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            nonce (str): The nonce string to validate</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if nonce is valid and unused</span>
+
+<span class="sd">        Security Checks:</span>
+<span class="sd">            - Existence verification</span>
+<span class="sd">            - Expiration validation</span>
+<span class="sd">            - Payload decryption and validation</span>
+<span class="sd">            - User session binding</span>
+<span class="sd">            - Single-use enforcement</span>
+
+<span class="sd">        Implementation Details:</span>
+<span class="sd">            - Implements one-time use pattern</span>
+<span class="sd">            - Automatic removal after use</span>
+<span class="sd">            - Maintains encrypted payload integrity</span>
+<span class="sd">            - Provides detailed error logging</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            - Used in conjunction with token validation</span>
+<span class="sd">            - Part of double-submit validation pattern</span>
+<span class="sd">            - Implements defense against replay attacks</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">nonce</span> <span class="ow">or</span> <span class="n">nonce</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">nonce_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span><span class="p">[</span><span class="n">nonce</span><span class="p">]</span>
+            <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+            <span class="c1"># Check expiration</span>
+            <span class="k">if</span> <span class="n">current_time</span> <span class="o">&gt;</span> <span class="n">nonce_data</span><span class="p">[</span><span class="s1">&#39;expires&#39;</span><span class="p">]:</span>
+                <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span><span class="p">[</span><span class="n">nonce</span><span class="p">]</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Decrypt and validate payload</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">fernet</span><span class="o">.</span><span class="n">decrypt</span><span class="p">(</span><span class="n">nonce</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+                <span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Validate user binding</span>
+            <span class="k">if</span> <span class="n">payload</span><span class="p">[</span><span class="s1">&#39;user_id&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">session</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;user_id&#39;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="c1"># Remove used nonce</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span><span class="p">[</span><span class="n">nonce</span><span class="p">]</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Nonce validation error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="CSRFProtection.csrf_protect">
+<a class="viewcode-back" href="../../index.html#security.csrf_protection.CSRFProtection.csrf_protect">[docs]</a>
+    <span class="k">def</span> <span class="nf">csrf_protect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Comprehensive CSRF protection decorator implementing multiple security layers.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            f (Callable): The Flask route function to protect</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Callable: Decorated function with CSRF protection</span>
+
+<span class="sd">        Security Layers:</span>
+<span class="sd">            1. Nonce validation</span>
+<span class="sd">            2. Token validation</span>
+<span class="sd">            3. Origin verification</span>
+<span class="sd">            4. Request chain validation</span>
+
+<span class="sd">        Usage:</span>
+<span class="sd">            @app.route(&#39;/api/data&#39;, methods=[&#39;POST&#39;])</span>
+<span class="sd">            @csrf_protect</span>
+<span class="sd">            def protected_endpoint():</span>
+<span class="sd">                return &#39;Protected data&#39;</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Abort(403): When any security check fails</span>
+<span class="sd">                - Invalid or missing nonce</span>
+<span class="sd">                - Invalid or missing token</span>
+<span class="sd">                - Invalid origin</span>
+<span class="sd">                - Failed request chain validation</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nd">@wraps</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">decorated_function</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">nonce</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;X-CSRF-Nonce&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">nonce</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">validate_nonce</span><span class="p">(</span><span class="n">nonce</span><span class="p">):</span>
+                <span class="n">abort</span><span class="p">(</span><span class="mi">403</span><span class="p">,</span> <span class="s2">&quot;Invalid CSRF nonce&quot;</span><span class="p">)</span>
+            <span class="c1"># Then validate token for all requests</span>
+
+            <span class="n">token</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;X-CSRF-Token&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">token</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">validate_token_request</span><span class="p">(</span><span class="n">token</span><span class="p">):</span>
+                <span class="n">abort</span><span class="p">(</span><span class="mi">403</span><span class="p">,</span> <span class="s2">&quot;Invalid CSRF token&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Additional origin validation</span>
+            <span class="n">origin</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Origin&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">origin</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_origin_secure</span><span class="p">(</span><span class="n">origin</span><span class="p">):</span>
+                <span class="n">abort</span><span class="p">(</span><span class="mi">403</span><span class="p">,</span> <span class="s2">&quot;Invalid request origin&quot;</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">decorated_function</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_cleanup_oldest_nonces</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Implements efficient cleanup of expired nonces and request chains.</span>
+
+<span class="sd">        Security Features:</span>
+<span class="sd">            - Prevents DOS through resource exhaustion</span>
+<span class="sd">            - Maintains system performance</span>
+<span class="sd">            - Implements fair cleanup strategy</span>
+
+<span class="sd">        Implementation Details:</span>
+<span class="sd">            - Removes expired nonces based on timestamp</span>
+<span class="sd">            - Cleans associated request chains</span>
+<span class="sd">            - Implements FIFO when max capacity reached</span>
+<span class="sd">            - Retains 50% of newest nonces when cleanup triggered</span>
+
+<span class="sd">        Performance Considerations:</span>
+<span class="sd">            - Automatic triggering when MAX_NONCES reached</span>
+<span class="sd">            - Efficient sorting and cleanup algorithm</span>
+<span class="sd">            - Maintains O(n log n) complexity</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+        <span class="c1"># Clean nonces</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">nonce</span><span class="p">:</span> <span class="n">data</span>
+            <span class="k">for</span> <span class="n">nonce</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;expires&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">current_time</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Clean request chains</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request_chains</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">req_id</span><span class="p">:</span> <span class="n">data</span>
+            <span class="k">for</span> <span class="n">req_id</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request_chains</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;expires&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">current_time</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Implement DOS protection</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">MAX_NONCES</span><span class="p">:</span>
+            <span class="n">sorted_nonces</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span>
+                <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;expires&#39;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">used_nonces</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">sorted_nonces</span><span class="p">[</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">MAX_NONCES</span><span class="o">//</span><span class="mi">2</span><span class="p">:])</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

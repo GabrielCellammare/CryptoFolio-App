@@ -1,0 +1,587 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>security.cryptography.cryptography_utils &mdash; CryptoFolio  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            CryptoFolio
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CryptoFolio</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">security.cryptography.cryptography_utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for security.cryptography.cryptography_utils</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Secure Cryptographic Operations Framework</span>
+<span class="sd">Version: 1.0</span>
+<span class="sd">Author: Gabriel Cellammare</span>
+<span class="sd">Last Modified: 05/01/2025</span>
+<span class="sd">This module implements a comprehensive cryptographic system with a strong focus on</span>
+<span class="sd">secure memory management, user identity protection, and robust encryption operations.</span>
+<span class="sd">It provides a defense-in-depth approach to protecting sensitive data through multiple</span>
+<span class="sd">layers of security controls and careful memory handling.</span>
+<span class="sd">Core Security Features:</span>
+
+<span class="sd">Memory Protection</span>
+
+<span class="sd">Secure byte array implementation for sensitive data</span>
+<span class="sd">Automatic memory zeroing after operations</span>
+<span class="sd">Protected key material handling</span>
+<span class="sd">Managed cleanup of cryptographic artifacts</span>
+
+
+<span class="sd">Encryption Operations</span>
+
+<span class="sd">AES-256-CBC encryption with PKCS7 padding</span>
+<span class="sd">Secure initialization vector management</span>
+<span class="sd">Salt generation and validation</span>
+<span class="sd">Protected cipher operations</span>
+
+
+<span class="sd">Key Management</span>
+
+<span class="sd">Secure key derivation using PBKDF2-HMAC-SHA3-256</span>
+<span class="sd">User-specific key isolation</span>
+<span class="sd">Master key protection</span>
+<span class="sd">Salt management for key derivation</span>
+
+
+<span class="sd">Identity Protection</span>
+
+<span class="sd">Secure user ID hashing with HMAC-SHA256</span>
+<span class="sd">Protected hash verification</span>
+<span class="sd">Timing attack prevention</span>
+<span class="sd">Base64 URL-safe encoding</span>
+
+
+
+<span class="sd">Security Considerations:</span>
+
+<span class="sd">All cryptographic operations use constant-time comparisons</span>
+<span class="sd">Memory containing sensitive data is securely erased</span>
+<span class="sd">Side-channel attack protections are implemented</span>
+<span class="sd">Cryptographic error states are safely handled</span>
+<span class="sd">Key material is protected throughout its lifecycle</span>
+<span class="sd">User identities are consistently hashed</span>
+<span class="sd">Encryption operations are isolated per user</span>
+
+<span class="sd">Dependencies:</span>
+
+<span class="sd">-cryptography: Core cryptographic operations</span>
+<span class="sd">-secure_byte_array: Protected memory management</span>
+<span class="sd">-hashlib: Hashing operations</span>
+<span class="sd">-base64: Secure encoding</span>
+<span class="sd">-typing: Type safety</span>
+<span class="sd">-logging: Security event tracking</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives.ciphers</span> <span class="kn">import</span> <span class="n">Cipher</span><span class="p">,</span> <span class="n">algorithms</span><span class="p">,</span> <span class="n">modes</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives</span> <span class="kn">import</span> <span class="n">padding</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.backends</span> <span class="kn">import</span> <span class="n">default_backend</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives</span> <span class="kn">import</span> <span class="n">hashes</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives.kdf.pbkdf2</span> <span class="kn">import</span> <span class="n">PBKDF2HMAC</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">hmac</span>
+<span class="kn">import</span> <span class="nn">hashlib</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">security.secure_bye_array</span> <span class="kn">import</span> <span class="n">SecureByteArray</span>
+
+
+<div class="viewcode-block" id="CryptographicError">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.cryptography_utils.CryptographicError">[docs]</a>
+<span class="k">class</span> <span class="nc">CryptographicError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom exception for cryptographic errors.&quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="AESCipher">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.cryptography_utils.AESCipher">[docs]</a>
+<span class="k">class</span> <span class="nc">AESCipher</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Secure implementation of AES encryption with protected memory management and user ID hashing.</span>
+
+<span class="sd">    This class provides:</span>
+<span class="sd">    - AES-256-CBC encryption with secure key derivation</span>
+<span class="sd">    - Secure memory management using SecureByteArray</span>
+<span class="sd">    - Protection against timing and side-channel attacks</span>
+<span class="sd">    - Automatic PKCS7 padding management</span>
+<span class="sd">    - Secure user ID hashing with HMAC-SHA256 and base64 encoding</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        BLOCK_SIZE (int): AES block size in bytes</span>
+<span class="sd">        KEY_LENGTH (int): Key length in bytes</span>
+<span class="sd">        IV_LENGTH (int): Initialization vector length</span>
+<span class="sd">        SALT_LENGTH (int): Salt length for key derivation</span>
+<span class="sd">        KDF_ITERATIONS (int): Number of iterations for key derivation</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Security constants</span>
+    <span class="n">BLOCK_SIZE</span> <span class="o">=</span> <span class="mi">32</span>
+    <span class="n">KEY_LENGTH</span> <span class="o">=</span> <span class="mi">32</span>  <span class="c1"># AES-256</span>
+    <span class="n">IV_LENGTH</span> <span class="o">=</span> <span class="mi">16</span>
+    <span class="n">SALT_LENGTH</span> <span class="o">=</span> <span class="mi">32</span>
+    <span class="n">KDF_ITERATIONS</span> <span class="o">=</span> <span class="mi">300000</span>  <span class="c1"># Increased for greater security</span>
+
+<div class="viewcode-block" id="AESCipher.__init__">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.cryptography_utils.AESCipher.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">master_key</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the AES cipher with a master key and optional app secret for user ID hashing.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            master_key: Master key as string, bytes, or SecureByteArray</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            CryptographicError: If the master key is invalid</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Logging configuration</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Conversion and validation of the master key</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">master_key</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">master_key</span> <span class="o">=</span> <span class="n">master_key</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">master_key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_secure_bytes</span><span class="p">(</span><span class="n">master_key</span><span class="p">)</span>
+
+            <span class="c1"># Verify the minimum key length</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">master_key</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">())</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">KEY_LENGTH</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">CryptographicError</span><span class="p">(</span><span class="s2">&quot;The master key is too short&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Initialize app secret for user ID hashing</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">app_secret</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s1">&#39;HASH_SECRET_KEY&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">app_secret</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_secure_bytes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">app_secret</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error initializing the cipher: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">CryptographicError</span><span class="p">(</span><span class="s2">&quot;Unable to initialize the cipher&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span></div>
+
+
+<div class="viewcode-block" id="AESCipher.hash_user_id">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.cryptography_utils.AESCipher.hash_user_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">hash_user_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">provider</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">original_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates a secure and consistent hash of the user ID using HMAC-SHA256,</span>
+<span class="sd">        encoded in URL-safe base64 format.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            provider: OAuth provider identifier (e.g., &#39;google&#39;, &#39;github&#39;)</span>
+<span class="sd">            original_id: Original user ID from the provider</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Base64 encoded hash, URL-safe without padding</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If provider or original_id is empty</span>
+<span class="sd">            CryptographicError: If hashing fails</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">provider</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">original_id</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Provider and user ID are required&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Combine provider and ID in a consistent format</span>
+            <span class="n">combined</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">provider</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">original_id</span><span class="si">}</span><span class="s2">&quot;</span>
+
+            <span class="c1"># Use HMAC-SHA256 to generate a secure hash</span>
+            <span class="n">hmac_obj</span> <span class="o">=</span> <span class="n">hmac</span><span class="o">.</span><span class="n">new</span><span class="p">(</span>
+                <span class="n">key</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">app_secret</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(),</span>
+                <span class="n">msg</span><span class="o">=</span><span class="n">combined</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span>
+                <span class="n">digestmod</span><span class="o">=</span><span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Convert to URL-safe base64 without padding</span>
+            <span class="n">hash_bytes</span> <span class="o">=</span> <span class="n">hmac_obj</span><span class="o">.</span><span class="n">digest</span><span class="p">()</span>  <span class="c1"># Get raw bytes instead of hexadecimal</span>
+            <span class="k">return</span> <span class="n">base64</span><span class="o">.</span><span class="n">urlsafe_b64encode</span><span class="p">(</span><span class="n">hash_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;=&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error hashing user ID: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">CryptographicError</span><span class="p">(</span><span class="s2">&quot;Unable to hash user ID&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span></div>
+
+
+<div class="viewcode-block" id="AESCipher.verify_user_id_hash">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.cryptography_utils.AESCipher.verify_user_id_hash">[docs]</a>
+    <span class="k">def</span> <span class="nf">verify_user_id_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">provider</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">original_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">hashed_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Verifies if a base64 encoded hash matches a given user ID using constant-time comparison.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            provider: OAuth provider identifier</span>
+<span class="sd">            original_id: Original user ID</span>
+<span class="sd">            hashed_id: Base64 encoded hash to verify</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if the hash matches, False otherwise</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            CryptographicError: If verification fails</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Add padding back if necessary</span>
+            <span class="n">padding_length</span> <span class="o">=</span> <span class="p">(</span><span class="mi">4</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">hashed_id</span><span class="p">)</span> <span class="o">%</span> <span class="mi">4</span><span class="p">)</span> <span class="o">%</span> <span class="mi">4</span>
+            <span class="n">padded_hash</span> <span class="o">=</span> <span class="n">hashed_id</span> <span class="o">+</span> <span class="s1">&#39;=&#39;</span> <span class="o">*</span> <span class="n">padding_length</span>
+
+            <span class="c1"># Convert base64 hash back to bytes for comparison</span>
+            <span class="n">hash_bytes</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">urlsafe_b64decode</span><span class="p">(</span><span class="n">padded_hash</span><span class="p">)</span>
+
+            <span class="c1"># Generate expected hash and compare in constant time</span>
+            <span class="n">expected_hash</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hash_user_id</span><span class="p">(</span><span class="n">provider</span><span class="p">,</span> <span class="n">original_id</span><span class="p">)</span>
+            <span class="n">expected_padded</span> <span class="o">=</span> <span class="n">expected_hash</span> <span class="o">+</span> <span class="s1">&#39;=&#39;</span> <span class="o">*</span> <span class="n">padding_length</span>
+            <span class="n">expected_bytes</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">urlsafe_b64decode</span><span class="p">(</span><span class="n">expected_padded</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">hmac</span><span class="o">.</span><span class="n">compare_digest</span><span class="p">(</span><span class="n">hash_bytes</span><span class="p">,</span> <span class="n">expected_bytes</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error verifying user ID hash: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">CryptographicError</span><span class="p">(</span><span class="s2">&quot;Unable to verify user ID hash&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_convert_to_secure_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">SecureByteArray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Safely converts various input types to SecureByteArray.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data: Input data to convert</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            SecureByteArray: Secure byte representation of input</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">data</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">SecureByteArray</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">SecureByteArray</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported data type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error converting data: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">CryptographicError</span><span class="p">(</span><span class="s2">&quot;Data conversion failed&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+
+    <span class="k">def</span> <span class="nf">_ensure_secure_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">SecureByteArray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Converts data to SecureByteArray securely.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data: Data to convert</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            SecureByteArray: Converted data</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the data type is not supported</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">data</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">str</span><span class="p">)):</span>
+                <span class="k">return</span> <span class="n">SecureByteArray</span><span class="p">(</span><span class="n">data</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span> <span class="k">else</span> <span class="n">data</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported data type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error converting data: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span>
+
+<div class="viewcode-block" id="AESCipher.generate_salt">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.cryptography_utils.AESCipher.generate_salt">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_salt</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SecureByteArray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates a cryptographically secure salt.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            SecureByteArray: Generated salt</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">SecureByteArray</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">urandom</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SALT_LENGTH</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error generating salt: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">CryptographicError</span><span class="p">(</span><span class="s2">&quot;Unable to generate salt&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span></div>
+
+
+<div class="viewcode-block" id="AESCipher.derive_key">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.cryptography_utils.AESCipher.derive_key">[docs]</a>
+    <span class="k">def</span> <span class="nf">derive_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">salt</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">SecureByteArray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Derives a user-specific key using PBKDF2-HMAC-SHA3-256.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            user_id: User identifier</span>
+<span class="sd">            salt: Salt for key derivation</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            SecureByteArray: Derived key</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            CryptographicError: If key derivation fails</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">key_material</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">secure_salt</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">derived_key</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Secure conversion of salt</span>
+            <span class="n">secure_salt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_secure_bytes</span><span class="p">(</span><span class="n">salt</span><span class="p">)</span>
+
+            <span class="c1"># KDF configuration</span>
+            <span class="n">kdf</span> <span class="o">=</span> <span class="n">PBKDF2HMAC</span><span class="p">(</span>
+                <span class="n">algorithm</span><span class="o">=</span><span class="n">hashes</span><span class="o">.</span><span class="n">SHA3_256</span><span class="p">(),</span>
+                <span class="n">length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">KEY_LENGTH</span><span class="p">,</span>
+                <span class="n">salt</span><span class="o">=</span><span class="n">secure_salt</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(),</span>
+                <span class="n">iterations</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">KDF_ITERATIONS</span><span class="p">,</span>
+                <span class="n">backend</span><span class="o">=</span><span class="n">default_backend</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Secure combination of user_id and master_key</span>
+            <span class="n">key_material</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span>
+                <span class="n">user_id</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">master_key</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Key derivation</span>
+            <span class="n">derived_key</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span><span class="n">kdf</span><span class="o">.</span><span class="n">derive</span><span class="p">(</span><span class="n">key_material</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()))</span>
+
+            <span class="k">return</span> <span class="n">derived_key</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error deriving key: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">CryptographicError</span><span class="p">(</span><span class="s2">&quot;Unable to derive key&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="c1"># Secure memory cleanup</span>
+            <span class="k">for</span> <span class="n">secure_data</span> <span class="ow">in</span> <span class="p">[</span><span class="n">key_material</span><span class="p">,</span> <span class="n">secure_salt</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">secure_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">secure_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">salt</span><span class="p">:</span>
+                    <span class="n">secure_data</span><span class="o">.</span><span class="n">secure_zero</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="AESCipher.encrypt">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.cryptography_utils.AESCipher.encrypt">[docs]</a>
+    <span class="k">def</span> <span class="nf">encrypt</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">salt</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Encrypts data using AES-256-CBC with secure memory management.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data: Data to encrypt (can be any JSON serializable type)</span>
+<span class="sd">            user_id: User identifier</span>
+<span class="sd">            salt: Salt for key derivation</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bytes: Encrypted data encoded in base64</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            CryptographicError: If encryption fails</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">iv</span> <span class="o">=</span> <span class="n">padded_data</span> <span class="o">=</span> <span class="n">ciphertext</span> <span class="o">=</span> <span class="n">result</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Data preparation - Convert SecureByteArray to bytes before JSON serialization</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">):</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+
+            <span class="c1"># IV generation and key derivation</span>
+            <span class="n">iv</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">urandom</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">IV_LENGTH</span><span class="p">))</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">derive_key</span><span class="p">(</span><span class="n">user_id</span><span class="p">,</span> <span class="n">salt</span><span class="p">)</span>
+
+            <span class="c1"># Cipher creation</span>
+            <span class="n">cipher</span> <span class="o">=</span> <span class="n">Cipher</span><span class="p">(</span>
+                <span class="n">algorithms</span><span class="o">.</span><span class="n">AES</span><span class="p">(</span><span class="n">key</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()),</span>
+                <span class="n">modes</span><span class="o">.</span><span class="n">CBC</span><span class="p">(</span><span class="n">iv</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()),</span>
+                <span class="n">backend</span><span class="o">=</span><span class="n">default_backend</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Data padding</span>
+            <span class="n">padder</span> <span class="o">=</span> <span class="n">padding</span><span class="o">.</span><span class="n">PKCS7</span><span class="p">(</span><span class="n">algorithms</span><span class="o">.</span><span class="n">AES</span><span class="o">.</span><span class="n">block_size</span><span class="p">)</span><span class="o">.</span><span class="n">padder</span><span class="p">()</span>
+            <span class="n">padded_data</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span>
+                <span class="n">padder</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">+</span> <span class="n">padder</span><span class="o">.</span><span class="n">finalize</span><span class="p">())</span>
+
+            <span class="c1"># Encryption</span>
+            <span class="n">encryptor</span> <span class="o">=</span> <span class="n">cipher</span><span class="o">.</span><span class="n">encryptor</span><span class="p">()</span>
+            <span class="n">ciphertext</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span>
+                <span class="n">encryptor</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">padded_data</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">())</span> <span class="o">+</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Combine IV and ciphertext</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span><span class="n">iv</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()</span> <span class="o">+</span> <span class="n">ciphertext</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">())</span>
+
+            <span class="k">return</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">())</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error during encryption: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">CryptographicError</span><span class="p">(</span><span class="s2">&quot;Unable to encrypt data&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="c1"># Secure memory cleanup</span>
+            <span class="k">for</span> <span class="n">secure_data</span> <span class="ow">in</span> <span class="p">[</span><span class="n">key</span><span class="p">,</span> <span class="n">iv</span><span class="p">,</span> <span class="n">padded_data</span><span class="p">,</span> <span class="n">ciphertext</span><span class="p">,</span> <span class="n">result</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">secure_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">secure_data</span><span class="o">.</span><span class="n">secure_zero</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="AESCipher.decrypt">
+<a class="viewcode-back" href="../../../index.html#security.cryptography.cryptography_utils.AESCipher.decrypt">[docs]</a>
+    <span class="k">def</span> <span class="nf">decrypt</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encrypted_data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">],</span> <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                <span class="n">salt</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Decrypts data with secure memory management.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            encrypted_data: Encrypted data (can be string, bytes, or SecureByteArray)</span>
+<span class="sd">            user_id: User identifier</span>
+<span class="sd">            salt: Salt used for encryption</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Any: Decrypted data (JSON object or string)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">encrypted</span> <span class="o">=</span> <span class="n">iv</span> <span class="o">=</span> <span class="n">ciphertext</span> <span class="o">=</span> <span class="n">padded_data</span> <span class="o">=</span> <span class="n">decrypted_data</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Convert input to SecureByteArray if needed</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">encrypted_data</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">encrypted_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                    <span class="n">encrypted_data</span> <span class="o">=</span> <span class="n">encrypted_data</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+                <span class="n">encrypted_data</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span>
+                    <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">encrypted_data</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">encrypted_data</span><span class="p">,</span> <span class="n">SecureByteArray</span><span class="p">):</span>
+                <span class="c1"># If it&#39;s already a SecureByteArray, decode its contents</span>
+                <span class="n">encrypted_data</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span>
+                    <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">encrypted_data</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">())</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Process IV and ciphertext</span>
+            <span class="n">encrypted</span> <span class="o">=</span> <span class="n">encrypted_data</span>
+            <span class="n">iv</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span><span class="n">encrypted</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()[:</span><span class="bp">self</span><span class="o">.</span><span class="n">IV_LENGTH</span><span class="p">])</span>
+            <span class="n">ciphertext</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span><span class="n">encrypted</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()[</span><span class="bp">self</span><span class="o">.</span><span class="n">IV_LENGTH</span><span class="p">:])</span>
+
+            <span class="c1"># Key derivation</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">derive_key</span><span class="p">(</span><span class="n">user_id</span><span class="p">,</span> <span class="n">salt</span><span class="p">)</span>
+
+            <span class="c1"># Create and initialize cipher</span>
+            <span class="n">cipher</span> <span class="o">=</span> <span class="n">Cipher</span><span class="p">(</span>
+                <span class="n">algorithms</span><span class="o">.</span><span class="n">AES</span><span class="p">(</span><span class="n">key</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()),</span>
+                <span class="n">modes</span><span class="o">.</span><span class="n">CBC</span><span class="p">(</span><span class="n">iv</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()),</span>
+                <span class="n">backend</span><span class="o">=</span><span class="n">default_backend</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Decrypt data</span>
+            <span class="n">decryptor</span> <span class="o">=</span> <span class="n">cipher</span><span class="o">.</span><span class="n">decryptor</span><span class="p">()</span>
+            <span class="n">padded_data</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span>
+                <span class="n">decryptor</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">ciphertext</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">())</span> <span class="o">+</span> <span class="n">decryptor</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Remove padding</span>
+            <span class="n">unpadder</span> <span class="o">=</span> <span class="n">padding</span><span class="o">.</span><span class="n">PKCS7</span><span class="p">(</span><span class="n">algorithms</span><span class="o">.</span><span class="n">AES</span><span class="o">.</span><span class="n">block_size</span><span class="p">)</span><span class="o">.</span><span class="n">unpadder</span><span class="p">()</span>
+            <span class="n">decrypted_data</span> <span class="o">=</span> <span class="n">SecureByteArray</span><span class="p">(</span>
+                <span class="n">unpadder</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">padded_data</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">())</span> <span class="o">+</span> <span class="n">unpadder</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Try JSON decoding first</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">decrypted_data</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">())</span>
+            <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">decrypted_data</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error during decryption: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">CryptographicError</span><span class="p">(</span><span class="s2">&quot;Unable to decrypt data&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="c1"># Secure cleanup of all temporary secure arrays</span>
+            <span class="k">for</span> <span class="n">secure_array</span> <span class="ow">in</span> <span class="p">[</span><span class="n">key</span><span class="p">,</span> <span class="n">encrypted</span><span class="p">,</span> <span class="n">iv</span><span class="p">,</span> <span class="n">ciphertext</span><span class="p">,</span>
+                                 <span class="n">padded_data</span><span class="p">,</span> <span class="n">decrypted_data</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">secure_array</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">secure_array</span><span class="o">.</span><span class="n">secure_zero</span><span class="p">()</span>
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">cleanup_error</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Error during cleanup: </span><span class="si">{</span><span class="n">cleanup_error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

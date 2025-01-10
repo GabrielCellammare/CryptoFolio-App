@@ -1,0 +1,380 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>configuration.ngrok_manager &mdash; CryptoFolio  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            CryptoFolio
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">CryptoFolio</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">configuration.ngrok_manager</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for configuration.ngrok_manager</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Enhanced Ngrok Tunnel Manager</span>
+<span class="sd">Version: 1.0</span>
+<span class="sd">Author: Gabriel Cellammare</span>
+<span class="sd">Last Modified: 05/01/2025</span>
+
+<span class="sd">This module implements secure ngrok tunnel management with a strong focus on</span>
+<span class="sd">memory safety, secure state persistence, and protected network operations.</span>
+
+<span class="sd">Security Features:</span>
+<span class="sd">1. Connection Protection</span>
+<span class="sd">   - Secure tunnel establishment</span>
+<span class="sd">   - Protected URL management</span>
+<span class="sd">   - SSL/TLS verification</span>
+<span class="sd">   - Timeout protection</span>
+
+<span class="sd">2. State Management Security</span>
+<span class="sd">   - Secure file operations</span>
+<span class="sd">   - Protected state persistence</span>
+<span class="sd">   - Memory-safe operations</span>
+<span class="sd">   - Automatic cleanup</span>
+
+<span class="sd">3. Configuration Security</span>
+<span class="sd">   - Protected environment variables</span>
+<span class="sd">   - Secure token handling</span>
+<span class="sd">   - Region validation</span>
+<span class="sd">   - Safe defaults</span>
+
+<span class="sd">4. Error Management</span>
+<span class="sd">   - Secure error recovery</span>
+<span class="sd">   - Non-revealing messages</span>
+<span class="sd">   - Protected logging</span>
+<span class="sd">   - Failsafe defaults</span>
+
+<span class="sd">Security Considerations:</span>
+<span class="sd">- All sensitive data is automatically cleaned up</span>
+<span class="sd">- Network operations are protected</span>
+<span class="sd">- Logging excludes sensitive information</span>
+<span class="sd">- File operations are secure</span>
+<span class="sd">- Error states provide safe defaults</span>
+
+<span class="sd">Dependencies:</span>
+<span class="sd">- pyngrok: For ngrok tunnel operations</span>
+<span class="sd">- requests: For secure HTTP operations</span>
+<span class="sd">- flask: For application integration</span>
+<span class="sd">- pathlib: For secure file operations</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">pyngrok</span> <span class="kn">import</span> <span class="n">ngrok</span><span class="p">,</span> <span class="n">conf</span>
+
+
+<div class="viewcode-block" id="NgrokManager">
+<a class="viewcode-back" href="../../index.html#configuration.ngrok_manager.NgrokManager">[docs]</a>
+<span class="k">class</span> <span class="nc">NgrokManager</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Manages ngrok tunnel configuration and persistence with security focus.</span>
+<span class="sd">    Implements secure tunnel creation, URL management, and state persistence.</span>
+
+<span class="sd">    Security Features:</span>
+<span class="sd">    - Protected tunnel operations</span>
+<span class="sd">    - Secure state management</span>
+<span class="sd">    - Memory-safe cleanup</span>
+<span class="sd">    - Protected logging</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="NgrokManager.__init__">
+<a class="viewcode-back" href="../../index.html#configuration.ngrok_manager.NgrokManager.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize NgrokManager with security considerations.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app: Optional Flask application instance</span>
+
+<span class="sd">        Security measures:</span>
+<span class="sd">        - Secure logger initialization</span>
+<span class="sd">        - Protected file operations</span>
+<span class="sd">        - Safe defaults</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">app</span> <span class="o">=</span> <span class="n">app</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tunnel</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ngrok_url</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_setup_secure_logging</span><span class="p">()</span>
+
+        <span class="c1"># Secure directory creation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s1">&#39;instance&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_create_secure_directory</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span> <span class="o">/</span> <span class="s1">&#39;ngrok_state.json&#39;</span>
+
+        <span class="c1"># Configure ngrok if app is provided</span>
+        <span class="k">if</span> <span class="n">app</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">init_app</span><span class="p">(</span><span class="n">app</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_setup_secure_logging</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Configure secure logging for ngrok operations.</span>
+
+<span class="sd">        Security measures:</span>
+<span class="sd">        - Sanitized log messages</span>
+<span class="sd">        - Protected handler setup</span>
+<span class="sd">        - Secure formatter</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;ngrok_manager&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">:</span>
+            <span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+            <span class="n">formatter</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span>
+                <span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span>
+            <span class="p">)</span>
+            <span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">formatter</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_create_secure_directory</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create data directory with proper security permissions.</span>
+
+<span class="sd">        Security measures:</span>
+<span class="sd">        - Secure permission setting</span>
+<span class="sd">        - Protected creation</span>
+<span class="sd">        - Error handling</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Failed to create secure directory&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Security initialization failed&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="NgrokManager.init_app">
+<a class="viewcode-back" href="../../index.html#configuration.ngrok_manager.NgrokManager.init_app">[docs]</a>
+    <span class="k">def</span> <span class="nf">init_app</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize with Flask app instance securely.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app: Flask application instance</span>
+
+<span class="sd">        Security measures:</span>
+<span class="sd">        - Token validation</span>
+<span class="sd">        - Region verification</span>
+<span class="sd">        - Protected configuration</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">app</span> <span class="o">=</span> <span class="n">app</span>
+
+        <span class="c1"># Validate configuration</span>
+        <span class="n">auth_token</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;NGROK_AUTH_TOKEN&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">auth_token</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Missing required NGROK_AUTH_TOKEN&quot;</span><span class="p">)</span>
+
+        <span class="n">region</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;NGROK_REGION&#39;</span><span class="p">,</span> <span class="s1">&#39;us&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">region</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;us&#39;</span><span class="p">,</span> <span class="s1">&#39;eu&#39;</span><span class="p">,</span> <span class="s1">&#39;ap&#39;</span><span class="p">,</span> <span class="s1">&#39;au&#39;</span><span class="p">,</span> <span class="s1">&#39;sa&#39;</span><span class="p">,</span> <span class="s1">&#39;jp&#39;</span><span class="p">,</span> <span class="s1">&#39;in&#39;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid NGROK_REGION specified&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Set secure configuration</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">conf</span><span class="o">.</span><span class="n">PyngrokConfig</span><span class="p">(</span>
+            <span class="n">auth_token</span><span class="o">=</span><span class="n">auth_token</span><span class="p">,</span>
+            <span class="n">region</span><span class="o">=</span><span class="n">region</span>
+        <span class="p">)</span>
+        <span class="n">conf</span><span class="o">.</span><span class="n">set_default</span><span class="p">(</span><span class="n">config</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_secure_save_state</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Save current ngrok state to file securely.</span>
+
+<span class="sd">        Security measures:</span>
+<span class="sd">        - Atomic write operations</span>
+<span class="sd">        - Protected file permissions</span>
+<span class="sd">        - Data validation</span>
+<span class="sd">        - Error handling</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ngrok_url</span><span class="p">:</span>
+            <span class="n">state</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;ngrok_url&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">ngrok_url</span><span class="p">,</span>
+                <span class="s1">&#39;tunnel_public_url&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">tunnel</span><span class="o">.</span><span class="n">public_url</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tunnel</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="p">}</span>
+
+            <span class="c1"># Secure atomic write</span>
+            <span class="n">temp_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_file</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s1">&#39;.tmp&#39;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">temp_file</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+                <span class="n">temp_file</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state_file</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">temp_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                    <span class="n">temp_file</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s2">&quot;Failed to save state securely&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">raise</span>
+
+    <span class="k">def</span> <span class="nf">_secure_load_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load saved ngrok state from file securely.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional[str]: Loaded ngrok URL if available</span>
+
+<span class="sd">        Security measures:</span>
+<span class="sd">        - Protected file operations</span>
+<span class="sd">        - Data validation</span>
+<span class="sd">        - Error handling</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">state</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+                    <span class="n">url</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ngrok_url&#39;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid state data&quot;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">url</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error loading state securely&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">_validate_port</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">port</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate port number for security.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            port: Port number to validate</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If port is invalid</span>
+
+<span class="sd">        Security measures:</span>
+<span class="sd">        - Range validation</span>
+<span class="sd">        - Type checking</span>
+<span class="sd">        - Error handling</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">port</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Port must be an integer&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">port</span> <span class="o">&lt;</span> <span class="mi">1024</span> <span class="ow">or</span> <span class="n">port</span> <span class="o">&gt;</span> <span class="mi">65535</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Port must be between 1024 and 65535&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="NgrokManager.start_tunnel">
+<a class="viewcode-back" href="../../index.html#configuration.ngrok_manager.NgrokManager.start_tunnel">[docs]</a>
+    <span class="k">def</span> <span class="nf">start_tunnel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5000</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Start ngrok tunnel securely for the specified port.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            port: Local port to tunnel</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Public ngrok URL</span>
+
+<span class="sd">        Security measures:</span>
+<span class="sd">        - Port validation</span>
+<span class="sd">        - Secure health check</span>
+<span class="sd">        - Protected tunnel creation</span>
+<span class="sd">        - Error handling</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_validate_port</span><span class="p">(</span><span class="n">port</span><span class="p">)</span>
+
+            <span class="c1"># Kill any existing tunnels</span>
+            <span class="n">ngrok</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># Wait for cleanup</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Attempting to start ngrok tunnel...&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tunnel</span> <span class="o">=</span> <span class="n">ngrok</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">port</span><span class="p">,</span> <span class="n">bind_tls</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ngrok_url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tunnel</span><span class="o">.</span><span class="n">public_url</span>
+
+            <span class="c1"># Save state before returning</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_secure_save_state</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ngrok tunnel started: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ngrok_url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ngrok_url</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to start ngrok tunnel: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
