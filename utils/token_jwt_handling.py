@@ -50,6 +50,7 @@ class TokenJWTHandling:
                       .where('user_id', '==', user_id)
                       .where('created_at', '>=', since)
                       # Only consider active tokens
+                      .where('status', '==', 'active')
                       .order_by('created_at', direction='DESCENDING')
                       .stream())
 
