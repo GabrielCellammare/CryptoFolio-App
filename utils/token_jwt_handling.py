@@ -10,7 +10,20 @@ from firebase_admin import firestore
 
 
 class AuthError(Exception):
-    """Custom exception for authentication errors"""
+
+    """
+    Custom exception class for authentication and token-related errors.
+
+    This class provides structured error handling for authentication operations,
+    including status codes for proper HTTP response handling.
+
+    Attributes:
+        error (str): Descriptive error message
+        status_code (int): HTTP status code for the error
+
+    Usage:
+        raise AuthError("Token expired", 401)
+    """
 
     def __init__(self, error: str, status_code: int):
         super().__init__()
@@ -18,14 +31,84 @@ class AuthError(Exception):
         self.status_code = status_code
 
 
+"""
+Enhanced JWT Token Management System
+Version: 2.0
+Author: Gabriel Cellammare
+Last Modified: 10/01/2025
+
+This module implements a comprehensive JWT (JSON Web Token) handling system with a strong 
+focus on security, encryption, and secure token lifecycle management. It provides 
+robust token generation, validation, and storage mechanisms with defense-in-depth 
+measures.
+
+Core Security Features:
+1. Token Management
+   - Secure token generation with user binding
+   - Protected token storage with encryption
+   - Automatic token expiration
+   - Token rotation policies
+   - Rate limiting implementation
+
+2. Cryptographic Security
+   - AES encryption for sensitive data
+   - Salt-based key derivation
+   - Secure token signing
+   - Protected storage operations
+   - Memory-safe cleanup
+
+3. Access Control
+   - User session binding
+   - Request validation
+   - IP tracking
+   - Device fingerprinting
+   - Audit logging
+
+4. State Management
+   - Secure token persistence
+   - Protected state transitions
+   - Safe cleanup operations
+   - Error isolation
+   - Recovery procedures
+
+Security Considerations:
+- All tokens are encrypted before storage
+- User sessions are strictly validated
+- Token operations are isolated
+- Rate limiting prevents abuse
+- Audit trails are maintained
+- Cleanup is automatic
+- Error states are safe
+
+Dependencies:
+- jwt: For token operations
+- firebase_admin: Database operations
+- cryptography: Encryption operations
+- datetime: Timestamp management
+- base64: Secure encoding
+"""
+
+
 class TokenJWTHandling:
     def __init__(self, db, cipher):
         """
-        Initialize TokenJWTHandling with database and cipher instances
+        Initialize secure token handling with database and encryption support.
+
+        This constructor sets up the token management system with proper security
+        configuration and initializes the required dependencies.
 
         Args:
-            db: Firebase database instance
-            cipher: AESCipher instance for encryption/decryption
+            db: Firestore database instance for token storage
+            cipher: AESCipher instance for data encryption/decryption
+
+        Security Features:
+            - Protected configuration loading
+            - Secure key management
+            - Rate limit configuration
+            - Token lifecycle settings
+
+        Environment Variables:
+            JWT_SECRET_KEY: Secret key for token signing
         """
         self.__db = db
         self.__MAX_DAILY_TOKENS = 2
@@ -37,14 +120,22 @@ class TokenJWTHandling:
 
     def get_user_token_history(self, user_id: str, since: datetime) -> list:
         """
-        Retrieves the token generation history for a specific user from Firestore.
+        Retrieve a user's token generation history with secure filtering.
+
+        This method securely queries the database for a user's token history,
+        applying proper time-based filtering and status validation.
 
         Args:
-            user_id (str): The unique identifier of the user whose token history is being retrieved.
-            since (datetime): The starting datetime point from which to retrieve the history.
+            user_id (str): Unique identifier of the user
+            since (datetime): Starting timestamp for history retrieval
 
         Returns:
-            List[Dict]: A list of dictionaries containing token history records.
+            List[Dict]: Filtered list of token history records
+
+        Security:
+            - Query parameter validation
+            - Status filtering
+            - Time-based constraints
         """
         token_docs = (self.__db.collection('user_tokens')
                       .where('user_id', '==', user_id)
@@ -58,13 +149,25 @@ class TokenJWTHandling:
 
     def check_token_request_eligibility(self, user_id: str) -> Tuple[bool, Optional[datetime], Optional[str]]:
         """
-        Determines if a user is eligible to request a new token based on daily limits and cooldown periods.
+        Validate token request eligibility based on security policies.
+
+        This method implements rate limiting and cooldown periods for token
+        generation to prevent abuse and ensure secure token management.
 
         Args:
-            user_id (str): The unique identifier of the user requesting a token.
+            user_id (str): Unique identifier of the requesting user
 
         Returns:
-            Tuple[bool, Optional[datetime], Optional[str]]: Eligibility info, next eligible time, and error message
+            Tuple[bool, Optional[datetime], Optional[str]]: 
+                - Boolean indicating eligibility
+                - Next eligible timestamp if applicable
+                - Error message if request is denied
+
+        Security:
+            - Daily limit enforcement
+            - Cooldown period validation
+            - Request tracking
+            - Time-based restrictions
         """
         current_time = datetime.now(timezone.utc)
         day_start = current_time.replace(
@@ -93,15 +196,33 @@ class TokenJWTHandling:
 
     def _encrypt_token_data(self, token_data: dict, user_id: str, salt: bytes) -> dict:
         """
-        Encrypt sensitive token data before storing in Firebase.
+        Encrypt sensitive token data for secure storage in Firebase.
+
+        This method implements secure encryption of token fields before database storage,
+        protecting sensitive information through field-level encryption with user-specific keys.
 
         Args:
-            token_data: Token data to encrypt
-            user_id: User identifier for encryption
-            salt: Salt for key derivation
+            token_data (dict): Token information to be encrypted
+            user_id (str): User identifier for encryption key derivation
+            salt (bytes): Cryptographic salt for key generation
 
         Returns:
-            dict: Token data with encrypted fields
+            dict: Token data with sensitive fields encrypted
+
+        Raises:
+            AuthError: When encryption operations fail with status code 500
+
+        Security Features:
+            - Field-level encryption
+            - User-specific key derivation
+            - Salt-based encryption
+            - Secure error handling
+            - Protected memory operations
+
+        Protected Fields:
+            - access_token
+            - refresh_token
+            - expires_at
         """
         encrypted_data = token_data.copy()
         # Added expires_at to sensitive fields for encryption
@@ -125,15 +246,33 @@ class TokenJWTHandling:
 
     def _decrypt_token_data(self, encrypted_data: dict, user_id: str, salt: bytes) -> dict:
         """
-        Decrypt token data retrieved from Firebase.
+        Decrypt encrypted token data retrieved from Firebase storage.
+
+        This method securely decrypts token information using user-specific keys
+        and handles proper conversion of decrypted data types.
 
         Args:
-            encrypted_data: Encrypted token data
-            user_id: User identifier for decryption
-            salt: Salt for key derivation
+            encrypted_data (dict): Encrypted token information from storage
+            user_id (str): User identifier for decryption key derivation
+            salt (bytes): Cryptographic salt used in encryption
 
         Returns:
-            dict: Decrypted token data
+            dict: Decrypted token data with original field values
+
+        Raises:
+            AuthError: When decryption fails with status code 500
+
+        Security Features:
+            - Secure key derivation
+            - Protected memory handling
+            - Type-safe conversions
+            - Error isolation
+            - Audit logging
+
+        Protected Operations:
+            - Decryption key generation
+            - Memory cleanup
+            - String encoding handling
         """
         decrypted_data = encrypted_data.copy()
         sensitive_fields = ['access_token', 'refresh_token', 'expires_at']
@@ -158,11 +297,30 @@ class TokenJWTHandling:
 
     def _store_encrypted_token(self, user_id: str, token_data: dict) -> None:
         """
-        Store encrypted token data in Firebase.
+        Securely store encrypted token data in Firebase with proper metadata.
+
+        This method handles the complete process of token storage, including salt retrieval,
+        encryption, and secure database operations with proper error handling.
 
         Args:
-            user_id: User identifier
-            token_data: Token data to store
+            user_id (str): User identifier for token association
+            token_data (dict): Token information to be stored
+
+        Raises:
+            AuthError: When storage operations fail with status code 500
+
+        Security Features:
+            - Salt retrieval protection
+            - Secure encryption
+            - Atomic database operations
+            - Timestamp recording
+            - Status tracking
+
+        Database Operations:
+            - Salt retrieval from security collection
+            - Token data encryption
+            - Secure document creation
+            - Status initialization
         """
         try:
             # Get user's salt from security collection
@@ -191,10 +349,32 @@ class TokenJWTHandling:
 
     def expire_previous_tokens(self, user_id: str) -> None:
         """
-        Expires all active tokens for a given user to ensure only one token is active at a time.
+        Invalidate all active tokens for a user with secure state transitions.
+
+        This method implements secure token expiration with proper audit logging
+        and atomic database operations to maintain token lifecycle integrity.
 
         Args:
-            user_id (str): The unique identifier of the user whose tokens should be expired.
+            user_id (str): User identifier whose tokens should be expired
+
+        Security Features:
+            - Batch operations for atomicity
+            - Secure decryption for validation
+            - Status transition logging
+            - Time-based validation
+            - Audit trail creation
+
+        Operations Flow:
+            1. Retrieve user's cryptographic salt
+            2. Query active tokens
+            3. Validate and decrypt tokens
+            4. Batch update expired status
+            5. Create audit logs
+
+        Protected State Transitions:
+            - Active to Expired status
+            - Timestamp recording
+            - Reason documentation
         """
         try:
             current_time = datetime.now(timezone.utc)
@@ -266,13 +446,29 @@ class TokenJWTHandling:
 
     def get_active_token(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
-        Retrieves the most recent active token for a specified user.
+        Retrieve the current active token for a user with validation.
+
+        This method securely fetches and validates the most recent active token,
+        performing necessary decryption and expiration checks.
 
         Args:
-            user_id (str): The unique identifier of the user.
+            user_id (str): User identifier to check for active tokens
 
         Returns:
-            Optional[Dict[str, Any]]: Dictionary containing token information if an active token exists
+            Optional[Dict[str, Any]]: Active token information if valid, None otherwise
+
+        Security Features:
+            - Salt-based decryption
+            - Time-based validation
+            - Status verification
+            - Secure ordering
+            - Query limiting
+
+        Validation Checks:
+            - Token existence
+            - Expiration status
+            - Decryption integrity
+            - Time validity
         """
         try:
             current_time = datetime.now(timezone.utc)
@@ -317,13 +513,33 @@ class TokenJWTHandling:
 
     def generate_tokens(self, user_id: str) -> Dict[str, Any]:
         """
-        Generate new JWT token with encryption and storage.
+        Generate new JWT tokens with secure storage and rate limiting.
+
+        This method creates new JWT tokens with proper security measures,
+        including rate limiting, encryption, and secure storage operations.
 
         Args:
-            user_id (str): User identifier
+            user_id (str): User identifier for token generation
 
         Returns:
-            Dict[str, Any]: Generated token information
+            Dict[str, Any]: Generated token information including expiration and next request time
+
+        Raises:
+            AuthError: For rate limit violations (429) or generation failures (500)
+
+        Security Features:
+            - Rate limit enforcement
+            - Previous token expiration
+            - Secure JWT creation
+            - Protected storage
+            - Device tracking
+
+        Token Properties:
+            - Expiration time
+            - Creation timestamp
+            - User binding
+            - Device information
+            - Request cooldown
         """
         try:
             # Check if user is eligible for a new token
@@ -381,7 +597,22 @@ class TokenJWTHandling:
 
     def get_token_creation_time(self, token: str) -> Optional[datetime]:
         """
-        Retrieve token creation time from JWT claims
+        Extract token creation timestamp from JWT claims securely.
+
+        This method safely decodes JWT claims to retrieve the token creation time
+        with proper error handling and validation.
+
+        Args:
+            token (str): JWT token to analyze
+
+        Returns:
+            Optional[datetime]: Token creation timestamp if valid, None otherwise
+
+        Security Features:
+            - Secure JWT decoding
+            - Signature validation
+            - Time parsing protection
+            - Error isolation
         """
         try:
             payload = jwt.decode(
@@ -393,14 +624,40 @@ class TokenJWTHandling:
 
     def jwt_required(self, f):
         """
-        Decorator that verifies JWT tokens and ensures proper authentication for protected routes.
-        Handles both the decrypted token from the user and the encrypted version in the database.
+        Protect routes with comprehensive JWT validation and security checks.
+
+        This decorator implements complete token validation including signature verification,
+        database validation, and proper user session binding.
 
         Args:
-            f (Callable): The function to be decorated.
+            f (Callable): The route function to protect
 
         Returns:
-            Callable: The decorated function with JWT verification.
+            Callable: Protected route function
+
+        Security Features:
+            - Token presence validation
+            - JWT signature verification
+            - Database token validation
+            - Expiration checking
+            - User session binding
+            - Error logging
+
+        Validation Flow:
+            1. Token format verification
+            2. JWT signature validation
+            3. Token type checking
+            4. Database record validation
+            5. Expiration verification
+            6. User session binding
+
+        Raises:
+            AuthError: Various 401 status codes for different validation failures
+                - Missing token
+                - Invalid signature
+                - Token not found
+                - Token expired
+                - Verification failed
         """
         @wraps(f)
         def decorated(*args, **kwargs):
