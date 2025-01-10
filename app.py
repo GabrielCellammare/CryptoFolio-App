@@ -5,37 +5,56 @@ Cryptocurrency Portfolio Management Application
 A secure Flask application for managing cryptocurrency portfolios with
 comprehensive security features and OAuth authentication.
 
-This module implements a secure web application that allows users to:
-- Authenticate via OAuth (Google & GitHub)
-- Manage cryptocurrency portfolios
-- Track portfolio performance
-- Set currency preferences
-- Maintain secure sessions
+Core Features:
+1. Authentication & Authorization
+   - OAuth 2.0 integration with Google and GitHub
+   - CSRF token protection
+   - Rate limiting and request throttling 
+   - Secure session management
+   - JWT-based API authentication
 
-Security Features:
-----------------
-- OAuth authentication (Google & GitHub)
-- AES encryption for sensitive data
-- CSRF protection
-- Rate limiting
-- Audit logging
-- Input validation
-- Secure session management
-- Security headers
-- Encrypted backups
+2. Data Protection
+   - AES-256 encryption for sensitive data
+   - Secure key derivation with salting
+   - Encrypted database storage
+   - Protected memory operations
+   - Secure data wiping
 
-Architecture:
------------
-The application follows a layered architecture:
-1. Authentication Layer: OAuth and session management
-2. Security Layer: Encryption, CSRF, rate limiting
-3. Business Logic Layer: Portfolio operations
-4. Data Access Layer: Firebase interactions
-5. API Layer: REST endpoints
+3. Security Controls
+   - Input validation and sanitization
+   - SQL injection prevention
+   - XSS protection headers
+   - CORS policy enforcement
+   - Secure error handling
+   - Audit logging
+   - Encrypted backups
+
+4. Secure Architecture:
+   1. Authentication Layer: OAuth and session management
+   2. Security Layer: Encryption, CSRF, rate limiting
+   3. Business Logic Layer: Portfolio operations 
+   4. Data Access Layer: Secure Firebase interactions
+   5. API Layer: Protected REST endpoints
+
+Security Considerations:
+- All sensitive data is encrypted at rest
+- User sessions are strictly validated
+- Rate limiting prevents abuse
+- Audit logs track critical operations
+- Error messages are sanitized
+- Memory is securely wiped
+- File operations are protected
+
+Dependencies:
+- flask: Web framework
+- authlib: OAuth implementation  
+- firebase_admin: Database operations
+- cryptography: Encryption operations
+- secure_byte_array: Protected memory management
 
 Author: Gabriel Cellammare
 Version: 1.0
-Last Modified: 05/01/2025
+Last Modified: 10/01/2025
 """
 
 # Standard library imports - organized by functionality
@@ -124,10 +143,13 @@ def rate_limit_decorator(f):
         if not user_id:
             return jsonify({'status': 'error', 'message': 'Authentication required'}), 401
 
-        # Inizializza il rate limiter con l'istanza esistente di Firestore
+        # Get client IP address securely
+        ip_address = request.remote_addr
+
+        # Initialize rate limiter with the existing Firestore instance
         rate_limiter = FirebaseRateLimiter(db)
         is_allowed, remaining, retry_after = rate_limiter.check_rate_limit(
-            user_id)
+            user_id, ip_address)
 
         if not is_allowed:
             response = jsonify({
@@ -140,10 +162,10 @@ def rate_limit_decorator(f):
             response.status_code = 429
             return response
 
-        # Esegui la funzione originale
+        # Execute the original function
         response = f(*args, **kwargs)
 
-        # Aggiungi gli header del rate limit alla risposta
+        # Add rate limit headers to response
         if isinstance(response, tuple):
             response_obj, status_code = response
         else:
@@ -161,10 +183,27 @@ def rate_limit_decorator(f):
 @app.before_request
 def check_session_timeout():
     """
-    Checks and enforces session timeout rules.
+    Validate and enforce session timeout rules.
 
-    Validates session age and redirects to login if expired.
-    Session timeout is set to 60 minutes of inactivity.
+    This method implements secure session management by validating session age and
+    forcing re-authentication when sessions expire.
+
+    Security Features:
+        - Strict timeout enforcement
+        - Secure session clearing
+        - Protected redirect handling
+        - Last activity tracking
+
+    Implementation:
+        - Checks last activity timestamp
+        - Enforces 60-minute inactivity timeout
+        - Securely clears expired sessions
+        - Redirects to login for re-authentication
+
+    Session Properties:
+        - Maximum inactivity: 60 minutes
+        - Secure cleanup on expiration
+        - Protected timestamp storage
     """
     if 'last_active' in session:
         last_active = datetime.fromtimestamp(session['last_active'])

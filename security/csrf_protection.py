@@ -239,7 +239,33 @@ class CSRFProtection:
 
     def init_app(self, app: Flask) -> None:
         """
-        Initialize application with security configurations.
+        Initialize application with comprehensive security configurations.
+
+        This method configures the Flask application with security features, sets up session
+        handling, and initializes OAuth providers.
+
+        Args:
+            app (Flask): The Flask application instance to configure
+
+        Security Features:
+            - Session security settings
+            - Origin validation rules
+            - HTTPS enforcement
+            - Security headers
+            - Environment-specific configurations 
+
+        Environment Handling:
+            - Development: Allows local testing and ngrok domains
+            - Production: Strict security controls
+
+        Implementation Details:
+            - Configures session parameters
+            - Sets up request hooks for HTTPS and headers
+            - Initializes origin validation
+            - Establishes environment-specific rate limits
+
+        Raises:
+            Exception: If initialization fails, with detailed error logging
         """
         # Apply session configuration
         app.config.update(self.SESSION_CONFIG)
