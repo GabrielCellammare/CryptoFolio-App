@@ -147,6 +147,7 @@ curl -X POST \
     "crypto_id": "ethereum",
     "symbol": "ETH",
     "amount": 2.0
+    // Error
 }
 ```
 
@@ -159,6 +160,7 @@ curl -X POST \
     "amount": "invalid",
     "purchase_price": -100,
     "purchase_date": "2024-01-15"
+    // Error
 }
 ```
 
@@ -170,9 +172,10 @@ curl -X POST \
     "amount": 1000,
     "purchase_price": 0.50,
     "purchase_date": "invalid-date"
+    // Error
 }
 ```
-#####Test 5: Caratteri speciali
+##### Test 5: Caratteri speciali
 ```json
 {
     "crypto_id": "dogecoin<script>",
@@ -180,6 +183,7 @@ curl -X POST \
     "amount": 1000,
     "purchase_price": 0.10,
     "purchase_date": "2024-01-15"
+    // Error
 }
 ```
 
