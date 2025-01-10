@@ -19,7 +19,7 @@ L'**applicazione** consente agli utenti di:
 5. Accedere ai prezzi delle criptovalute in tempo reale grazie all'integrazione delle API di [CoinGecko](https://www.coingecko.com/ "CoinGecko")
 6. Gestire il **portfolio** in modo sicuro attraverso l'autenticazione **OAuth 2.0**
 7. Interagire con il proprio portfolio attraverso **un'API Restful** 
-8. Ottenere il **controvalore** del proprio portfolio in diverse valute sfrutando i tassi di conversione aggiornati in tempo reale attraverso [Exchangerate](https://www.exchangerate-api.com/ "Exchangerate")
+8. Ottenere il **controvalore** del proprio portfolio in diverse valute sfrutando i tassi di conversione aggiornati in tempo reale 
 
 ## Architettura tecnica
 
