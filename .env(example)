@@ -1,0 +1,47 @@
+#RENAME THIS FILE IN .ENV
+# Ambiente
+
+FLASK_ENV=development
+NGROK_AUTH_TOKEN=your_ngrok_auth_token
+FLASK_RUN_PORT=5000
+NGROK_REGION=eu
+
+# Origins permessi (separati da virgole)
+# Modifica questa linea nel tuo .env
+DEV_ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000,https://*.ngrok.io,https://*.ngrok-free.app
+PROD_ALLOWED_ORIGINS=https://yourdomain.com
+
+# Configurazione CORS
+CORS_MAX_AGE=86400
+CORS_ALLOWED_HEADERS=Content-Type, X-CSRF-Token, X-CSRF-Nonce, X-Requested-With, X-Client-Version
+CORS_ALLOWED_METHODS=GET, POST, PUT, DELETE, OPTIONS
+CORS_ALLOW_CREDENTIALS=true
+CORS_EXPOSE_HEADERS=Content-Type
+
+# Configurazione HSTS
+HSTS_MAX_AGE=31536000
+INCLUDE_SUBDOMAINS=true
+
+# URL Ngrok (opzionale)
+NGROK_URL=
+BASE_URL=http://127.0.0.1:5000
+
+# Chiavi segrete (sostituisci con le tue chiavi)
+FLASK_SECRET_KEY=your_flask_secret_key (lunghezza: 64 caratteri)
+MASTER_ENCRYPTION_KEY=your_master_encryption_key (lunghezza: 44 caratteri)
+HASH_SECRET_KEY=your_hash_secret_key (lunghezza: 64 caratteri)
+COINGECKO_API_KEY=your_coingecko_api_key (lunghezza: variabile)
+CACHE_DURATION=30
+
+SERVER_METADATA_URL_GOOGLE=https://accounts.google.com/.well-known/openid-configuration
+GOOGLE_CLIENT_ID=your_google_client_id (lunghezza: variabile)
+GOOGLE_CLIENT_SECRET=your_google_client_secret (lunghezza: variabile)
+
+FERNET_KEY=your_fernet_key (lunghezza: 44 caratteri)
+
+GITHUB_CLIENT_ID=your_github_client_id (lunghezza: variabile)
+GITHUB_CLIENT_SECRET=your_github_client_secret (lunghezza: variabile)
+
+JWT_SECRET_KEY=your_jwt_secret_key (lunghezza: 256 caratteri)
+
+SESSION_TIMEOUT_MINUTES=60
