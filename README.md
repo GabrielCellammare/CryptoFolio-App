@@ -23,7 +23,10 @@ L'**applicazione** consente agli utenti di:
 
 ## Architettura tecnica
 
-Foto dell'architettura e spiegazione di flask
+L'architettura del sistema si presenta in tale modo
+
+[CryptoFolio(Project).pdf](https://github.com/user-attachments/files/18382420/CryptoFolio.Project.pdf)
+
 
 ## Route
 
