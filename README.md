@@ -1,9 +1,9 @@
 # **CryptoFolio**: Tieni traccia delle tue criptovalute in modo semplice e sicuro
 
-## SAOS 2024-2025: Caso di studio della materia di **Sicurezza delle Architetture Orientate ai Servizi** - Prof. Giulio Mallardi
-## Laurea Magistrale in Sicurezza informatica - Università degli studi di Bari "Aldo Moro" - Dipartimento d'Informatica
+### SAOS 2024-2025: Caso di studio della materia di **Sicurezza delle Architetture Orientate ai Servizi** - Prof. Giulio Mallardi
+### Laurea Magistrale in Sicurezza informatica - Università degli studi di Bari "Aldo Moro" - Dipartimento d'Informatica
 
-## Author
+### Author
 
 - [@GabrielCellammare](https://github.com/GabrielCellammare)
 
