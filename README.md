@@ -7,7 +7,7 @@
 
 - [@GabrielCellammare](https://github.com/GabrielCellammare)
 
-**CryptoFolio** è un'applicazione web completa e incentrata sulla sicurezza, progettata per aiutare gli utenti a tenere traccia e a gestire i loro investimenti in criptovalute, con particolare attenzione alla protezione dei dati e all'autenticazione sicura. Basato su **Flask** , con le moderne politiche di sicurezza offre un robusto set di funzionalità mantenendo rigorosi controlli di sicurezza.
+**CryptoFolio** è un'applicazione web incentrata sulla sicurezza, progettata per aiutare gli utenti a tenere traccia e a gestire i loro investimenti in criptovalute, con particolare attenzione alla protezione dei dati e all'autenticazione sicura. Basato su **Flask** , con le moderne politiche di sicurezza offre un robusto set di funzionalità mantenendo rigorosi controlli di sicurezza.
 
 ## Caratteristiche principali
 L'**applicazione** consente agli utenti di:
@@ -17,11 +17,54 @@ L'**applicazione** consente agli utenti di:
 3. *Aggiungere, aggiornare e rimuovere* posizioni in **criptovalute**
 4. Visualizzare le **analisi** del portfolio
 5. Accedere ai prezzi delle criptovalute in tempo reale grazie all'integrazione delle API di [CoinGecko](https://www.coingecko.com/ "CoinGecko")
-6. Gestire il **portfolio** in modo sicuro attraverso l'autenticazione** OAuth 2.0**
+6. Gestire il **portfolio** in modo sicuro attraverso l'autenticazione **OAuth 2.0**
 7. Interagire con il proprio portfolio attraverso **un'API Restful** 
 8. Ottenere il **controvalore** del proprio portfolio in diverse valute sfrutando i tassi di conversione aggiornati in tempo reale attraverso [Exchangerate](https://www.exchangerate-api.com/ "Exchangerate")
 
+## Architettura tecnica
 
+Foto dell'architettura e spiegazione di flask
+
+## Route
+
+### Autenticazione e sicurezza
+
+1. Integrazione OAuth 2.0 con Google e GitHub per l'autenticazione sicura degli utenti
+2. Autenticazione API basata su JWT per l'accesso programmatico
+3. Protezione CSRF con convalida di token e nonce
+4. Limitazione della velocità e strozzatura delle richieste
+5. Crittografia AES-256 per l'archiviazione di dati sensibili
+6. Convalida e sanitizzazione complete dell'input
+7. Gestione sicura delle sessioni con timeout automatico
+8. Operazioni di memoria protette per i dati sensibili
+
+## Integrazioni esterne
+
+1. CoinGecko API per i dati di prezzo delle criptovalute in tempo reale
+2. Firebase/Firestore per la persistenza sicura dei dati
+3. Google OAuth per l'autenticazione
+4. GitHub OAuth per l'autenticazione
+
+## Protezione dei dati
+Tutti i dati sensibili dell'utente vengono crittografati utilizzando la crittografia AES-256 prima della memorizzazione, con meccanismi di derivazione della chiave e di salatura adeguati. L'applicazione implementa un approccio di difesa in profondità con più livelli di sicurezza:
+
+sicurezza del livello di trasporto (TLS) per tutte le comunicazioni
+Gestione sicura dei token con rotazione automatica
+endpoint API protetti con controlli di accesso adeguati
+Registrazione di audit per gli eventi rilevanti per la sicurezza
+Gestione sicura degli errori per prevenire la perdita di informazioni
+
+## Caratteristiche del frontend
+
+Valutazione del portafoglio in tempo reale
+Grafici e analisi interattivi
+Design reattivo con Bootstrap
+Supporto per la conversione di valuta
+Gestione sicura dei moduli
+
+
+L'applicazione segue le moderne best practice di sicurezza e include un'ampia protezione contro le vulnerabilità web più comuni come XSS, CSRF, SQL injection e vari vettori di attacco specifici per le API. Fornisce una piattaforma sicura per la gestione del portafoglio di criptovalute, mantenendo elevati standard di protezione dei dati degli utenti.
+Tutte queste funzionalità sono implementate con una forte attenzione alla sicurezza, seguendo il principio della difesa in profondità e incorporando più livelli di protezione per garantire che i dati degli utenti rimangano al sicuro durante tutte le operazioni.
 
 ## Documentazione API CryptoFolio
 
