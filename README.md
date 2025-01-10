@@ -2,7 +2,7 @@
 
 ### Introduzione
 
-CryptoFolio fornisce un'API RESTful che permette di gestire il proprio portfolio di criptovalute in modo programmatico e sicuro. Questa documentazione descrive come utilizzare le API disponibili per interagire con il tuo portfolio.
+**CryptoFolio** fornisce un'API RESTful che permette di gestire il proprio portfolio di criptovalute in modo programmatico e sicuro. Questa documentazione descrive come utilizzare le API disponibili per interagire con il tuo portfolio.
 
 ### Autenticazione
 
@@ -14,26 +14,30 @@ Tutte le richieste API devono essere autenticate utilizzando un token JWT (JSON 
 
 Il token ha una validità di 7 giorni e deve essere incluso nell'header `Authorization` di ogni richiesta nel seguente formato:
 
+***RICORDA***: Se pensi che qualcuno sia venuto a conoscenza del tuo token JWT, potrai rinnovarlo nelle 12 ore immediatamente successive alla generazione, accedendo alla tua dashboard. Il token precedentemente generato verrà correttamente invalidato dal sistema.
+
 ```
 Authorization: Bearer il_tuo_token_jwt
 ```
 
-*Secondo *RFC6750* The OAuth 2.0 Authorization Framework Il Bearer Token è un token di sicurezza che soltanto le parti autorizzati possono utilizzare, da qui il <Bearer>, ovvero un possessore. Lato server, questo Token è prodotto attraverso lo standard JWT.*
+#### Perchè Authorization: Bearer?
+
+Secondo *RFC6750* The OAuth 2.0 Authorization Framework Il Bearer Token è un token di sicurezza che soltanto le parti autorizzati possono utilizzare, da qui il nome ***Bearer**, ovvero un possessore. Lato server, questo Token è prodotto attraverso lo standard JWT.
 
 L'aggiunta del termine “Bearer” prima del token nell'intestazione “Authorization” ha due scopi importanti:
 
-1. Identificazione: La parola chiave “Bearer” aiuta il server a identificare facilmente il tipo di token utilizzato e a gestirlo in modo appropriato durante i processi di autenticazione e autorizzazione. 
-2. Standardizzazione: L'uso dello schema “Bearer” è una convenzione ampiamente adottata e una pratica raccomandata per chiarezza e standardizzazione. Promuove l'interoperabilità tra i diversi sistemi e componenti coinvolti nel flusso di autenticazione, riducendo le possibilità di interpretazioni o comunicazioni errate.
+1. **Identificazione**: La parola chiave “Bearer” aiuta il server a identificare facilmente il tipo di token utilizzato e a gestirlo in modo appropriato durante i processi di autenticazione e autorizzazione. 
+2. **Standardizzazione**: L'uso dello schema “Bearer” è una convenzione ampiamente adottata e una pratica raccomandata per chiarezza e standardizzazione. Promuove l'interoperabilità tra i diversi sistemi e componenti coinvolti nel flusso di autenticazione, riducendo le possibilità di interpretazioni o comunicazioni errate.
 
-#### È necessario allegare un *Bearer*?
+##### È necessario allegare il termine *Bearer*?
 
 Sebbene tecnicamente sia possibile eseguire l'autenticazione senza includere esplicitamente la parola chiave “Bearer”, si raccomanda vivamente di includerla per un'autenticazione corretta utilizzando lo schema del token Bearer. L'aggiunta di “Bearer” prima del token garantisce chiarezza, coerenza e compatibilità tra le diverse implementazioni e i diversi sistemi.
 
 Quando il server riceve una richiesta HTTP con l'intestazione “Authorization”, controlla la presenza della parola chiave “Bearer” per determinare lo schema di autenticazione utilizzato. Senza la parola chiave “Bearer”, il server potrebbe non riconoscere il token come token Bearer e potrebbe non riuscire ad autenticare o autorizzare correttamente la richiesta.
 
-Pertanto, includere sempre la parola chiave “Bearer” prima dell'operazione.
+Pertanto, è importante includere sempre la parola chiave “Bearer” prima dell'operazione.
 
-#### JWT
+##### JWT
 Lo standard JWT rappresenta semplicemente un formato di serializzazione di informazioni (claim), espressi in **JSON** (*JavaScript Object Notation*).
 
 Ogni JWT è composto (a parte casi particolari) da tre parti, codificate in base64:
@@ -44,7 +48,7 @@ Ogni JWT è composto (a parte casi particolari) da tre parti, codificate in base
 
 Per il calcolo della firma, è stato utilizzato *HS256* algoritmo simmetrico, nel quale la stessa chiave è usata per generare e validare la firma.
 
-#### Differenze tra Authorization Bearer Token e JSON Web Token
+##### Differenze tra Authorization Bearer Token e JSON Web Token
 Quindi è bene specificare che i **Bearer Token** sono un tipo particolare di Access Token, usati per ottenere l'autorizzazione ad accedere ad una risorsa protetta da un Authorization Server, mentre il JWT è un formato di serializzazione.
 
 ### Endpoints Disponibili
@@ -122,13 +126,71 @@ curl -X POST \
 }
 ```
 
+#### Esempi di Test
+
+
+##### Test 1: Aggiunta valida
+```json
+
+{
+    "crypto_id": "bitcoin",
+    "symbol": "BTC",
+    "amount": 0.5,
+    "purchase_price": 42000.00,
+    "purchase_date": "2024-01-15"
+}
+```
+##### Test 2: Campi mancanti
+```json
+
+{
+    "crypto_id": "ethereum",
+    "symbol": "ETH",
+    "amount": 2.0
+}
+```
+
+##### Test 3: Valori numerici invalidi
+
+```json
+{
+    "crypto_id": "ripple",
+    "symbol": "XRP", 
+    "amount": "invalid",
+    "purchase_price": -100,
+    "purchase_date": "2024-01-15"
+}
+```
+
+##### Test 4: Data invalida
+```json
+{
+    "crypto_id": "cardano",
+    "symbol": "ADA",
+    "amount": 1000,
+    "purchase_price": 0.50,
+    "purchase_date": "invalid-date"
+}
+```
+#####Test 5: Caratteri speciali
+```json
+{
+    "crypto_id": "dogecoin<script>",
+    "symbol": "DOGE';--",
+    "amount": 1000,
+    "purchase_price": 0.10,
+    "purchase_date": "2024-01-15"
+}
+```
+
 ### Limiti e Quote
 
 Per garantire un servizio ottimale, sono in vigore i seguenti limiti:
 
-- Massimo 100 richieste al minuto per ogni endpoint
+- Massimo 100 richieste all'ora condivise tra i due EndPoint
 - Massimo 2 token generabili al giorno
 - Periodo di attesa di 12 ore tra una generazione di token e l'altra
+- Validità di 7 giorni per ogni Token
 
 ### Gestione degli Errori
 
