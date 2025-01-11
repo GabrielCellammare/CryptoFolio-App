@@ -224,7 +224,7 @@ Link all'architettura completa:
 
 Questa parte del documento illustra tutti i percorsi implementati nell'applicazione CryptoFolio, comprese le misure di sicurezza, i controlli di accesso e le funzionalità.
 
-### Percorsi di autenticazione
+### Routes di autenticazione
 
 #### /auth/login/provider
 
@@ -359,7 +359,7 @@ Caratteristiche di **sicurezza**:
 
 **Risultato**: Risposta **JSON** con redirect alla pagina **principale**
 
-### Route di gestione del Portfolio 
+### Routes di gestione del Portfolio 
 
 È bene specificare che tutte queste **routes** (al di fuori di dashboard), sono accessibili soltanto dalla pagina principale: non è possibile effettuare richieste API esternamente poichè verranno gestite interamente dalla web app, attraverso una firma gemerata da un'origine javascript verificata con una validità limitata. 
 
@@ -486,7 +486,7 @@ Nel caso in cui l'utente decidesse di cambiare solo un valore, i rimanenti valor
 - Registrazione di **audit**
 - Gestione degli **errori**
 
-### Route di gestiione dei Token per API (JWT)
+### Routes di gestiione dei Token per API (JWT)
 
 Anche in questo caso, tutte le routes sono accessibili soltanto dalla pagina **principale**: non è possibile effettuare richieste API esternamente poichè verranno gestite interamente dalla web app, attraverso una firma gemerata da un'origine javascript verificata con una validità limitata. 
 
@@ -552,10 +552,111 @@ Anche in questo caso, tutte le routes sono accessibili soltanto dalla pagina **p
 
 - **Autenticazione** necessaria
 - **Protezione** CSRF
-- Abilità o meno la **possibilità** di generare un nuovo token
+- Abilità o meno la **possibilità** di generare un nuovo token JWT
+
+### Routes utilizzati per la gestione dei Token CSRF
+
+####  Generazione Token CSRF: api/csrf/token
+
+```
+   GET api/csrf/token
+```
+
+**Metodo**: GET
+
+**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **dashboard**
+
+**Descrizione**: Ottieni un token **CSRF** da utilizzare per il corretto funzionamento del sistema
+
+**Prerequisiti**:  Nonce,  Login,  Validazione Origin e Headers
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- **Autenticazione** necessaria
+- Generazione **crittograficamente** sicura del Token CSRF
+- Rotazione dei **token**
+- Eliminazione **token** **CSRF** (Protezione DDOS)
+
+####  Generazione Nonce CSRF: api/csrf/nonce
+
+```
+   GET api/csrf/nonce
+```
+
+**Metodo**: GET
+
+**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **dashboard**
+
+**Descrizione**: Ottieni un nonce **CSRF** da utilizzare per il corretto funzionamento del sistema insieme al Token **CSRF**
+
+**Prerequisiti**:  Token CSRF,  Login,  Validazione Origin e Headers
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- **Autenticazione** necessaria
+- Generazione **crittograficamente** sicura del Nonce CSRF
+- Rotazione dei nonce
+- Eliminazione nonce scaduti
+
+
+### Routes di utility
+####  Navigazione verso la pagina principale: /navigate-home
+
+```
+   POST /navigate-home
+```
+
+
+**Metodo**: POST
+
+**Accesso**: Riservato ad utenti loggati e accessibile soltanto dalla dashboard
+
+**Descrizione**: Riporta l'utente alla pagina di benvenuto
+
+**Prerequisiti**: Token CSRF, Nonce, , Validazione Origin e Headers, e Login
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- Autenticazione **richiesta** (login_required)
+- Protezione **CSRF** (csrf.csrf_protect)
 
 
 
+### Routes di gestione delle Cryptovalute disponibili
+
+####  Generazione Token CSRF: api/cryptocurrencies
+
+```
+   GET api/cryptocurrencies
+```
+
+**Metodo**: GET
+
+**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **dashboard**
+
+**Descrizione**: Restituisce tutte le **crypto** disponibili provenienti come risposta dall'API di CoinGecko e le salva nella cache: successivamente i valori verranno prelevati da essa e riaggiornati dopo 30 min.
+
+**Prerequisiti**:  Token CSRF, Nonce,  Login,  Validazione Origin e Headers
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- **Autenticazione** necessaria
+- Protezione **CSRF** (csrf.csrf_protect)
+
+### Conclusione routes
+
+Ogni percorso dell'applicazione è protetto da più livelli di sicurezza, secondo il principio della **difesa in profondità**. Le caratteristiche di sicurezza comuni a tutti i percorsi includono:
+
+1. Convalida e sanificazione dell'input
+2. Gestione degli errori con registrazione sicura
+3. Limitazione della velocità, ove appropriato
+4. Protezione CSRF
+5. Controlli di autenticazione
+6. Registrazione di eventi significativi
+7. Gestione sicura delle sessioni
+8. Crittografia dei dati per le informazioni sensibili
+
+Tutti i dati di risposta sono accuratamente sanificati per evitare la fuga di informazioni e i messaggi di errore sono generalizzati per evitare di esporre dettagli interni al sistema.
 
 
 
