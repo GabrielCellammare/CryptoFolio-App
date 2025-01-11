@@ -354,6 +354,8 @@ Caratteristiche di **sicurezza**:
 
 ### Route di gestione del Portfolio 
 
+È bene specificare che tutte queste **routes** (al di fuori di dashboard), sono accessibili soltanto dalla pagina diretta: non è possibile effettuare richieste API esternamente poichè verranno gestite interamente dalla web app, attraverso una firma gemerata da un'origine javascript verificata con una validità limitata. 
+
 ####  Dashboard route: /dashboard
 
 ```
@@ -398,7 +400,7 @@ Caratteristiche di **sicurezza**:
 
 **Descrizione**: Aggiunge una nuova crypto al portfolio con archiviazione crittografata
 
-**Prerequisiti**: Token CSRF, Nonce, Ratelimiting e Login
+**Prerequisiti**: Token CSRF, Nonce, Ratelimiting, Validazione Origin e Headers, e Login
 
 **Questo percorso implementa diverse misure di sicurezza necessarie**
 
@@ -415,12 +417,70 @@ Caratteristiche di **sicurezza**:
 ```json
 {
     “crypto_id": “bitcoin”,
-    “simbolo": “BTC”,
-    “importo": 1.5,
-    “prezzo_acquisto": 45000,
-    “data_acquisto": “2024-01-15”
+    “symbol": “BTC”,
+    “amount": 1.5,
+    “purchase_price": 45000,
+    “purchase_date": “2024-01-15”
 }
 ```
+
+
+####  Modifica valori di una crypto nel portfolio: /api/portfolio/update/{doc_id}
+
+```
+   PUT /api/portfolio/update/<doc_id>
+```
+
+**Metodo**: PUT
+
+**Accesso**: Riservato ad utenti loggati
+
+**Descrizione**: Modifica **quantità**, prezzo di **acquisto** e data di **acquisto** di una specifico **crypto** associata al portfolio con archiviazione **crittografata**.
+
+**Prerequisiti**: Token CSRF, Nonce,  Login, Validazione Origin e Headers
+
+**Campi necessari**:
+`purchase_price`       `float`  **Required** nuovo prezzo di acquisto
+ `purchase_date`       `float`  **Required** nuova data di acquisto 
+ `purchase_amount`  `float`  **Required**. nuova quantità di acquisto 
+
+Nel caso in cui l'utente decidesse di cambiare solo un valore, i rimanenti valori verranno aggiornati con quelli precedentemente presenti di default.
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- Verifica della **proprietà** del documento
+- Cifratura dei **dati**
+- **Sanificazione** dell'input
+- **Registrazione** delle verifiche
+- Gestione degli **errori**
+
+####  Elimina una crypto dal portfolio: /api/portfolio/delete/{doc_id}
+
+```
+   DELETE /api/portfolio/delete/<doc_id>
+```
+
+**Metodo**: DELETE
+
+**Accesso**: Riservato ad utenti loggati
+
+**Descrizione**: Elimina una crypto dal portfolio dell'utente
+
+**Prerequisiti**: Token CSRF, Nonce,  Login,   Validazione Origin e Headers
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- Verifica della **proprietà** dei documenti
+- Creazione di un **backup** crittografato
+- Pulizia dei dati **associati**
+- Registrazione di **audit**
+- Gestione degli **errori**
+
+
+
+
+
+
 
 
 ### Autenticazione e sicurezza
