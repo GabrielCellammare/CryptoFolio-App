@@ -22,24 +22,29 @@ L'**applicazione** consente agli utenti di:
 8. Ottenere il **controvalore** del proprio portfolio in diverse valute sfrutando i tassi di conversione aggiornati in tempo reale 
 
 ## CryptoFolio: Architettura del sistema
-**CryptoFolio** implementa un modello di "**architettura orientata ai servizi (SOA)**", in particolare un approccio simile ai **microservizi**, in cui i diversi componenti hanno un basso accoppiamente ed un'alta coesione, comunicando attraverso interfacce ben definite (***API REST***). Questa scelta architettonica offre diversi vantaggi:
+**CryptoFolio** implementa un modello di "**architettura orientata ai servizi (SOA)**", in particolare un approccio simile ai **microservizi**, in cui i diversi componenti hanno un basso accoppiamento ed un'alta coesione, comunicando attraverso interfacce ben definite (***API REST***). 
 
-- **Indipendenza dai servizi**: Ogni componente (autenticazione, gestione del portafoglio...) opera in modo indipendente.
-- **Scalabilità**: I servizi possono essere scalati in modo indipendente in base al carico.
-- **Isolamento della sicurezza:** La compromissione di un servizio non compromette automaticamente gli altri.
+Questa scelta architettonica offre diversi vantaggi:
+
+- **Indipendenza dai servizi**: Ogni componente (autenticazione, gestione del portafoglio...) opera in modo indipendente
+- **Scalabilità**: I servizi possono essere scalati in modo indipendente in base al carico
+- **Isolamento della sicurezza:** La compromissione di un servizio non compromette automaticamente gli altri
 - **Flessibilità tecnologica**: Servizi diversi possono utilizzare tecnologie diverse a seconda delle necessità
 
 ### Componenti principali
 #### Architettura del Backend - Flask
 ![image](https://github.com/user-attachments/assets/08e8ffc2-91c8-4eb7-9be2-9e5e014ae562)
 
-Flask è un framework di sviluppo web open-source scritto in Python. È stato progettato per essere un framework minimalista, flessibile e facile da utilizzare per la creazione di applicazioni web. L'utilizzo di Flask non è casuale, poichè consente lo sviluppo di API (Interfacce di Programmazione delle Applicazioni) attraverso la creazione di endpoint e percorsi per elaborare richieste e risposte HTTP.
+Flask è un framework di sviluppo web open-source scritto in Python. È stato progettato per essere un framework minimalista, flessibile e facile da utilizzare per la creazione di applicazioni web. L'utilizzo di Flask non è casuale, poichè consente lo sviluppo di **API** (_Interfacce di Programmazione delle Applicazioni_) attraverso la creazione di **endpoint** e percorsi per elaborare richieste e risposte **HTTP**.
+
 Le caratteristiche **principali** includono:
 
 - Nucleo minimalista e flessibile
 - Ampio supporto per i plugin
 - Server di sviluppo integrato
 - Integrazione del toolkit Werkzeug per le funzionalità WSGI
+
+  Il Web Server Gateway Interface (WSGI) è un protocollo di trasmissione che stabilisce e descrive comunicazioni ed interazioni tra server ed applicazioni web scritte nel linguaggio Python. È quindi 			l'interfaccia standard del web service per la programmazione in Python.
 
 In CryptoFolio, **Flask** gestisce:
 
@@ -57,17 +62,19 @@ In CryptoFolio, **Flask** gestisce:
 
 Il **frontend** utilizza uno stack moderno incentrato su _sicurezza e prestazioni_:
 
-1. HTML5/CSS3: markup semantico e stile reattivo
-2. JavaScript (ES6+): Funzionalità lato client con modelli sicuri
-3. Bootstrap 5: framework di design reattivo
-4. Select2: Caselle di selezione migliorate
-5. Chart.js: Visualizzazione grafica del portafoglio
-6. jQuery: Manipolazione del DOM e richieste AJAX
+1. **HTML5/CSS3**: markup semantico e stile reattivo
+2. **JavaScript (ES6+)**: Funzionalità lato client con modelli sicuri
+3. **Bootstrap 5**: framework di design reattivo
+4. **Select2**: Caselle di selezione migliorate
+5. **Chart.js**: Visualizzazione grafica del portafoglio
+6. **jQuery**: Manipolazione del DOM e richieste AJAX
 
 La tecnologia utilizzata ha permesso l'Implementazione di **CSP** (_Content Security Policy_) e quindi di conseguenza misure di prevenzione **XSS**, gestione dei token **CSRF** attraverso cookie sicuri, sanificazione degli **input** e una corretta gestione degli **errori** per evitare **IOE** (_Information over exposure_).
 
 #### Architteura di archiviazione - Firebase Cloud Firestore
-![image](https://github.com/user-attachments/assets/3c5619b8-500d-4f21-aa05-a9188b29095f)
+
+![image](https://github.com/user-attachments/assets/06459b7f-a2e6-4407-9a6c-1c9d711dddc6)
+
 
 **Firebase Cloud Firestore** è un cloud NoSQL flessibile e scalabile, costruito sull'infrastruttura di Google Cloud, per archiviare e sincronizzare i dati per lo sviluppo lato client e lato server.
 Firebase fornisce una soluzione di database sicura e scalabile con:
@@ -100,7 +107,7 @@ Sono state implementate  - _attraverso API debitamente protette_ - diversi servi
 		Archiviazione sicura dei dati
 		Crittografia dei token
 		
-	Servizio di limitazione della velocità
+	Servizio di limitazione
 		Limitazione delle richieste
 		Protezione DDoS
 		Monitoraggio dell'utilizzo
@@ -112,7 +119,7 @@ Sono state implementate  - _attraverso API debitamente protette_ - diversi servi
 
 #### Integrazioni esterne
 
-Il sistema per offrire le funzionalità core dello stesso, integra diversi servizi esterni attraverso API RestFul messe a disposizione. Nel caso specifico dei prezzi crypto - per garantire disponibilità del dato agli utenti - è stato implementato un meccanismo di caching interno che possa aggirare la problematica della "_sincronia_" delle API RestFul, ovvero una delle caratteristiche principali dei Servizi Rest. Se Coincegko non dovesse essere disponibile, l'utente potrà in egual modo accedere ai prezzi delee crypto grazie a tale sistema.
+Il sistema per offrire le funzionalità core dello stesso, integra diversi servizi esterni attraverso API RestFul messe a disposizione. Nel caso specifico dei prezzi crypto - per garantire disponibilità del dato agli utenti - è stato implementato un meccanismo di caching interno che possa aggirare la problematica della "_sincronia_" delle API RestFul, ovvero una delle caratteristiche principali dei Servizi Rest. Se Coincegko non dovesse essere disponibile, l'utente potrà in egual modo accedere ai prezzi delle crypto grazie a tale sistema.
 
 **API CoinGecko**
 
@@ -157,7 +164,7 @@ Il flusso di comunicazione del sistema segue diversi schemi chiave:
 - Chiamate API REST
 - Autenticazione JWT
 - Convalida dei token CSRF
-- Richieste a velocità limitata
+- Richieste imitate
 
 
 **Comunicazione Backend-Servizi esterni**
@@ -183,14 +190,14 @@ In tutto il sistema, i dati sono protetti da:
 
 **Sicurezza dell'archiviazione dei dati**
 
-- Crittografia AES-256 a riposo
+- Crittografia AES-256 
 - Gestione sicura delle chiavi
 - Generazione e rotazione del sale
 
 
 **Sicurezza delle richieste**
 - Convalida dell'ingresso
-- Sanitizzazione dell'input e output
+- Sanificazione dell'input e output
 - Limitazione delle richieste
 - Protezione CSRF
 
@@ -201,7 +208,7 @@ In tutto il sistema, i dati sono protetti da:
 
 ### Architettura completa
 
-Le comunicazioni avvengono tutte attraverso le cosìddette **Routes**, messe a disposizione di Flask. Ogni route rappresenta quindi un endpoint accessibile attraverso un' API Restful con un livello di protezione adeguato alla rota specifica.
+Le comunicazioni avvengono tutte attraverso le cosìddette **Routes**, messe a disposizione di Flask. Ogni route rappresenta quindi un endpoint accessibile attraverso un' API Restful con un livello di protezione adeguato alla route specifica.
 
 ![image](https://github.com/user-attachments/assets/61bc6261-656f-4db3-a45d-3da4e308fee7)
 ![image](https://github.com/user-attachments/assets/96d68f16-01d9-4012-ae57-8af8d503b62b)
@@ -215,7 +222,7 @@ Link all'architettura completa:
 
 ## Routes
 
-Questo documento illustra tutti i percorsi implementati nell'applicazione CryptoFolio, comprese le misure di sicurezza, i controlli di accesso e le funzionalità.
+Questa parte del documento illustra tutti i percorsi implementati nell'applicazione CryptoFolio, comprese le misure di sicurezza, i controlli di accesso e le funzionalità.
 
 ### Percorsi di autenticazione
 
