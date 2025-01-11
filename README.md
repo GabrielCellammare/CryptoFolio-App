@@ -218,7 +218,10 @@ Link all'architettura completa:
 Questo documento illustra tutti i percorsi implementati nell'applicazione CryptoFolio, comprese le misure di sicurezza, i controlli di accesso e le funzionalità.
 
 ### Percorsi di autenticazione
-####  Route Login
+
+#### /auth/login/provider
+
+
 
 ```
    /auth/login/<provider>
@@ -229,7 +232,8 @@ Questo documento illustra tutti i percorsi implementati nell'applicazione Crypto
 | `provider` | `string` | **Required**. ['Google', 'Github] |
 
 **Accesso**: Pubblico
-**Descrizione**: *Avvia il flusso di autenticazione OAuth per il provider specificato (Google o GitHub). *
+
+**Descrizione**: Avvia il flusso di autenticazione OAuth per il provider specificato (Google o GitHub).
 
 **Questo percorso implementa diverse misure di sicurezza necessarie per la route successiva:**
 
@@ -244,6 +248,110 @@ Caratteristiche di **sicurezza**:
 - Protezione **CSRF** attraverso la generazione di token
 - Gestione sicura della sessione
 - Convalida dei parametri di stato OAuth
+
+**Esempio di risposta:** Reindirizza alla pagina di login del provider OAuth (Google - Github)
+
+####  auth/callback/provider
+
+```
+   GET /auth/callback/<provider>
+```
+
+| Parameter | Type     | Description                |
+| :-------- | :------- | :------------------------- |
+| `provider` | `string` | **Required**. ['Google', 'Github] |
+
+**Metodo**: GET
+
+**Accesso**: Riservato
+
+**Descrizione**: Gestisce il callback OAuth dopo l'autenticazione del provider. 
+
+**Prerequisiti**: Token CSRF
+
+**Questo percorso implementa diverse misure di sicurezza necessarie per la route successiva:**
+
+
+- Convalida dello stato **CSRF**
+- Crittografia dei dati con **AES-256**
+- Generazione sicura di **sale**
+- **Registrazione** di tutti i tentativi di autenticazione
+- Gestione degli **errori** con registrazione sicura
+
+**Flusso di processo:**
+
+1. Convalida lo stato **CSRF** dal provider
+2. Recupera e convalida i token **OAuth**
+3. Recupera le informazioni sull'utente dal **provider**
+4. Recupera ID Utente dal **provider** ed effettua **hashing** per assicurare coerenza del formato indipendentemente dal provider
+   
+   ```python
+	def hash_user_id(self, provider: str, original_id: str) -> str:
+        """
+        Generates a secure and consistent hash of the user ID using HMAC-SHA256,
+        encoded in URL-safe base64 format.
+
+        Args:
+            provider: OAuth provider identifier (e.g., 'google', 'github')
+            original_id: Original user ID from the provider
+
+        Returns:
+            str: Base64 encoded hash, URL-safe without padding
+
+        Raises:
+            ValueError: If provider or original_id is empty
+            CryptographicError: If hashing fails
+        """
+        if not provider or not original_id:
+            raise ValueError("Provider and user ID are required")
+
+        try:
+            # Combine provider and ID in a consistent format
+            combined = f"{provider}:{original_id}"
+
+            # Use HMAC-SHA256 to generate a secure hash
+            hmac_obj = hmac.new(
+                key=self.app_secret.to_bytes(),
+                msg=combined.encode(),
+                digestmod=hashlib.sha256
+            )
+
+            # Convert to URL-safe base64 without padding
+            hash_bytes = hmac_obj.digest()  # Get raw bytes instead of hexadecimal
+            return base64.urlsafe_b64encode(hash_bytes).rstrip(b'=').decode('ascii')
+
+        except Exception as e:
+            self.logger.error(f"Error hashing user ID: {e}")
+            raise CryptographicError("Unable to hash user ID") from e
+
+6. Crittografa i dati **sensibili** dell'utente
+7. Crea/aggiorna i record dell'utente
+8. Stabilisce una sessione **sicura**
+
+####  Logout Route: auth/logout
+
+```
+   POST auth/logout
+```
+
+**Metodo**: POST
+
+**Accesso**: Riservato ad utenti loggati
+
+**Descrizione**: Gestisce il processo di logout sicuro dell'utente
+
+**Prerequisiti**: Token CSRF e Login
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- Richiede l'autenticazione (**login_required**)
+- Protezione CSRF (**csrf.csrf_protect**)
+- Pulizia completa della **sessione**
+- Registrazione di **audit**
+
+
+**Risultato**: Risposta **JSON** con redirect alla pagina **principale**
+
 
 ### Autenticazione e sicurezza
 
