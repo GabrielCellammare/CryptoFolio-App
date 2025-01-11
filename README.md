@@ -201,6 +201,8 @@ In tutto il sistema, i dati sono protetti da:
 
 ### Architettura completa
 
+Le comunicazioni avvengono tutte attraverso le cosìddette **Routes**, messe a disposizione di Flask. Ogni route rappresenta quindi un endpoint accessibile attraverso un' API Restful con un livello di protezione adeguato alla rota specifica.
+
 ![image](https://github.com/user-attachments/assets/61bc6261-656f-4db3-a45d-3da4e308fee7)
 ![image](https://github.com/user-attachments/assets/96d68f16-01d9-4012-ae57-8af8d503b62b)
 
