@@ -90,12 +90,12 @@ Sono state implementate  - _attraverso API debitamente protette_ - diversi servi
 		Gestione dei token JWT
 		Gestione delle sessioni
 		Gestione dell'identità dell'utente
-    Gestione delle origini 
-    Controllo Cookie e Headers
+    		Gestione delle origini 
+    		Controllo Cookie e Headers
 
 	Servizio di crittografia
 		Crittografia AES-256
-    Hashing con HMAC
+    		Hashing con HMAC
 		Gestione delle chiavi
 		Archiviazione sicura dei dati
 		Crittografia dei token
@@ -139,8 +139,68 @@ Il sistema per offrire le funzionalità core dello stesso, integra diversi servi
 
 
 - Tunnel sicuro per lo sviluppo locale
-- Crittografia HTTPS
+- Crittografia TLS e utilizzo del protocollo HTTPS
 - Gestione degli URL
+
+### Flusso di comunicazione
+Il flusso di comunicazione del sistema segue diversi schemi chiave:
+
+**Comunicazione utente-frontend**
+
+- Connessioni protette da HTTPS
+- Invio di moduli
+- Richieste AJAX
+
+
+**Comunicazione Frontend-Backend**
+
+- Chiamate API REST
+- Autenticazione JWT
+- Convalida dei token CSRF
+- Richieste a velocità limitata
+
+
+**Comunicazione Backend-Servizi esterni**
+
+- Chiamate API a CoinGecko
+- Operazioni sul database Firebase
+- Interazioni con il provider OAuth
+- Gestione del tunnel Ngrok (sviluppo)
+- Comunicazione con i servizi interni
+- Autenticazione da servizio a servizio
+- Trasferimento di dati criptati
+
+
+### Sicurezza del flusso di dati
+In tutto il sistema, i dati sono protetti da:
+
+**Sicurezza del trasporto**
+
+- Crittografia TLS 1.3
+- Convalida del certificato
+- Applicazione del protocollo sicuro
+
+
+**Sicurezza dell'archiviazione dei dati**
+
+- Crittografia AES-256 a riposo
+- Gestione sicura delle chiavi
+- Generazione e rotazione del sale
+
+
+**Sicurezza delle richieste**
+- Convalida dell'ingresso
+- Sanitizzazione dell'output
+- Limitazione della velocità
+- Protezione CSRF
+
+
+
+![Flow](https://github.com/user-attachments/assets/7dcbabfd-b252-4dca-a053-bf24b090d96e)
+
+
+
+
 
 
 L'architettura del sistema si presenta in tale modo
