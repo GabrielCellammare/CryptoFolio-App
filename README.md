@@ -90,12 +90,12 @@ Sono state implementate  - _attraverso API debitamente protette_ - diversi servi
 		Gestione dei token JWT
 		Gestione delle sessioni
 		Gestione dell'identità dell'utente
-    		Gestione delle origini 
-    		Controllo Cookie e Headers
+    	Gestione delle origini 
+    	Controllo Cookie e Headers
 
 	Servizio di crittografia
 		Crittografia AES-256
-    		Hashing con HMAC
+    	Hashing con HMAC
 		Gestione delle chiavi
 		Archiviazione sicura dei dati
 		Crittografia dei token
@@ -190,8 +190,8 @@ In tutto il sistema, i dati sono protetti da:
 
 **Sicurezza delle richieste**
 - Convalida dell'ingresso
-- Sanitizzazione dell'output
-- Limitazione della velocità
+- Sanitizzazione dell'input e output
+- Limitazione delle richieste
 - Protezione CSRF
 
 
@@ -199,15 +199,16 @@ In tutto il sistema, i dati sono protetti da:
 ![Flow](https://github.com/user-attachments/assets/7dcbabfd-b252-4dca-a053-bf24b090d96e)
 
 
+### Architettura completa
+
+![image](https://github.com/user-attachments/assets/61bc6261-656f-4db3-a45d-3da4e308fee7)
+![image](https://github.com/user-attachments/assets/96d68f16-01d9-4012-ae57-8af8d503b62b)
 
 
 
 
-L'architettura del sistema si presenta in tale modo
-Anteprima ![image](https://github.com/user-attachments/assets/b5db5d12-471b-4d9f-9635-99695da2baed)
-![image](https://github.com/user-attachments/assets/3f4d84c8-67d6-4df0-8e72-9aa4853f23a3)
-
-Link all'architettura completa: [CryptoFolio(Project).pdf](https://github.com/user-attachments/files/18382420/CryptoFolio.Project.pdf)
+Link all'architettura completa: 
+[CryptoFolio(Project).pdf](https://github.com/user-attachments/files/18385195/CryptoFolio.Project.pdf)
 
 
 ## Route
