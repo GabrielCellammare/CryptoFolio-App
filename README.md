@@ -1220,4 +1220,5 @@ To deploy this project run
  - [Firebase Cloud Firestore](https://firebase.google.com/docs/firestore?hl=it)
  - [OAuth 2.0 (Google)](https://developers.google.com/identity/protocols/oauth2?hl=it)
  - [OAuth 2.0 (Github)](https://medium.com/@tony.infisical/guide-to-using-oauth-2-0-to-access-github-api-818383862591)
+ - [CSP](https://managedserver.it/cose-il-criterio-csp-e-come-aggiungerne-uno-content-security-policy/)
 
