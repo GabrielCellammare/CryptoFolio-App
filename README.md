@@ -702,6 +702,214 @@ Ogni percorso dell'applicazione è protetto da più livelli di sicurezza, second
 Tutti i dati di risposta sono accuratamente sanificati per evitare la fuga di informazioni e i messaggi di errore sono generalizzati per evitare di esporre dettagli interni al sistema.
 
 
+### Configurazione iniziale
+
+# Configurazione di Sicurezza per Applicazioni Flask
+
+Questo documento descrive in dettaglio la configurazione di sicurezza definita nel file Python analizzato, con spiegazioni per ciascuna delle variabili principali e il loro utilizzo.
+
+---
+
+## **Security Headers**
+
+### **1. HSTS**
+```python
+HSTS: str = field(default="max-age=31536000; includeSubDomains")
+```
+- **Significato**:
+  - **`max-age=31536000`**: Impone ai browser di accedere al dominio solo tramite HTTPS per un periodo di 1 anno (31536000 secondi).
+  - **`includeSubDomains`**: Estende questa regola a tutti i sottodomini del dominio principale.
+- **Utilizzo**: Garantisce che il traffico del dominio (e dei suoi sottodomini) sia sempre cifrato.
+
+---
+
+### **2. CONTENT_TYPE_OPTIONS**
+```python
+CONTENT_TYPE_OPTIONS: str = field(default="nosniff")
+```
+- **Significato**:
+  - Previene che il browser interpreti il tipo di contenuto in modo diverso da quanto dichiarato dal server.
+  - Protegge da attacchi di tipo **MIME-sniffing**.
+- **Utilizzo**: Blocca il caricamento di contenuti con tipi MIME non validi o non attesi.
+
+---
+
+### **3. FRAME_OPTIONS**
+```python
+FRAME_OPTIONS: str = field(default="DENY")
+```
+- **Significato**:
+  - Impedisce che il sito venga incorniciato (`<iframe>`) in altri siti web.
+  - Protegge da attacchi di **clickjacking**.
+- **Utilizzo**: Blocca qualsiasi tentativo di visualizzare il sito in un iframe.
+
+---
+
+### **4. XSS_PROTECTION**
+```python
+XSS_PROTECTION: str = field(default="1; mode=block")
+```
+- **Significato**:
+  - Attiva il filtro XSS del browser.
+  - **`1`**: Abilita il filtro.
+  - **`mode=block`**: Blocca completamente la pagina in caso di rilevamento di uno script dannoso.
+- **Utilizzo**: Protezione contro gli attacchi **Cross-Site Scripting (XSS)**.
+
+---
+
+### **5. REFERRER_POLICY**
+```python
+REFERRER_POLICY: str = field(default="strict-origin-when-cross-origin")
+```
+- **Significato**:
+  - Controlla quali informazioni del referrer (URL precedente) vengono inviate nelle richieste.
+  - **`strict-origin-when-cross-origin`**:
+    - Invia solo il dominio (`origin`) del referrer per richieste cross-origin.
+    - Invia l'intero referrer solo per richieste verso la stessa origine.
+- **Utilizzo**: Migliora la privacy degli utenti riducendo la quantità di informazioni condivise tra domini.
+
+---
+
+### **6. PERMITTED_CROSS_DOMAIN_POLICIES**
+```python
+PERMITTED_CROSS_DOMAIN_POLICIES: str = field(default="none")
+```
+- **Significato**:
+  - Blocca le richieste di politiche cross-domain come i file `*.swf` o `*.xml`.
+- **Utilizzo**: Previene potenziali abusi relativi a plugin Adobe Flash o Silverlight.
+
+---
+
+## **Content Security Policy (CSP)**
+
+### **Definizione di CSP**
+```python
+CSP: str = field(default=(
+    "default-src 'self'; "
+    "img-src 'self' data: https:; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com; "
+    "font-src 'self' https://cdnjs.cloudflare.com; "
+    "connect-src 'self' https://*.ngrok-free.app https://*.ngrok.io; "
+    "frame-ancestors 'none';"
+))
+```
+
+#### **Descrizione delle direttive**:
+1. **`default-src 'self';`**
+   - Origine predefinita per tutte le risorse non coperte da altre direttive.
+   - **`'self'`**: Consente solo risorse provenienti dallo stesso dominio da cui la pagina è stata servita.
+
+2. **`img-src 'self' data: https:;`**
+   - Controlla le origini consentite per il caricamento delle immagini.
+   - **`'self'`**: Immagini caricate dallo stesso dominio della pagina.
+   - **`data:`**: Consente immagini caricate come data URI (es. `data:image/png;base64,...`).
+   - **`https:`**: Permette immagini da qualsiasi origine che usa HTTPS.
+
+3. **`style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;`**
+   - Controlla le origini per i fogli di stile (CSS).
+   - **`'self'`**: Fogli di stile dal dominio della pagina.
+   - **`'unsafe-inline'`**: Permette stili inline (rischioso, ma utile in alcuni casi specifici).
+   - **URL specifici**: Permette stili da CDN noti come `jsdelivr` e `cdnjs`.
+
+4. **`script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com;`**
+   - Controlla le origini per il caricamento degli script JavaScript.
+   - **`'self'`**: Solo script dal dominio della pagina.
+   - **`'unsafe-inline'`**: Consente script inline (potenzialmente rischioso per XSS).
+   - **`'unsafe-eval'`**: Permette l'uso di `eval()` e simili (rischioso).
+   - **URL specifici**: Consente script da CDN comuni come `jsdelivr`, `cdnjs` e `code.jquery.com`.
+
+5. **`font-src 'self' https://cdnjs.cloudflare.com;`**
+   - Origini per i font web.
+   - **`'self'`**: Font dal dominio della pagina.
+   - **`cdnjs.cloudflare.com`**: Permette font da questo CDN.
+
+6. **`connect-src 'self' https://*.ngrok-free.app https://*.ngrok.io;`**
+   - Origini per connessioni HTTP o WebSocket.
+   - **`'self'`**: Consente connessioni al proprio dominio.
+   - **`https://*.ngrok-free.app`** e **`https://*.ngrok.io`**: Permette connessioni a sottodomini dinamici (es. per debug con ngrok).
+
+7. **`frame-ancestors 'none';`**
+   - Specifica chi può incorniciare il sito (usando `<iframe>`).
+   - **`'none'`**: Blocca qualsiasi tentativo di incorniciare il sito.
+
+---
+
+## **Altre Variabili di Configurazione**
+
+### **7. DEFAULT_CORS_MAX_AGE**
+```python
+DEFAULT_CORS_MAX_AGE: int = 3600  # 1 hour
+```
+- **Significato**:
+  - Specifica per quanto tempo una risposta **CORS preflight** può essere memorizzata nella cache dal browser.
+- **Utilizzo**: Riduce il numero di richieste **OPTIONS** effettuate dal browser.
+
+---
+
+### **8. DEFAULT_HSTS_MAX_AGE**
+```python
+DEFAULT_HSTS_MAX_AGE: int = 31536000  # 1 year
+```
+- **Significato**:
+  - Durata predefinita per l'header HSTS.
+- **Utilizzo**: Fornisce una configurazione standard per la durata delle politiche HSTS.
+
+---
+
+### **9. SUPPORTED_ENVIRONMENTS**
+```python
+SUPPORTED_ENVIRONMENTS: Set[str] = frozenset({'development', 'production'})
+```
+- **Significato**:
+  - Elenco degli ambienti supportati dall'applicazione.
+  - **`development`**: Ambiente di test/sviluppo.
+  - **`production`**: Ambiente di produzione con configurazioni più restrittive.
+- **Utilizzo**: Aiuta a gestire configurazioni diverse per ambienti differenti.
+
+---
+
+## **Configurazioni CORS**
+
+### **Definizione di cors_headers**
+```python
+cors_headers = {
+    'Access-Control-Allow-Headers': os.getenv('CORS_ALLOWED_HEADERS', ''),
+    'Access-Control-Allow-Methods': os.getenv('CORS_ALLOWED_METHODS', ''),
+    'Access-Control-Allow-Credentials': os.getenv('CORS_ALLOW_CREDENTIALS', ''),
+    'Access-Control-Expose-Headers': os.getenv('CORS_EXPOSE_HEADERS', ''),
+    'Access-Control-Max-Age': str(self.DEFAULT_CORS_MAX_AGE)
+}
+```
+#### **Descrizione**:
+1. **`Access-Control-Allow-Headers`**: Specifica gli header HTTP che il client può includere nelle richieste cross-origin.
+2. **`Access-Control-Allow-Methods`**: Elenca i metodi HTTP consentiti (es. GET, POST, PUT).
+3. **`Access-Control-Allow-Credentials`**: Consente al browser di inviare credenziali (es. cookie) nelle richieste cross-origin.
+4. **`Access-Control-Expose-Headers`**: Definisce quali header il browser può esporre.
+5. **`Access-Control-Max-Age`**: Specifica la durata di caching per le richieste preflight.
+
+---
+
+## **Configurazioni Security Headers**
+
+### **Definizione di security_headers**
+```python
+security_headers = {
+    'X-Content-Type-Options': self._security_headers.CONTENT_TYPE_OPTIONS,
+    'X-Frame-Options': self._security_headers.FRAME_OPTIONS,
+    'X-XSS-Protection': self._security_headers.XSS_PROTECTION,
+    'Referrer-Policy': self._security_headers.REFERRER_POLICY,
+    'X-Permitted-Cross-Domain-Policies': self._security_headers.PERMITTED_CROSS_DOMAIN_POLICIES,
+    'Content-Security-Policy': self._security_headers.CSP
+}
+```
+#### **Descrizione**:
+1. **`X-Content-Type-Options`**: Previene il MIME-sniffing.
+2. **`X-Frame-Options`**: Impedisce il framing della pagina.
+3. **`X-XSS-Protection`**: Protegge da attacchi XSS.
+4. **`Referrer-Policy`**: Limita i dati referrer inviati nelle richieste.
+5. **`X-Permitted-Cross-Domain-Policies`**: Blocca richieste cross-domain non autorizzate.
+6. **`Content-Security-Policy`**: Gestisce le origini delle risorse caricate dal browser.
 
 
 ### Autenticazione e sicurezza
@@ -1010,4 +1218,6 @@ To deploy this project run
  - [JWT e Bearer Token](https://www.linkedin.com/pulse/jwt-e-bearer-token-facciamo-chiarezza-guido-spadotto/)
  - [Flask Framework](https://flask.palletsprojects.com/en/stable/)
  - [Firebase Cloud Firestore](https://firebase.google.com/docs/firestore?hl=it)
+ - [OAuth 2.0 (Google)](https://developers.google.com/identity/protocols/oauth2?hl=it)
+ - [OAuth 2.0 (Github)](https://medium.com/@tony.infisical/guide-to-using-oauth-2-0-to-access-github-api-818383862591)
 
