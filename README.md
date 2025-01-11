@@ -486,6 +486,49 @@ Nel caso in cui l'utente decidesse di cambiare solo un valore, i rimanenti valor
 - Registrazione di **audit**
 - Gestione degli **errori**
 
+####  Visualizzazione valuta selezionata: /api/preferences/currency
+
+```
+   GET /api/preferences/currency
+```
+
+**Metodo**: GET
+
+**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **dashboard**
+
+**Descrizione**: Restituisce la valuta attualmente selezionata dalla **dashboard**
+
+**Prerequisiti**:  Token CSRF, Nonce,  Login,  Validazione Origin e Headers
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- **Autenticazione** necessaria
+- Protezione **CSRF** (csrf.csrf_protect)
+
+####  Modifica della valuta da visualizzare: /api/preferences/currency
+
+```
+   PUT /api/preferences/currency
+```
+
+| Parameter | Type     | Description                |
+| :-------- | :------- | :------------------------- |
+| `currency` | `string` | **Required**. ['USD', 'EUR' |
+
+**Metodo**: PUT
+
+**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **dashboard**
+
+**Descrizione**: Permette di modificare la valuta attualmente selezionata dalla **dashboard**
+
+**Prerequisiti**:  Token CSRF, Nonce,  Login,  Validazione Origin e Headers
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- **Autenticazione** necessaria
+- Protezione **CSRF** (csrf.csrf_protect)
+- Sanificazione degli **Input**
+
 ### Routes di gestiione dei Token per API (JWT)
 
 Anche in questo caso, tutte le routes sono accessibili soltanto dalla pagina **principale**: non è possibile effettuare richieste API esternamente poichè verranno gestite interamente dalla web app, attraverso una firma gemerata da un'origine javascript verificata con una validità limitata. 
