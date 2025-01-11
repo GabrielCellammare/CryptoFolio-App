@@ -440,15 +440,18 @@ Caratteristiche di **sicurezza**:
 
 **Metodo**: PUT
 
-**Accesso**: Riservato ad utenti loggati
+**Accesso**: Riservato ad utenti loggati e accessibile soltanto dalla dashboard
 
 **Descrizione**: Modifica **quantità**, prezzo di **acquisto** e data di **acquisto** di una specifico **crypto** associata al portfolio con archiviazione **crittografata**.
 
 **Prerequisiti**: Token CSRF, Nonce,  Login, Validazione Origin e Headers
 
 **Campi necessari**:
+
 `purchase_price`       `float`  **Required** nuovo prezzo di acquisto
+
  `purchase_date`       `float`  **Required** nuova data di acquisto 
+ 
  `purchase_amount`  `float`  **Required**. nuova quantità di acquisto 
 
 Nel caso in cui l'utente decidesse di cambiare solo un valore, i rimanenti valori verranno aggiornati con quelli precedentemente presenti di default.
@@ -469,7 +472,7 @@ Nel caso in cui l'utente decidesse di cambiare solo un valore, i rimanenti valor
 
 **Metodo**: DELETE
 
-**Accesso**: Riservato ad utenti loggati
+**Accesso**: Riservato ad utenti loggati e accessibile soltanto dalla dashboard
 
 **Descrizione**: Elimina una crypto dal portfolio dell'utente
 
@@ -495,7 +498,7 @@ Anche in questo caso, tutte le routes sono accessibili soltanto dalla pagina **p
 
 **Metodo**: POST
 
-**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **web app**
+**Accesso**: Riservato ad utenti loggati e accessibile soltanto dalla dashboard
 
 **Descrizione**: Ottieni un token **JWT** da utilizzare con **EndPoint** designati all'ottenimento del valore del **Portfolio** o all'aggiunta di nuove **Crypto**
 
@@ -519,7 +522,7 @@ Anche in questo caso, tutte le routes sono accessibili soltanto dalla pagina **p
 
 **Metodo**: GET
 
-**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **web app**
+**Accesso**: Riservato ad utenti loggati e accessibile soltanto dalla dashboard
 
 **Descrizione**: Ottieni informazioni sulla validità di un token **JWT** da utilizzare con **EndPoint** designati all'ottenimento del valore del **Portfolio** o all'aggiunta di nuove **Crypto**
 
@@ -539,7 +542,7 @@ Anche in questo caso, tutte le routes sono accessibili soltanto dalla pagina **p
 
 **Metodo**: POST
 
-**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **web app**
+**Accesso**: Riservato ad utenti loggati e accessibile soltanto dalla dashboard
 
 **Descrizione**: Gestisce i token scaduti modificando la **proprietà** su Firestore da **Valid** a **Expired**
 
