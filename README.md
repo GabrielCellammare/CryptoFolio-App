@@ -361,7 +361,7 @@ Caratteristiche di **sicurezza**:
 
 ### Route di gestione del Portfolio 
 
-È bene specificare che tutte queste **routes** (al di fuori di dashboard), sono accessibili soltanto dalla pagina diretta: non è possibile effettuare richieste API esternamente poichè verranno gestite interamente dalla web app, attraverso una firma gemerata da un'origine javascript verificata con una validità limitata. 
+È bene specificare che tutte queste **routes** (al di fuori di dashboard), sono accessibili soltanto dalla pagina principale: non è possibile effettuare richieste API esternamente poichè verranno gestite interamente dalla web app, attraverso una firma gemerata da un'origine javascript verificata con una validità limitata. 
 
 ####  Dashboard route: /dashboard
 
@@ -414,7 +414,7 @@ Caratteristiche di **sicurezza**:
 - Autenticazione **richiesta** (login_required)
 - Protezione **CSRF** (csrf.csrf_protect)
 - Limitazione della **richieste** (rate_limit_decorator)
-- **Validazione** dell'input
+- **Sanificazione** dell'input
 - **Crittografia** dei dati
 - Gestione delle **transazioni**
 - Registrazione delle verifiche
@@ -483,6 +483,73 @@ Nel caso in cui l'utente decidesse di cambiare solo un valore, i rimanenti valor
 - Registrazione di **audit**
 - Gestione degli **errori**
 
+### Route di gestiione dei Token per API (JWT)
+
+Anche in questo caso, tutte le routes sono accessibili soltanto dalla pagina **principale**: non è possibile effettuare richieste API esternamente poichè verranno gestite interamente dalla web app, attraverso una firma gemerata da un'origine javascript verificata con una validità limitata. 
+
+####  Ottieni un Token API (JWT): /api/token
+
+```
+   POST /api/token
+```
+
+**Metodo**: POST
+
+**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **web app**
+
+**Descrizione**: Ottieni un token **JWT** da utilizzare con **EndPoint** designati all'ottenimento del valore del **Portfolio** o all'aggiunta di nuove **Crypto**
+
+**Prerequisiti**: Token CSRF, Nonce,  Login,  Validazione Origin e Headers, Prerequisiti per la generazione
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- **Autenticazione** necessaria
+- **Protezione** CSRF
+- Limitazione delle **richieste** (1 token ogni 12 ore, Max 2 token al giorno)
+- La generazione di un nuovo **token** invalida quello precedentemente **generato**
+- Rotazione dei **token**
+- Registrazione di audit
+- Tracciamento del dispositivo
+
+####  Ottieni informazioni sulla validità del Token API (JWT): /api/token/status
+
+```
+   GET /api/token/status
+```
+
+**Metodo**: GET
+
+**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **web app**
+
+**Descrizione**: Ottieni informazioni sulla validità di un token **JWT** da utilizzare con **EndPoint** designati all'ottenimento del valore del **Portfolio** o all'aggiunta di nuove **Crypto**
+
+**Prerequisiti**: Token CSRF, Nonce,  Login,  Validazione Origin e Headers
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- **Autenticazione** necessaria
+- **Protezione** CSRF
+- Abilità o meno la **possibilità** di generare un nuovo token
+
+####  Pulizia dei Token API (JWT): /api/token/cleanup
+
+```
+   POST  /api/token/cleanup
+```
+
+**Metodo**: POST
+
+**Accesso**: Riservato ad utenti **loggati** e accessibile soltanto attraverso la **web app**
+
+**Descrizione**: Gestisce i token scaduti modificando la **proprietà** su Firestore da **Valid** a **Expired**
+
+**Prerequisiti**: Token CSRF, Nonce,  Login,  Validazione Origin e Headers
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- **Autenticazione** necessaria
+- **Protezione** CSRF
+- Abilità o meno la **possibilità** di generare un nuovo token
 
 
 
