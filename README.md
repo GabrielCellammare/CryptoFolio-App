@@ -21,7 +21,127 @@ L'**applicazione** consente agli utenti di:
 7. Interagire con il proprio portfolio attraverso **un'API Restful** 
 8. Ottenere il **controvalore** del proprio portfolio in diverse valute sfrutando i tassi di conversione aggiornati in tempo reale 
 
-## Architettura tecnica
+## CryptoFolio: Architettura del sistema
+**CryptoFolio** implementa un modello di "**architettura orientata ai servizi (SOA)**", in particolare un approccio simile ai **microservizi**, in cui i diversi componenti hanno un basso accoppiamente ed un'alta coesione, comunicando attraverso interfacce ben definite (***API REST***). Questa scelta architettonica offre diversi vantaggi:
+
+- **Indipendenza dai servizi**: Ogni componente (autenticazione, gestione del portafoglio...) opera in modo indipendente.
+- **Scalabilità**: I servizi possono essere scalati in modo indipendente in base al carico.
+- **Isolamento della sicurezza:** La compromissione di un servizio non compromette automaticamente gli altri.
+- **Flessibilità tecnologica**: Servizi diversi possono utilizzare tecnologie diverse a seconda delle necessità
+
+### Componenti principali
+#### Architettura del Backend - Flask
+![image](https://github.com/user-attachments/assets/08e8ffc2-91c8-4eb7-9be2-9e5e014ae562)
+
+Flask è un framework di sviluppo web open-source scritto in Python. È stato progettato per essere un framework minimalista, flessibile e facile da utilizzare per la creazione di applicazioni web. L'utilizzo di Flask non è casuale, poichè consente lo sviluppo di API (Interfacce di Programmazione delle Applicazioni) attraverso la creazione di endpoint e percorsi per elaborare richieste e risposte HTTP.
+Le caratteristiche **principali** includono:
+
+- Nucleo minimalista e flessibile
+- Ampio supporto per i plugin
+- Server di sviluppo integrato
+- Integrazione del toolkit Werkzeug per le funzionalità WSGI
+
+In CryptoFolio, **Flask** gestisce:
+
+1. Instradamento ed elaborazione delle richieste
+2. Gestione delle sessioni
+3. Rendering dei modelli
+4. Integrazione del middleware di sicurezza
+5. Implementazione di endpoint API
+6. Configurazione iniziale del Server
+7. Meccanismi di sicurezza
+
+#### Architettura del frontend
+
+![image](https://github.com/user-attachments/assets/cce6530a-d59a-4203-a046-e5a27f7c5799)
+
+Il **frontend** utilizza uno stack moderno incentrato su _sicurezza e prestazioni_:
+
+1. HTML5/CSS3: markup semantico e stile reattivo
+2. JavaScript (ES6+): Funzionalità lato client con modelli sicuri
+3. Bootstrap 5: framework di design reattivo
+4. Select2: Caselle di selezione migliorate
+5. Chart.js: Visualizzazione grafica del portafoglio
+6. jQuery: Manipolazione del DOM e richieste AJAX
+
+La tecnologia utilizzata ha permesso l'Implementazione di **CSP** (_Content Security Policy_) e quindi di conseguenza misure di prevenzione **XSS**, gestione dei token **CSRF** attraverso cookie sicuri, sanificazione degli **input** e una corretta gestione degli **errori** per evitare **IOE** (_Information over exposure_).
+
+#### Architteura di archiviazione - Firebase Cloud Firestore
+![image](https://github.com/user-attachments/assets/3c5619b8-500d-4f21-aa05-a9188b29095f)
+
+**Firebase Cloud Firestore** è un cloud NoSQL flessibile e scalabile, costruito sull'infrastruttura di Google Cloud, per archiviare e sincronizzare i dati per lo sviluppo lato client e lato server.
+Firebase fornisce una soluzione di database sicura e scalabile con:
+
+1. Sincronizzazione dei dati in tempo reale
+2. Integrazione dell'autenticazione integrata
+3. Scalabilità automatica
+4. Regole di accesso sicuro ai dati
+5. Backup e disaster recovery
+6. Archiviazione crittografata dei dati
+
+#### Architettura di sicurezza - Servizi di sicurezza
+
+![image](https://github.com/user-attachments/assets/09c547e3-9a28-40be-8979-a0933ea177f7)
+
+Sono state implementate  - _attraverso API debitamente protette_ - diversi servizi di sicurezza che lavorano sinergicamente per proteggere l'applicazione:
+
+	Servizio di autenticazione
+		Integrazione OAuth 2.0 (Google/GitHub)
+		Gestione dei token JWT
+		Gestione delle sessioni
+		Gestione dell'identità dell'utente
+    Gestione delle origini 
+    Controllo Cookie e Headers
+
+	Servizio di crittografia
+		Crittografia AES-256
+    Hashing con HMAC
+		Gestione delle chiavi
+		Archiviazione sicura dei dati
+		Crittografia dei token
+		
+	Servizio di limitazione della velocità
+		Limitazione delle richieste
+		Protezione DDoS
+		Monitoraggio dell'utilizzo
+		
+	Servizio di protezione CSRF
+		Generazione di token
+		Convalida delle richieste
+		Gestione nonce
+
+#### Integrazioni esterne
+
+Il sistema per offrire le funzionalità core dello stesso, integra diversi servizi esterni attraverso API RestFul messe a disposizione. Nel caso specifico dei prezzi crypto - per garantire disponibilità del dato agli utenti - è stato implementato un meccanismo di caching interno che possa aggirare la problematica della "_sincronia_" delle API RestFul, ovvero una delle caratteristiche principali dei Servizi Rest. Se Coincegko non dovesse essere disponibile, l'utente potrà in egual modo accedere ai prezzi delee crypto grazie a tale sistema.
+
+**API CoinGecko**
+
+![image](https://github.com/user-attachments/assets/ba036108-ff54-4761-b664-936d650d850d)
+
+
+- Prezzi delle criptovalute in tempo reale
+- Dati di mercato
+- Informazioni sulle attività
+
+
+**Fornitori OAuth**
+
+![image](https://github.com/user-attachments/assets/2bc53069-9ec8-446a-8ce9-9b3d2559b77f)
+
+
+- Servizio OAuth di Google
+- Servizio GitHub OAuth
+
+
+**Ngrok**
+
+![image](https://github.com/user-attachments/assets/71bce232-ab88-4b58-ab9a-0ce72f623839)
+
+
+- Tunnel sicuro per lo sviluppo locale
+- Crittografia HTTPS
+- Gestione degli URL
+
 
 L'architettura del sistema si presenta in tale modo
 Anteprima ![image](https://github.com/user-attachments/assets/b5db5d12-471b-4d9f-9635-99695da2baed)
@@ -336,4 +456,6 @@ To deploy this project run
 
  - [Bearer Token](https://stackoverflow.com/questions/25838183/what-is-the-oauth-2-0-bearer-token-exactly)
  - [JWT e Bearer Token](https://www.linkedin.com/pulse/jwt-e-bearer-token-facciamo-chiarezza-guido-spadotto/)
+ - [Flask Framework](https://flask.palletsprojects.com/en/stable/)
+ - [Firebase Cloud Firestore](https://firebase.google.com/docs/firestore?hl=it)
 
