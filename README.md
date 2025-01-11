@@ -213,7 +213,37 @@ Link all'architettura completa:
 [CryptoFolio(Project).pdf](https://github.com/user-attachments/files/18385195/CryptoFolio.Project.pdf)
 
 
-## Route
+## Routes
+
+Questo documento illustra tutti i percorsi implementati nell'applicazione CryptoFolio, comprese le misure di sicurezza, i controlli di accesso e le funzionalità.
+
+### Percorsi di autenticazione
+####  Route Login
+
+```
+   /auth/login/<provider>
+```
+
+| Parameter | Type     | Description                |
+| :-------- | :------- | :------------------------- |
+| `provider` | `string` | **Required**. ['Google', 'Github] |
+
+**Accesso**: Pubblico
+**Descrizione**: *Avvia il flusso di autenticazione OAuth per il provider specificato (Google o GitHub). *
+
+**Questo percorso implementa diverse misure di sicurezza necessarie per la route successiva:**
+
+- Generazione di token **CSRF** senza richiedere **l'ID utente**
+- Convalida del provider per consentire solo “*google*” e “*github*”.
+- Gestione sicura dei **reindirizzamenti**
+- Gestione dello **stato** della sessione
+
+Caratteristiche di **sicurezza**:
+
+- Convalida dell'input per i parametri del *provider*
+- Protezione **CSRF** attraverso la generazione di token
+- Gestione sicura della sessione
+- Convalida dei parametri di stato OAuth
 
 ### Autenticazione e sicurezza
 
