@@ -278,7 +278,7 @@ Caratteristiche di **sicurezza**:
 - **Registrazione** di tutti i tentativi di autenticazione
 - Gestione degli **errori** con registrazione sicura
 
-**Flusso di processo:**
+**Flusso del processo:**
 
 1. Convalida lo stato **CSRF** dal provider
 2. Recupera e convalida i token **OAuth**
@@ -351,6 +351,76 @@ Caratteristiche di **sicurezza**:
 
 
 **Risultato**: Risposta **JSON** con redirect alla pagina **principale**
+
+### Route di gestione del Portfolio 
+
+####  Dashboard route: /dashboard
+
+```
+   GET /dashboard
+```
+
+**Metodo**: GET
+
+**Accesso**: Riservato ad utenti loggati
+
+**Descrizione**: Dashboard principale che visualizza i dati crittografati del portfolio con valutazioni in tempo reale
+
+**Prerequisiti**: Token CSRF e Login
+
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- **Autenticazione** necessaria
+- Cifratura/decifratura dei **dati**
+- Sanificazione dell'**input**
+- Gestione degli **errori**
+- Registrazione di **audit**
+
+
+**Dettagli di implementazione:**
+
+- Implementa la **paginazione** (50 elementi per pagina)
+- Logica di ripetizione della **connessione** (max 3 tentativi)
+- Recupero dei prezzi in batch
+- Chunking dei dati per le prestazioni
+
+
+####  Aggiungi crypto al portfolio: /api/portfolio/add
+
+```
+   POST /api/portfolio/add
+```
+
+**Metodo**: POST
+
+**Accesso**: Riservato ad utenti loggati e accessibile soltanto dalla dashboard
+
+**Descrizione**: Aggiunge una nuova crypto al portfolio con archiviazione crittografata
+
+**Prerequisiti**: Token CSRF, Nonce, Ratelimiting e Login
+
+**Questo percorso implementa diverse misure di sicurezza necessarie**
+
+- Autenticazione **richiesta** (login_required)
+- Protezione **CSRF** (csrf.csrf_protect)
+- Limitazione della **richieste** (rate_limit_decorator)
+- **Validazione** dell'input
+- **Crittografia** dei dati
+- Gestione delle **transazioni**
+- Registrazione delle verifiche
+
+
+**Esempio di utilizzo**
+```json
+{
+    “crypto_id": “bitcoin”,
+    “simbolo": “BTC”,
+    “importo": 1.5,
+    “prezzo_acquisto": 45000,
+    “data_acquisto": “2024-01-15”
+}
+```
 
 
 ### Autenticazione e sicurezza
