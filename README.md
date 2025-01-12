@@ -331,7 +331,7 @@ Caratteristiche di **sicurezza**:
             self.logger.error(f"Error hashing user ID: {e}")
             raise CryptographicError("Unable to hash user ID") from e
 
-6. Crittografa i dati **sensibili** dell'utente
+6. Cifra i dati **sensibili** dell'utente
 7. Crea/aggiorna i record dell'utente
 8. Stabilisce una sessione **sicura**
 
@@ -1428,45 +1428,197 @@ Aggiunge header di sicurezza a tutte le risposte (precedentemente analizzato):
 - Protezione XSS
 - Prevenzione Clickjacking
 
+# Utilizzo del Sale nell'Applicazione
 
-### Autenticazione e sicurezza
+## Panoramica dell'Utilizzo del Sale
 
-1. Integrazione OAuth 2.0 con Google e GitHub per l'autenticazione sicura degli utenti
-2. Autenticazione API basata su JWT per l'accesso programmatico
-3. Protezione CSRF con convalida di token e nonce
-4. Limitazione della velocità e strozzatura delle richieste
-5. Crittografia AES-256 per l'archiviazione di dati sensibili
-6. Convalida e sanitizzazione complete dell'input
-7. Gestione sicura delle sessioni con timeout automatico
-8. Operazioni di memoria protette per i dati sensibili
+Nell'applicazione, il sale crittografico viene utilizzato principalmente per tre scopi fondamentali:
 
-## Integrazioni esterne
+1. Protezione delle informazioni sensibili degli utenti
+2. Generazione di identificatori utente univoci e sicuri
+3. Derivazione delle chiavi di crittografia
 
-1. CoinGecko API per i dati di prezzo delle criptovalute in tempo reale
-2. Firebase/Firestore per la persistenza sicura dei dati
-3. Google OAuth per l'autenticazione
-4. GitHub OAuth per l'autenticazione
+## Generazione e Memorizzazione del Sale
 
-## Protezione dei dati
-Tutti i dati sensibili dell'utente vengono crittografati utilizzando la crittografia AES-256 prima della memorizzazione, con meccanismi di derivazione della chiave e di salatura adeguati. L'applicazione implementa un approccio di difesa in profondità con più livelli di sicurezza:
+Quando un nuovo utente si registra attraverso OAuth, viene generato un sale univoco:
 
-sicurezza del livello di trasporto (TLS) per tutte le comunicazioni
-Gestione sicura dei token con rotazione automatica
-endpoint API protetti con controlli di accesso adeguati
-Registrazione di audit per gli eventi rilevanti per la sicurezza
-Gestione sicura degli errori per prevenire la perdita di informazioni
+```python
+# Nel callback OAuth
+secure_salt = cipher.generate_salt()
+security_ref = db.collection('user_security').document(user_id)
 
-## Caratteristiche del frontend
+# Conversione del SecureByteArray in stringa base64 per storage
+salt_bytes = secure_salt.to_bytes()
+encoded_salt = base64.b64encode(salt_bytes).decode()
 
-Valutazione del portafoglio in tempo reale
-Grafici e analisi interattivi
-Design reattivo con Bootstrap
-Supporto per la conversione di valuta
-Gestione sicura dei moduli
+# Memorizzazione nel database
+security_ref.set({
+    'salt': encoded_salt,
+    'created_at': firestore.SERVER_TIMESTAMP,
+    'last_login': firestore.SERVER_TIMESTAMP,
+    'oauth_token_metadata': token_metadata
+})
+```
 
+Il metodo generate_salt() nella classe AESCipher produce un sale crittograficamente sicuro:
 
-L'applicazione segue le moderne best practice di sicurezza e include un'ampia protezione contro le vulnerabilità web più comuni come XSS, CSRF, SQL injection e vari vettori di attacco specifici per le API. Fornisce una piattaforma sicura per la gestione del portafoglio di criptovalute, mantenendo elevati standard di protezione dei dati degli utenti.
-Tutte queste funzionalità sono implementate con una forte attenzione alla sicurezza, seguendo il principio della difesa in profondità e incorporando più livelli di protezione per garantire che i dati degli utenti rimangano al sicuro durante tutte le operazioni.
+```python
+def generate_salt(self) -> SecureByteArray:
+    try:
+        return SecureByteArray(os.urandom(self.SALT_LENGTH))
+    except Exception as e:
+        self.logger.error(f"Error generating salt: {e}")
+        raise CryptographicError("Unable to generate salt")
+```
+
+## Utilizzo del Sale per la Crittografia
+
+Il sale viene utilizzato per la derivazione delle chiavi di crittografia quando si devono cifrare dati sensibili dell'utente:
+
+```python
+def derive_key(self, user_id: str, salt: Union[bytes, SecureByteArray]) -> SecureByteArray:
+    key_material = None
+    secure_salt = None
+    derived_key = None
+
+    try:
+        # Conversione sicura del sale
+        secure_salt = self._ensure_secure_bytes(salt)
+
+        # Configurazione KDF (Key Derivation Function)
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA3_256(),
+            length=self.KEY_LENGTH,
+            salt=secure_salt.to_bytes(),
+            iterations=self.KDF_ITERATIONS,
+            backend=default_backend()
+        )
+
+        # Combinazione sicura di user_id e master_key
+        key_material = SecureByteArray(
+            user_id.encode() + self.master_key.to_bytes()
+        )
+
+        # Derivazione della chiave
+        derived_key = SecureByteArray(kdf.derive(key_material.to_bytes()))
+
+        return derived_key
+
+    finally:
+        # Pulizia sicura della memoria
+        for secure_data in [key_material, secure_salt]:
+            if secure_data is not None and secure_data is not salt:
+                secure_data.secure_zero()
+```
+
+## Utilizzo Pratico nella Gestione del Portfolio
+
+Quando si gestiscono le informazioni del portfolio dell'utente, il sale viene utilizzato per cifrare i dati sensibili:
+
+```python
+# Recupero del sale dell'utente per operazioni di portfolio
+security_ref = db.collection('user_security').document(user_id)
+security_data = security_ref.get()
+
+encoded_salt = security_data.to_dict()['salt']
+salt_bytes = base64.b64decode(encoded_salt)
+
+# Cifratura di un elemento del portfolio
+encrypted_data = portfolio_encryption.encrypt_portfolio_item(
+    validated_data,
+    user_id,
+    salt_bytes
+)
+
+# Decifratura di un elemento del portfolio
+decrypted_item = portfolio_encryption.decrypt_portfolio_item(
+    encrypted_item,
+    user_id,
+    salt_bytes
+)
+```
+
+## Protezione degli Indirizzi Email
+
+Gli indirizzi email degli utenti vengono cifrati usando il sale dell'utente prima di essere memorizzati:
+
+```python
+# Durante la registrazione dell'utente
+encrypted_email = cipher.encrypt(
+    user_email,
+    user_id,
+    secure_salt
+).decode()
+
+user_ref.set({
+    'username': username,
+    'email': encrypted_email,
+    'preferred_currency': 'USD',
+    'created_at': firestore.SERVER_TIMESTAMP,
+    'last_login': firestore.SERVER_TIMESTAMP,
+    'provider': provider
+})
+```
+
+## Gestione Sicura della Memoria
+
+L'applicazione utilizza la classe SecureByteArray per gestire in modo sicuro il sale in memoria:
+
+```python
+class SecureByteArray:
+    def secure_zero(self) -> None:
+        """Cancella in modo sicuro i dati dalla memoria"""
+        if self._length == 0:
+            return
+
+        try:
+            for _ in range(self.SECURE_WIPE_PASSES):
+                # Sovrascrittura con dati casuali
+                random_data = secrets.token_bytes(
+                    max(self._length, self.MIN_RANDOM_BYTES)
+                )
+                ctypes.memmove(self._address, random_data, self._length)
+
+            # Passaggio finale di azzeramento
+            ctypes.memset(self._address, 0, self._length)
+
+        except Exception as e:
+            self.logger.error(f"Errore durante la pulizia sicura della memoria: {e}")
+            raise MemorySecurityError(
+                "Impossibile cancellare la memoria in modo sicuro"
+            )
+```
+
+## Vantaggi dell'Utilizzo del Sale
+
+L'utilizzo del sale nell'applicazione fornisce diversi benefici di sicurezza:
+
+1. **Unicità per Utente**: Ogni utente ha un sale univoco, quindi anche se due utenti hanno gli stessi dati, i valori cifrati saranno diversi.
+
+2. **Protezione contro Attacchi Rainbow Table**: Il sale rende inefficaci gli attacchi basati su tabelle precalcolate.
+
+3. **Isolamento dei Dati**: Il sale per utente garantisce che una compromissione dei dati di un utente non comprometta gli altri.
+
+4. **Derivazione Sicura delle Chiavi**: Il sale permette di derivare chiavi di cifratura uniche per ogni utente partendo dalla master key.
+
+## Considerazioni sulla Sicurezza
+
+1. Il sale viene sempre generato utilizzando funzioni crittograficamente sicure (os.urandom)
+2. La lunghezza del sale è sufficiente (32 byte) per garantire l'unicità
+3. Il sale viene memorizzato in modo sicuro nel database
+4. La memoria contenente il sale viene pulita in modo sicuro dopo l'uso
+5. Il sale non viene mai esposto nelle risposte API o nei log
+
+## Gestione del Ciclo di Vita
+
+Il sale viene:
+1. Generato alla registrazione dell'utente
+2. Memorizzato nel documento di sicurezza dell'utente
+3. Recuperato quando necessario per operazioni crittografiche
+4. Mai modificato o rigenerato (per mantenere l'accesso ai dati cifrati)
+5. Eliminato solo se l'account dell'utente viene completamente rimosso
+
+Questa gestione assicura che i dati degli utenti rimangano accessibili e sicuri per l'intera durata dell'account.
 
 ## Documentazione API CryptoFolio
 
