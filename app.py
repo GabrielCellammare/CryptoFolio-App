@@ -59,6 +59,7 @@ Last Modified: 10/01/2025
 
 # Standard library imports - organized by functionality
 from logging import Logger
+from logging.handlers import RotatingFileHandler
 from utils.token_jwt_handling import AuthError, TokenJWTHandling
 from datetime import datetime, timedelta, timezone
 from difflib import restore
@@ -77,6 +78,7 @@ from flask import (
     Blueprint,
     abort,
     jsonify,
+    logging,
     render_template,
     request,
     session,
@@ -272,7 +274,7 @@ def login_required(f):
 # Login route
 
 
-@ app.route('/auth/login/<provider>')
+@app.route('/auth/login/<provider>')
 def login(provider):
     """
     Initiates OAuth login flow for specified provider.
@@ -294,27 +296,72 @@ def login(provider):
     - Provider validation
     - Secure redirect handling
     - Session state management
+    - Request origin validation
     """
+    app.logger.info(f"Starting OAuth login for provider: {provider}")
+    app.logger.info(f"Current environment: {os.getenv('FLASK_ENV')}")
+    app.logger.info(f"Current NGROK_URL: {os.getenv('NGROK_URL')}")
+
+    # Validazione del provider
     if provider not in ['google', 'github']:
         flash('Authentication failed')
         return redirect(url_for('index'))
 
-    # Generate token without requiring user_id
+    # Generazione token CSRF
     csrf_token, response = csrf.generate_token(require_user_id=False)
     session['csrf_token'] = csrf_token
 
-    # Create OAuth client and redirect
+    # Creazione client OAuth
     oauth_client = oauth.create_client(provider)
-    redirect_uri = url_for('auth_callback', provider=provider, _external=True)
 
-    # Get OAuth redirect with state
-    response = oauth_client.authorize_redirect(
-        redirect_uri,
-        state=csrf_token
-    )
+    # Verifica se la richiesta arriva attraverso Ngrok
+    is_ngrok_request = False
+    ngrok_url = os.getenv('NGROK_URL')
 
-    return response
+    # Controlliamo gli header X-Forwarded-* che Ngrok aggiunge
+    forwarded_proto = request.headers.get('X-Forwarded-Proto')
+    forwarded_host = request.headers.get('X-Forwarded-Host')
 
+    app.logger.info(f"Forwarded Proto: {forwarded_proto}")
+    app.logger.info(f"Forwarded Host: {forwarded_host}")
+
+    # Se abbiamo gli header di Ngrok e corrispondono alla nostra configurazione
+    if (forwarded_proto and forwarded_host and
+            ngrok_url and forwarded_host in ngrok_url):
+        is_ngrok_request = True
+        app.logger.info("Richiesta identificata come proveniente da Ngrok")
+    else:
+        app.logger.info("Richiesta identificata come locale")
+
+    try:
+        if is_ngrok_request:
+            # Per richieste Ngrok, usa HTTPS
+            callback_url = url_for('auth_callback',
+                                   provider=provider,
+                                   _external=True,
+                                   _scheme='https')
+            app.logger.info(f"Using Ngrok callback URL: {callback_url}")
+        else:
+            # Per richieste locali, usa HTTP
+            callback_url = url_for('auth_callback',
+                                   provider=provider,
+                                   _external=True)
+            app.logger.info(f"Using local callback URL: {callback_url}")
+
+        # Effettua il redirect OAuth
+        response = oauth_client.authorize_redirect(
+            callback_url,
+            state=csrf_token
+        )
+        app.logger.info(f"OAuth redirect URL: {response.location}")
+        return response
+
+    except Exception as e:
+        app.logger.error(f"Error during OAuth redirect: {str(e)}")
+        # Log dettagliato dell'errore per debug
+        app.logger.error(f"Request details: proto={forwarded_proto}, "
+                         f"host={forwarded_host}, ngrok_url={ngrok_url}")
+        raise
 # Authentication routes
 
 
@@ -357,6 +404,9 @@ def auth_callback(provider):
     """
 
     try:
+        app.logger.info(f"Received callback for provider: {provider}")
+        app.logger.info(f"Request args: {request.args}")
+        app.logger.info(f"Request headers: {request.headers}")
         if request.args.get('state') != session.get('csrf_token'):
             raise ValueError("Invalid CSRF state")
 
