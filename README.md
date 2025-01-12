@@ -910,6 +910,525 @@ security_headers = {
 6. **`Content-Security-Policy`**: Gestisce le origini delle risorse caricate dal browser.
 
 
+## Come vengono protette le routes?
+### I decorator
+
+I decorator in Python sono uno strumento potente che permette di modificare o estendere il comportamento di funzioni e metodi in modo pulito e riutilizzabile. Nel contesto della sicurezza delle applicazioni web, i decorator giocano un ruolo fondamentale permettendo di implementare controlli di sicurezza in modo modulare e consistente.
+
+Un decorator è essenzialmente una funzione che prende come input un'altra funzione e ne estende il comportamento senza modificarne il codice sorgente. Questo pattern è particolarmente utile per implementare funzionalità trasversali come:
+
+- Autenticazione e autorizzazione
+- Rate limiting
+- Protezione CSRF
+- Logging e audit
+- Gestione delle sessioni
+- Validazione degli input
+
+### Principali Classi di Sicurezza
+
+Le classi principali che implementano la logica di sicurezza attraverso i decorator sono:
+
+#### SecureConfig
+Gestisce le configurazioni di sicurezza dell'applicazione, incluse:
+- Gestione delle origini CORS consentite
+- Configurazione degli header di sicurezza
+- Validazione dell'ambiente
+- Protezione contro attacchi di tipo injection
+
+```python
+class SecureConfig:
+    def __init__(self):
+        self._setup_secure_logging()
+        self._init_crypto()
+        self._request_history = {}
+        self._initialized = False
+```
+
+#### CSRFProtection
+Implementa la protezione contro attacchi Cross-Site Request Forgery attraverso:
+- Generazione e validazione di token
+- Gestione dei nonce
+- Verifica dell'origine delle richieste
+- Tracciamento delle catene di richieste
+
+```python
+class CSRFProtection:
+    def __init__(self, app=None):
+        self._signing_key = secrets.token_bytes(32)
+        self.encryption_key = Fernet.generate_key()
+        self._token_cache = {}
+```
+
+#### TokenJWTHandling
+Gestisce l'intero ciclo di vita dei token JWT:
+- Generazione sicura dei token
+- Validazione e rinnovo
+- Gestione della scadenza
+
+#### FirebaseRateLimiter
+Implementa il rate limiting distribuito usando Firebase:
+- Tracciamento delle richieste
+- Applicazione dei limiti
+- Gestione delle finestre temporali
+- Cleanup automatico
+
+### Decorator di Sicurezza
+
+#### @login_required
+
+Questo decorator garantisce che solo gli utenti autenticati possano accedere alle route protette. È implementato come segue:
+
+```python
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+```
+
+Funzionalità di sicurezza:
+- Verifica della presenza di una sessione valida
+- Redirect sicuro per utenti non autenticati
+- Mantenimento della catena di redirect
+- Protezione contro accessi non autorizzati
+
+### @rate_limit_decorator
+
+Implementa il controllo del rate limiting per prevenire abusi delle API e rallentamenti del sistema. I
+
+```python
+def rate_limit_decorator(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        ip_address = request.remote_addr
+        rate_limiter = FirebaseRateLimiter(db)
+        is_allowed, remaining, retry_after = rate_limiter.check_rate_limit(
+            user_id, ip_address)
+```
+l sistema di rate limiting utilizza un approccio a doppio livello che combina limitazioni basate sull'IP e sull'identità dell'utente. Questo permette di proteggere l'applicazione sia da attacchi distribuiti che da abusi da parte di singoli utenti autenticati.
+
+Il sistema mantiene le seguenti informazioni per ogni IP:
+- Un contatore di richieste
+- Il timestamp di inizio della finestra temporale
+- Il timestamp dell'ultima richiesta
+
+Per ogni nuova richiesta, il sistema:
+1. Verifica se esiste già un record per l'IP
+2. Controlla se la finestra temporale corrente è scaduta
+3. Verifica se il numero di richieste ha superato il limite
+4. Aggiorna i contatori in modo atomico usando una transazione Firebase
+
+
+I limiti utente vengono gestiti separatamente ma in modo analogo ai limiti IP. Questo permette di:
+- Avere limiti diversi per utenti autenticati
+- Tracciare l'utilizzo per utente indipendentemente dall'IP
+- Applicare politiche diverse per utenti specifici
+
+
+Tutti questi dati vengono gestiti attraverso una finestra temporale:
+
+1. Ogni finestra ha una durata configurabile (default: 3600 secondi per IP, configurabile per utente)
+2. Quando una finestra scade, viene creata una nuova finestra con contatore azzerato
+3. Le richieste vengono conteggiate all'interno della finestra corrente
+4. Il sistema mantiene il timestamp di inizio finestra per calcolare quando resettare i contatori
+
+
+L'utilizzo di Firebase Firestore permette una gestione distribuita del rate limiting:
+
+1. Le transazioni atomiche garantiscono la consistenza dei contatori
+2. I dati sono sincronizzati tra tutte le istanze dell'applicazione
+3. Il cleanup automatico rimuove i record scaduti
+4. Il sistema scala automaticamente con il carico
+
+
+
+Il sistema aggiunge header di risposta per informare i client:
+
+```python
+response.headers['X-RateLimit-Remaining'] = str(remaining)
+response.headers['X-RateLimit-Reset'] = str(retry_after)
+```
+
+Questi header permettono ai client di:
+- Conoscere il numero di richieste rimanenti
+- Sapere quando i limiti verranno resettati
+- Implementare logiche di backoff quando necessario
+
+Il sistema implementa un cleanup probabilistico dei dati:
+
+```python
+def maybe_cleanup(self):
+    if random.random() < self.cleanup_probability:
+        try:
+            self.cleaner.clean_expired_entries(self.window_seconds)
+        except Exception as e:
+            logging.warning(f"Inline cleanup error: {str(e)}")
+```
+
+Questo assicura che:
+1. I record scaduti vengano rimossi periodicamente
+2. Il carico del cleanup sia distribuito nel tempo
+3. Il database non cresca indefinitamente
+4. Le performance rimangano costanti nel tempo
+
+
+### @csrf.csrf_protect
+
+Fornisce protezione CSRF completa attraverso:
+
+```python
+def csrf_protect(self, f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        nonce = request.headers.get('X-CSRF-Nonce')
+        if not nonce or not self.validate_nonce(nonce):
+            abort(403, "Invalid CSRF nonce")
+```
+
+
+
+La protezione CSRF (Cross-Site Request Forgery) implementata nell'applicazione utilizza un approccio a più livelli che combina token, nonce e validazione dell'origine. Questo crea una difesa in profondità contro attacchi CSRF sofisticati.
+
+La strategia protettiva dei sistemi informatici denominata Defense in Depth o DiD (difesa in profondità) consiste in una stratificazione delle risorse informatiche di protezione. Il concetto di Difesa in Profondità si origina come strategia militare, per il rallentamento dell’avanzare nemico tramite barriere fisiche.
+
+Agendo in tal modo, era possibile preparare l’effettivo contrattacco, delineando una strategia d’azione coerente e i mezzi attraverso cui attuarla.
+
+
+Il decorator csrf_protect è il punto di ingresso principale per la protezione CSRF. Ecco come funziona nel dettaglio:
+
+```python
+def csrf_protect(self, f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 1. Validazione del nonce
+        nonce = request.headers.get('X-CSRF-Nonce')
+        if not nonce or not self.validate_nonce(nonce):
+            abort(403, "Invalid CSRF nonce")
+
+        # 2. Validazione del token
+        token = request.headers.get('X-CSRF-Token')
+        if not token or not self.validate_token_request(token):
+            abort(403, "Invalid CSRF token")
+
+        # 3. Validazione dell'origine
+        origin = request.headers.get('Origin')
+        if origin and not self._validate_origin_secure(origin):
+            abort(403, "Invalid request origin")
+
+        return f(*args, **kwargs)
+    return decorated_function
+```
+
+#### Validazione del Nonce
+
+Il sistema utilizza nonce monouso per prevenire gli attacchi replay:
+
+```python
+def validate_nonce(self, nonce: str) -> bool:
+    try:
+        if not nonce or nonce not in self.used_nonces:
+            return False
+
+        nonce_data = self.used_nonces[nonce]
+        current_time = time.time()
+
+        # Verifica scadenza
+        if current_time > nonce_data['expires']:
+            del self.used_nonces[nonce]
+            return False
+
+        # Decrittazione e validazione payload
+        payload = json.loads(
+            self.fernet.decrypt(nonce.encode()).decode()
+        )
+
+        # Verifica binding con l'utente
+        if payload['user_id'] != session.get('user_id'):
+            return False
+
+        # Rimozione dopo l'uso (one-time use)
+        del self.used_nonces[nonce]
+        return True
+
+    except Exception as e:
+        self.logger.error(f"Errore validazione nonce: {str(e)}")
+        return False
+```
+
+Il nonce fornisce:
+- Protezione contro attacchi replay
+- Binding con la sessione utente
+- Scadenza temporale automatica
+- Utilizzo singolo garantito
+
+
+
+Il sistema implementa una validazione completa del token CSRF:
+
+```python
+def validate_token_request(self, token: str) -> bool:
+    if not token:
+        return False
+
+    # Validazione origine
+    origin = request.headers.get('Origin')
+    if origin:
+        if not self._validate_origin_format(origin):
+            self.logger.warning(f"Formato origine non valido: {origin}")
+            return False
+
+        if not self._check_origin_allowed(origin):
+            self.logger.warning(f"Origine non consentita: {origin}")
+            return False
+
+    # Validazione referrer per richieste same-origin
+    referrer = request.headers.get('Referer')
+    if referrer:
+        ref_url = urlparse(referrer)
+        req_url = urlparse(request.url)
+        if ref_url.netloc != req_url.netloc:
+            self.logger.warning(f"Referrer non valido: {referrer}")
+            return False
+
+    return self._validate_token(token)
+```
+
+La validazione del token include:
+- Controllo del formato e della firma
+- Validazione dell'origine della richiesta
+- Verifica del referrer
+- Binding con la sessione utente
+
+#### Generazione Sicura dei Token
+
+I token vengono generati in modo sicuro con multiple protezioni:
+
+```python
+def _generate_secure_token(self, require_user_id=True) -> str:
+    if require_user_id and 'user_id' not in session:
+        abort(401)
+
+    # Cleanup dei token scaduti
+    self._cleanup_expired_tokens()
+
+    if (require_user_id):
+        # Validazione origine JavaScript
+        js_origin = request.headers.get('X-JavaScript-Origin')
+        if not js_origin or not self._validate_js_origin(js_origin):
+            abort(403, "Invalid request origin")
+
+        user_id = session['user_id']
+
+        # Generazione componenti token
+        timestamp = int(time.time())
+        random_bytes = secrets.token_bytes(32)
+        request_id = secrets.token_hex(16)
+
+        # Creazione payload
+        payload = {
+            'user_id': user_id,
+            'timestamp': timestamp,
+            'request_id': request_id,
+            'random': base64.b64encode(random_bytes).decode()
+        }
+
+        # Cifratura payload
+        encrypted_payload = self.fernet.encrypt(
+            json.dumps(payload).encode()
+        )
+
+        # Generazione firma HMAC
+        signature = hmac.new(
+            self._signing_key,
+            encrypted_payload,
+            hashlib.sha256
+        ).digest()
+
+        # Composizione token finale
+        token = base64.urlsafe_b64encode(
+            encrypted_payload + signature
+        ).decode()
+
+        # Salvataggio in cache con metadata
+        self._token_cache[user_id][token] = {
+            'timestamp': timestamp,
+            'uses': 0,
+            'request_id': request_id
+        }
+
+        return token
+```
+
+La generazione include:
+- Entropia crittografica tramite secrets
+- Crittografia del payload con Fernet
+- Firma HMAC per integrità
+- Caching sicuro con metadata
+
+#### Validazione dell'Origine
+
+Il sistema implementa una validazione completa dell'origine delle richieste:
+
+```python
+def _validate_origin_secure(self, origin: str) -> bool:
+    if not origin or '\x00' in origin:
+        return False
+
+    try:
+        parsed = urlparse(origin)
+        
+        # Validazione protocollo
+        if parsed.scheme not in {'http', 'https'}:
+            return False
+
+        # Gestione origini locali
+        is_local = (
+            parsed.netloc.startswith('localhost') or
+            parsed.netloc.startswith('127.0.0.1') or
+            parsed.netloc == '[::1]'
+        )
+
+        if is_local:
+            if os.getenv('FLASK_ENV') != 'development':
+                return False
+
+            # Validazione porta per sviluppo locale
+            if ':' in parsed.netloc:
+                port = int(parsed.netloc.split(':')[1])
+                if not (1024 <= port <= 65535):
+                    return False
+
+            return True
+
+        # Validazione dominio
+        if not parsed.netloc or '.' not in parsed.netloc:
+            return False
+
+        return True
+
+    except Exception as e:
+        self.logger.error(f"Errore validazione origine: {str(e)}")
+        return False
+```
+
+La validazione dell'origine assicura:
+- Formato URL valido 
+- Protocollo consentito
+- Domini autorizzati
+- Porte consentite in sviluppo
+
+#### Gestione del Ciclo di Vita dei Token
+
+Il sistema gestisce in modo sicuro l'intero ciclo di vita dei token:
+
+```python
+def _cleanup_expired_tokens(self) -> None:
+    current_time = time.time()
+
+    for user_id, tokens in list(self._token_cache.items()):
+        # Rimuovi token scaduti o sovra-utilizzati
+        valid_tokens = {}
+        for token, data in tokens.items():
+            is_valid = (
+                (current_time - data['timestamp']) <= self._token_lifetime and
+                data['uses'] < self._max_uses_per_token
+            )
+
+            # Gestione speciale token di autenticazione
+            if data.get('is_auth_flow', False):
+                is_valid = is_valid and data['uses'] == 0
+
+            if is_valid:
+                valid_tokens[token] = data
+
+        if valid_tokens:
+            self._token_cache[user_id] = valid_tokens
+        else:
+            del self._token_cache[user_id]
+
+    # Protezione DoS - Se troppi token, rimuovi i più vecchi
+    total_tokens = sum(len(tokens) 
+                    for tokens in self._token_cache.values())
+    if total_tokens > self._max_tokens_per_session * len(self._token_cache):
+        for user_id in self._token_cache:
+            tokens = self._token_cache[user_id]
+            if len(tokens) > self._max_tokens_per_session:
+                sorted_tokens = sorted(
+                    tokens.items(),
+                    key=lambda x: x[1]['timestamp'],
+                    reverse=True
+                )
+                self._token_cache[user_id] = dict(
+                    sorted_tokens[:self._max_tokens_per_session]
+                )
+```
+
+Il ciclo di vita include:
+- Pulizia automatica token scaduti
+- Limiti di utilizzo per token
+- Protezione contro accumulo token
+- Gestione speciale token di autenticazione
+
+Il sistema di protezione CSRF implementa una difesa in profondità attraverso:
+
+1. Validazione multipla delle richieste
+   - Token CSRF
+   - Nonce monouso
+   - Controllo origine
+   - Validazione referrer
+
+2. Gestione sicura dei token
+   - Generazione crittografica
+   - Cifratura payload
+   - Firme HMAC
+   - Cleanup automatico
+
+3. Protezione sessione
+   - Cookie sicuri
+   - Binding utente
+   - Timeout automatico
+   - Limiti di utilizzo
+
+4. Prevenzione attacchi
+   - Anti-replay
+   - Anti-DoS
+   - Anti-timing
+   - Sanitizzazione input
+
+La combinazione di questi meccanismi crea più livelli di protezione, rendendo estremamente difficile bypassare la sicurezza anche se un singolo controllo viene compromesso.
+
+
+
+
+### Middleware di Sicurezza
+
+#### check_session_timeout
+- Valida l'età della sessione
+- Forza la ri-autenticazione per sessioni scadute
+- Traccia l'ultima attività
+- Implementa timeout di inattività di 60 minuti
+
+```python
+@app.before_request
+def check_session_timeout():
+    if 'last_active' in session:
+        last_active = datetime.fromtimestamp(session['last_active'])
+        if datetime.now() - last_active > timedelta(minutes=60):
+            session.clear()
+```
+
+#### add_security_headers
+Aggiunge header di sicurezza a tutte le risposte (precedentemente analizzato):
+- Configurazione CORS
+- Content Security Policy
+- HSTS enforcement
+- Protezione XSS
+- Prevenzione Clickjacking
+
+
 ### Autenticazione e sicurezza
 
 1. Integrazione OAuth 2.0 con Google e GitHub per l'autenticazione sicura degli utenti
