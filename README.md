@@ -702,17 +702,15 @@ Ogni percorso dell'applicazione è protetto da più livelli di sicurezza, second
 Tutti i dati di risposta sono accuratamente sanificati per evitare la fuga di informazioni e i messaggi di errore sono generalizzati per evitare di esporre dettagli interni al sistema.
 
 
-### Configurazione iniziale
+## Configurazione di Sicurezza per Applicazioni Flask
 
-# Configurazione di Sicurezza per Applicazioni Flask
-
-Questo documento descrive in dettaglio la configurazione di sicurezza definita nel file Python analizzato, con spiegazioni per ciascuna delle variabili principali e il loro utilizzo.
+Questa parte specifica della documentazione descrive in dettaglio la configurazione di sicurezza definita e adottata per la Web App, poichè tali parametri offrono protezione contro attacchi comuni, come lo scripting cross-site (XSS) e il clickjacking, e garantiscono che la comunicazione tra il server e il browser avvenga in modo sicuro.
 
 ---
 
-## **Security Headers**
+### **Security Headers**
 
-### **1. HSTS**
+#### **1. HSTS**
 ```python
 HSTS: str = field(default="max-age=31536000; includeSubDomains")
 ```
@@ -723,7 +721,7 @@ HSTS: str = field(default="max-age=31536000; includeSubDomains")
 
 ---
 
-### **2. CONTENT_TYPE_OPTIONS**
+#### **2. CONTENT_TYPE_OPTIONS**
 ```python
 CONTENT_TYPE_OPTIONS: str = field(default="nosniff")
 ```
@@ -734,7 +732,7 @@ CONTENT_TYPE_OPTIONS: str = field(default="nosniff")
 
 ---
 
-### **3. FRAME_OPTIONS**
+#### **3. FRAME_OPTIONS**
 ```python
 FRAME_OPTIONS: str = field(default="DENY")
 ```
@@ -745,7 +743,7 @@ FRAME_OPTIONS: str = field(default="DENY")
 
 ---
 
-### **4. XSS_PROTECTION**
+#### **4. XSS_PROTECTION**
 ```python
 XSS_PROTECTION: str = field(default="1; mode=block")
 ```
@@ -757,7 +755,7 @@ XSS_PROTECTION: str = field(default="1; mode=block")
 
 ---
 
-### **5. REFERRER_POLICY**
+#### **5. REFERRER_POLICY**
 ```python
 REFERRER_POLICY: str = field(default="strict-origin-when-cross-origin")
 ```
@@ -770,7 +768,7 @@ REFERRER_POLICY: str = field(default="strict-origin-when-cross-origin")
 
 ---
 
-### **6. PERMITTED_CROSS_DOMAIN_POLICIES**
+#### **6. PERMITTED_CROSS_DOMAIN_POLICIES**
 ```python
 PERMITTED_CROSS_DOMAIN_POLICIES: str = field(default="none")
 ```
@@ -780,9 +778,9 @@ PERMITTED_CROSS_DOMAIN_POLICIES: str = field(default="none")
 
 ---
 
-## **Content Security Policy (CSP)**
+### **Content Security Policy (CSP)**
 
-### **Definizione di CSP**
+#### **Definizione di CSP**
 ```python
 CSP: str = field(default=(
     "default-src 'self'; "
@@ -795,7 +793,7 @@ CSP: str = field(default=(
 ))
 ```
 
-#### **Descrizione delle direttive**:
+##### **Descrizione delle direttive**:
 1. **`default-src 'self';`**
    - Origine predefinita per tutte le risorse non coperte da altre direttive.
    - **`'self'`**: Consente solo risorse provenienti dallo stesso dominio da cui la pagina è stata servita.
@@ -835,9 +833,9 @@ CSP: str = field(default=(
 
 ---
 
-## **Altre Variabili di Configurazione**
+### **Altre Variabili di Configurazione**
 
-### **7. DEFAULT_CORS_MAX_AGE**
+#### **7. DEFAULT_CORS_MAX_AGE**
 ```python
 DEFAULT_CORS_MAX_AGE: int = 3600  # 1 hour
 ```
@@ -847,7 +845,7 @@ DEFAULT_CORS_MAX_AGE: int = 3600  # 1 hour
 
 ---
 
-### **8. DEFAULT_HSTS_MAX_AGE**
+#### **8. DEFAULT_HSTS_MAX_AGE**
 ```python
 DEFAULT_HSTS_MAX_AGE: int = 31536000  # 1 year
 ```
@@ -857,7 +855,7 @@ DEFAULT_HSTS_MAX_AGE: int = 31536000  # 1 year
 
 ---
 
-### **9. SUPPORTED_ENVIRONMENTS**
+#### **9. SUPPORTED_ENVIRONMENTS**
 ```python
 SUPPORTED_ENVIRONMENTS: Set[str] = frozenset({'development', 'production'})
 ```
@@ -869,9 +867,9 @@ SUPPORTED_ENVIRONMENTS: Set[str] = frozenset({'development', 'production'})
 
 ---
 
-## **Configurazioni CORS**
+### **Configurazioni CORS**
 
-### **Definizione di cors_headers**
+#### **Definizione di cors_headers**
 ```python
 cors_headers = {
     'Access-Control-Allow-Headers': os.getenv('CORS_ALLOWED_HEADERS', ''),
@@ -881,7 +879,7 @@ cors_headers = {
     'Access-Control-Max-Age': str(self.DEFAULT_CORS_MAX_AGE)
 }
 ```
-#### **Descrizione**:
+##### **Descrizione**:
 1. **`Access-Control-Allow-Headers`**: Specifica gli header HTTP che il client può includere nelle richieste cross-origin.
 2. **`Access-Control-Allow-Methods`**: Elenca i metodi HTTP consentiti (es. GET, POST, PUT).
 3. **`Access-Control-Allow-Credentials`**: Consente al browser di inviare credenziali (es. cookie) nelle richieste cross-origin.
@@ -890,9 +888,9 @@ cors_headers = {
 
 ---
 
-## **Configurazioni Security Headers**
+### **Configurazioni Security Headers**
 
-### **Definizione di security_headers**
+#### **Definizione di security_headers**
 ```python
 security_headers = {
     'X-Content-Type-Options': self._security_headers.CONTENT_TYPE_OPTIONS,
@@ -903,7 +901,7 @@ security_headers = {
     'Content-Security-Policy': self._security_headers.CSP
 }
 ```
-#### **Descrizione**:
+##### **Descrizione**:
 1. **`X-Content-Type-Options`**: Previene il MIME-sniffing.
 2. **`X-Frame-Options`**: Impedisce il framing della pagina.
 3. **`X-XSS-Protection`**: Protegge da attacchi XSS.
