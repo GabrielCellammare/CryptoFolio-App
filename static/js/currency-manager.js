@@ -239,7 +239,6 @@ export default class CurrencyManager {
 
         alert.innerHTML = `
             ${sanitizedMessage}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
 
         flashMessages.appendChild(alert);
