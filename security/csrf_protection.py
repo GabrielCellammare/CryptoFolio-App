@@ -993,6 +993,12 @@ class CSRFProtection:
         if not token:
             return False
 
+        cookie_token = request.cookies.get('csrf_token')
+
+        # Verifica che entrambi i token siano presenti e corrispondano
+        if not cookie_token or cookie_token != token:
+            self.logger.warning("Token mismatch tra cookie e header")
+            return False
         # Origin validation
         origin = request.headers.get('Origin')
         if origin:
