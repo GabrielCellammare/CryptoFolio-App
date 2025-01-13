@@ -26,7 +26,7 @@ L'**applicazione** consente agli utenti di:
 
 Questa scelta architettonica offre diversi vantaggi:
 
-- **Indipendenza dai servizi**: Ogni componente (autenticazione, gestione del portafoglio...) opera in modo indipendente
+- **Indipendenza dai servizi**: Ogni componente (_autenticazione, gestione del portafoglio..._) opera in modo indipendente
 - **Scalabilità**: I servizi possono essere scalati in modo indipendente in base al carico
 - **Isolamento della sicurezza:** La compromissione di un servizio non compromette automaticamente gli altri
 - **Flessibilità tecnologica**: Servizi diversi possono utilizzare tecnologie diverse a seconda delle necessità
@@ -39,22 +39,22 @@ Flask è un framework di sviluppo web open-source scritto in Python. È stato pr
 
 Le caratteristiche **principali** includono:
 
-- Nucleo minimalista e flessibile
+- Nucleo **minimalista** e flessibile
 - Ampio supporto per i plugin
 - Server di sviluppo integrato
-- Integrazione del toolkit Werkzeug per le funzionalità WSGI
+- Integrazione del toolkit **Werkzeug** per le funzionalità WSGI
 
-  Il Web Server Gateway Interface (WSGI) è un protocollo di trasmissione che stabilisce e descrive comunicazioni ed interazioni tra server ed applicazioni web scritte nel linguaggio Python. È quindi 			l'interfaccia standard del web service per la programmazione in Python.
+  _Il Web Server Gateway Interface (WSGI) è un protocollo di trasmissione che stabilisce e descrive comunicazioni ed interazioni tra server ed applicazioni web scritte nel linguaggio Python. È quindi 			l'interfaccia standard del web service per la programmazione in Python._
 
 In CryptoFolio, **Flask** gestisce:
 
-1. Instradamento ed elaborazione delle richieste
-2. Gestione delle sessioni
+1. **Instradamento** ed elaborazione delle richieste
+2. Gestione delle **sessioni**
 3. Rendering dei modelli
-4. Integrazione del middleware di sicurezza
+4. Integrazione del **middleware** di sicurezza
 5. Implementazione di endpoint API
 6. Configurazione iniziale del Server
-7. Meccanismi di sicurezza
+7. Meccanismi di **sicurezza**
 
 #### Architettura del frontend
 
@@ -71,7 +71,7 @@ Il **frontend** utilizza uno stack moderno incentrato su _sicurezza e prestazion
 
 La tecnologia utilizzata ha permesso l'Implementazione di **CSP** (_Content Security Policy_) e quindi di conseguenza misure di prevenzione **XSS**, gestione dei token **CSRF** attraverso cookie sicuri, sanificazione degli **input** e una corretta gestione degli **errori** per evitare **IOE** (_Information over exposure_).
 
-#### Architteura di archiviazione - Firebase Cloud Firestore
+#### Architettura di archiviazione - Firebase Cloud Firestore
 
 ![image](https://github.com/user-attachments/assets/06459b7f-a2e6-4407-9a6c-1c9d711dddc6)
 
@@ -79,12 +79,12 @@ La tecnologia utilizzata ha permesso l'Implementazione di **CSP** (_Content Secu
 **Firebase Cloud Firestore** è un cloud NoSQL flessibile e scalabile, costruito sull'infrastruttura di Google Cloud, per archiviare e sincronizzare i dati per lo sviluppo lato client e lato server.
 Firebase fornisce una soluzione di database sicura e scalabile con:
 
-1. Sincronizzazione dei dati in tempo reale
-2. Integrazione dell'autenticazione integrata
+1. Sincronizzazione dei **dati** in tempo reale
+2. Integrazione dell'**autenticazione** integrata
 3. Scalabilità automatica
 4. Regole di accesso sicuro ai dati
-5. Backup e disaster recovery
-6. Archiviazione crittografata dei dati
+5. Backup e **disaster** recovery
+6. Archiviazione **crittografata** dei dati
 
 #### Architettura di sicurezza - Servizi di sicurezza
 
@@ -119,7 +119,7 @@ Sono state implementate  - _attraverso API debitamente protette_ - diversi servi
 
 #### Integrazioni esterne
 
-Il sistema per offrire le funzionalità core dello stesso, integra diversi servizi esterni attraverso API RestFul messe a disposizione. Nel caso specifico dei prezzi crypto - per garantire disponibilità del dato agli utenti - è stato implementato un meccanismo di caching interno che possa aggirare la problematica della "_sincronia_" delle API RestFul, ovvero una delle caratteristiche principali dei Servizi Rest. Se Coincegko non dovesse essere disponibile, l'utente potrà in egual modo accedere ai prezzi delle crypto grazie a tale sistema.
+Il sistema per offrire le funzionalità **core** dello stesso, integra diversi servizi esterni attraverso API RestFul messe a disposizione. Nel caso specifico dei prezzi crypto - per garantire disponibilità del dato agli utenti - è stato implementato un meccanismo di **caching** interno che possa aggirare la problematica della "_sincronia_" delle API RestFul, ovvero una delle caratteristiche principali dei Servizi Rest. Se Coincegko non dovesse essere **disponibile**, l'utente potrà in egual modo accedere ai prezzi delle crypto grazie a tale **sistema**.
 
 **API CoinGecko**
 
@@ -172,10 +172,10 @@ Il flusso di comunicazione del sistema segue diversi schemi chiave:
 - Chiamate API a CoinGecko
 - Operazioni sul database Firebase
 - Interazioni con il provider OAuth
-- Gestione del tunnel Ngrok (sviluppo)
+- Gestione del tunnel Ngrok
 - Comunicazione con i servizi interni
 - Autenticazione da servizio a servizio
-- Trasferimento di dati criptati
+- Trasferimento di dati crittografati
 
 
 ### Sicurezza del flusso di dati
@@ -192,11 +192,11 @@ In tutto il sistema, i dati sono protetti da:
 
 - Crittografia AES-256 
 - Gestione sicura delle chiavi
-- Generazione e rotazione del sale
+- Generazione del sale
 
 
 **Sicurezza delle richieste**
-- Convalida dell'ingresso
+- Convalida dell'origine
 - Sanificazione dell'input e output
 - Limitazione delle richieste
 - Protezione CSRF
@@ -349,7 +349,7 @@ Caratteristiche di **sicurezza**:
 
 **Prerequisiti**: Token CSRF e Login
 
-**Questo percorso implementa diverse misure di sicurezza necessarie**
+**Questo percorso implementa diverse misure di sicurezza necessarie**:
 
 - Richiede l'autenticazione (**login_required**)
 - Protezione CSRF (**csrf.csrf_protect**)
@@ -361,7 +361,7 @@ Caratteristiche di **sicurezza**:
 
 ### Routes di gestione del Portfolio 
 
-È bene specificare che tutte queste **routes** (al di fuori di dashboard), sono accessibili soltanto dalla pagina principale: non è possibile effettuare richieste API esternamente poichè verranno gestite interamente dalla web app, attraverso una firma gemerata da un'origine javascript verificata con una validità limitata. 
+È bene specificare che tutte queste **routes** (al di fuori di dashboard), sono accessibili soltanto dalla pagina principale: non è possibile effettuare richieste API esternamente poichè verranno gestite interamente dalla web app, attraverso una firma gemerata da un'origine javascript verificata con una validità limitata attraverso una finestra temporale. 
 
 ####  Dashboard route: /dashboard
 
@@ -810,11 +810,9 @@ CSP: str = field(default=(
    - **`'unsafe-inline'`**: Permette stili inline (rischioso, ma utile in alcuni casi specifici).
    - **URL specifici**: Permette stili da CDN noti come `jsdelivr` e `cdnjs`.
 
-4. **`script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com;`**
+4. **`script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com;`**
    - Controlla le origini per il caricamento degli script JavaScript.
    - **`'self'`**: Solo script dal dominio della pagina.
-   - **`'unsafe-inline'`**: Consente script inline (potenzialmente rischioso per XSS).
-   - **`'unsafe-eval'`**: Permette l'uso di `eval()` e simili (rischioso).
    - **URL specifici**: Consente script da CDN comuni come `jsdelivr`, `cdnjs` e `code.jquery.com`.
 
 5. **`font-src 'self' https://cdnjs.cloudflare.com;`**
@@ -1172,6 +1170,12 @@ Il sistema implementa una validazione completa del token CSRF:
 def validate_token_request(self, token: str) -> bool:
     if not token:
         return False
+    cookie_token = request.cookies.get('csrf_token')
+
+    # Verifica che entrambi i token siano presenti e corrispondano
+    if not cookie_token or cookie_token != token:
+	self.logger.warning("Token mismatch tra cookie e header")
+	return False
 
     # Validazione origine
     origin = request.headers.get('Origin')
@@ -1198,6 +1202,7 @@ def validate_token_request(self, token: str) -> bool:
 
 La validazione del token include:
 - Controllo del formato e della firma
+- Controllo del token presente nel cookie
 - Validazione dell'origine della richiesta
 - Verifica del referrer
 - Binding con la sessione utente
@@ -1428,8 +1433,7 @@ Aggiunge header di sicurezza a tutte le risposte (precedentemente analizzato):
 - Protezione XSS
 - Prevenzione Clickjacking
 
-# Utilizzo del Sale nell'Applicazione
-
+# Utilizzo del Sale in CryptoFolio
 ## Panoramica dell'Utilizzo del Sale
 
 Nell'applicazione, il sale crittografico viene utilizzato principalmente per tre scopi fondamentali:
@@ -1608,13 +1612,15 @@ Nel contesto dello sviluppo di applicazioni web moderne, la necessità di esporr
 Il tunneling sicuro con ngrok offre una soluzione elegante a questa sfida, creando un ponte crittografato tra l'ambiente di sviluppo locale e internet. Questo approccio non solo facilita il testing e lo sviluppo, ma implementa anche robuste misure di sicurezza per proteggere le comunicazioni.
 
 ### Architettura del Sistema di Tunneling
-Come illustrato nel diagramma sopra, l'architettura del sistema di tunneling si compone di tre elementi principali:
+Come illustrato nel diagramma, l'architettura del sistema di tunneling si compone di tre elementi principali:
 Ngrok crea una connessione sicura tra l'endpoint pubblico e il computer locale, in modo che il traffico sia crittografato e sicuro. Quando la richiesta arriva all'endpoint pubblico, viene crittografata e inoltrata al nostro server locale. Ngrok utilizza una combinazione di crittografia e tecniche di instradamento della rete per creare una connessione sicura e affidabile tra l'endpoint pubblico e il computer locale. In questo modo Ngrok consente di eseguire facilmente il tunnel del server locale, garantendo al contempo la sicurezza.
 
 ![image](https://github.com/user-attachments/assets/96cea708-c744-4b1b-8e6b-c9196c895394)
 
 **Client Esterno**: Rappresenta qualsiasi client che tenta di accedere all'applicazione attraverso internet.
+
 **Ngrok Cloud**: Agisce come intermediario sicuro, gestendo la terminazione TLS e la validazione delle origini.
+
 **Applicazione Flask Locale**: L'ambiente di sviluppo che viene esposto in modo sicuro.
 
 Il flusso delle richieste attraversa questi componenti mediante tunnel crittografati, garantendo la sicurezza end-to-end delle comunicazioni.
@@ -1628,25 +1634,6 @@ Un aspetto critico della sicurezza è la validazione delle origini delle richies
 
 
 Il sistema di tunneling sicuro con ngrok rappresenta un esempio eccellente di come sia possibile bilanciare la necessità di accessibilità durante lo sviluppo con rigorosi requisiti di sicurezza.
-
-## Considerazioni sulla Sicurezza
-
-1. Il sale viene sempre generato utilizzando funzioni crittograficamente sicure (os.urandom)
-2. La lunghezza del sale è sufficiente (32 byte) per garantire l'unicità
-3. Il sale viene memorizzato in modo sicuro nel database
-4. La memoria contenente il sale viene pulita in modo sicuro dopo l'uso
-5. Il sale non viene mai esposto nelle risposte API o nei log
-
-## Gestione del Ciclo di Vita
-
-Il sale viene:
-1. Generato alla registrazione dell'utente
-2. Memorizzato nel documento di sicurezza dell'utente
-3. Recuperato quando necessario per operazioni crittografiche
-4. Mai modificato o rigenerato (per mantenere l'accesso ai dati cifrati)
-5. Eliminato solo se l'account dell'utente viene completamente rimosso
-
-Questa gestione assicura che i dati degli utenti rimangano accessibili e sicuri per l'intera durata dell'account.
 
 ## Documentazione API CryptoFolio
 
@@ -1771,8 +1758,7 @@ curl -X POST \
 ```json
 {
   "status": "success",
-  "message": "Cryptocurrency added successfully",
-  "document_id": "abc123xyz"
+  "message": "Cryptocurrency added successfully"
 }
 ```
 
@@ -1889,13 +1875,13 @@ R: Al momento i prezzi sono forniti solo in USD. La conversione in altre valute 
 
 ### Prerequisiti
 
-Prima di installare CryptoFolio, assicurati di avere installato quanto segue:
-- Python 3.7 o superiore
-- pip (gestore di pacchetti Python)
-- Git
-- Un account Firebase
-- Un account Google Cloud Platform (per OAuth)
-- Un account sviluppatore GitHub (per OAuth)
+Prima di installare **CryptoFolio**, assicurati di avere installato quanto segue:
+- **Python** 3.7 o superiore
+- **pip** (gestore di pacchetti Python)
+- **Git**
+- Un account **Firebase**
+- Un account **Google Cloud Platform** (per OAuth)
+- Un account sviluppatore **GitHub** (per OAuth)**
 
 ### Passaggi di Installazione
 
@@ -1993,10 +1979,10 @@ print(secrets.token_hex(128))
 5. Crea un ID Client OAuth 2.0:
   - Aggiungi origini JavaScript autorizzate:
     - `http://localhost:5000`
-    - `https://your-production-domain.com`
+    - `https://*.ngrok-free.app`
   - Aggiungi URI di reindirizzamento autorizzati:
     - `http://localhost:5000/auth/callback/google`
-    - `https://your-production-domain.com/auth/callback/google`
+    - `https://*.ngrok-free.app/auth/callback/google`
 6. Copia l'ID Client e il Segreto Client nel tuo file `.env`
 
 ### Configurazione GitHub OAuth
@@ -2008,7 +1994,7 @@ print(secrets.token_hex(128))
   - URL della homepage: `http://localhost:5000` (sviluppo) o il tuo URL di produzione
   - URL di callback per l'autorizzazione: 
     - `http://localhost:5000/auth/callback/github` (sviluppo)
-    - `https://your-production-domain.com/auth/callback/github`
+    - `https://https://*.ngrok-free.app/auth/callback/github`
 4. Copia l'ID Client e il Segreto Client nel tuo file `.env`
 
 Durante ogni nuovo avvio dell'applicazione, sarà necessario configurare URL di callback per l'autorizzazione di Google e di Github con il link prodotto da ngrok.
@@ -2093,7 +2079,7 @@ flask run
 
 ### Considerazioni sulla Sicurezza
 
-1. Non commettere mai il file `.env` o `firebase_config.json` nel controllo di versione
+1. Non committare mai il file `.env` o `firebase_config.json` nel controllo di versione
 2. Ruota regolarmente le chiavi di sicurezza e i token API
 3. Monitora i log di audit per attività sospette
 4. Mantieni tutte le dipendenze aggiornate
