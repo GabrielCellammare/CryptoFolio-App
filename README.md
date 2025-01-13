@@ -1885,26 +1885,256 @@ R: Riceverai un errore 429 con un header `Retry-After` che indica dopo quanti se
 
 R: Al momento i prezzi sono forniti solo in USD. La conversione in altre valute deve essere gestita lato client. È necessario cambiare la valuta dalla dashboard per poter ricevere il controvalore correttamente attraverso l'Api.
 
+## Installazione
 
-## Installation
+### Prerequisiti
 
-Install my-project with npm
+Prima di installare CryptoFolio, assicurati di avere installato quanto segue:
+- Python 3.7 o superiore
+- pip (gestore di pacchetti Python)
+- Git
+- Un account Firebase
+- Un account Google Cloud Platform (per OAuth)
+- Un account sviluppatore GitHub (per OAuth)
+
+### Passaggi di Installazione
+
+1. Clona il repository
+```bash
+git clone https://github.com/GabrielCellammare/CryptoFolio-App.git
+cd CryptoFolio-App
+```
+
+2. Crea e attiva un ambiente virtuale
+```bash
+python -m venv venv
+source venv/bin/activate  # Su Windows: venv\Scripts\activate
+```
+
+3. Installa le dipendenze
+```bash
+pip install -r requirements.txt
+```
+
+## Configurazione dell'Ambiente
+
+2. Modifica il file `.env(example)` nella directory principale e configura tutte le variabili:
 
 ```bash
-  npm install my-project
-  cd my-project
+# Ambiente
+FLASK_ENV=development
+FLASK_RUN_PORT=5000
+NGROK_AUTH_TOKEN=your_ngrok_token  # Opzionale per lo sviluppo
+NGROK_REGION=eu
+
+# Origini (Sviluppo)
+DEV_ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000,https://*.ngrok.io,https://*.ngrok-free.app
+PROD_ALLOWED_ORIGINS=https://yourdomain.com
+
+# Configurazione CORS
+CORS_MAX_AGE=86400
+CORS_ALLOWED_HEADERS=Content-Type, X-CSRF-Token, X-CSRF-Nonce, X-Requested-With, X-Client-Version
+CORS_ALLOWED_METHODS=GET, POST, PUT, DELETE, OPTIONS
+CORS_ALLOW_CREDENTIALS=true
+CORS_EXPOSE_HEADERS=Content-Type
+
+# Impostazioni di Sicurezza
+FLASK_SECRET_KEY=your_generated_64_char_secret_key
+MASTER_ENCRYPTION_KEY=your_generated_64_char_encryption_key
+HASH_SECRET_KEY=your_generated_64_char_hash_key
+JWT_SECRET_KEY=your_generated_256_char_jwt_key
+
+# Configurazione OAuth
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+SERVER_METADATA_URL_GOOGLE=https://accounts.google.com/.well-known/openid-configuration
+
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+
+# Chiavi API
+COINGECKO_API_KEY=your_coingecko_api_key
+
+# Configurazione della Sessione
+SESSION_TIMEOUT_MINUTES=60
+```
+
+### Generazione delle Chiavi di Sicurezza
+
+Genera chiavi sicure per le variabili d'ambiente:
+
+```python
+import secrets
+
+# Genera FLASK_SECRET_KEY (64 caratteri)
+print(secrets.token_urlsafe(48))
+
+# Genera MASTER_ENCRYPTION_KEY (64 caratteri)
+print(secrets.token_urlsafe(48))
+
+# Genera HASH_SECRET_KEY (64 caratteri)
+print(secrets.token_hex(32))
+
+# Genera JWT_SECRET_KEY (256 caratteri)
+print(secrets.token_hex(128))
+```
+
+### Configurazione OAuth
+
+#### Configurazione Google OAuth
+
+1. Vai al [Google Cloud Console](https://console.cloud.google.com/)
+2. Crea un nuovo progetto o seleziona uno esistente
+3. Abilita l'API Google+ e la schermata di consenso OAuth
+4. Configura la schermata di consenso OAuth:
+  - Aggiungi la tua email per il contatto sviluppatore
+  - Aggiungi domini autorizzati
+  - Aggiungi ambiti per email e profilo
+5. Crea un ID Client OAuth 2.0:
+  - Aggiungi origini JavaScript autorizzate:
+    - `http://localhost:5000`
+    - `https://your-production-domain.com`
+  - Aggiungi URI di reindirizzamento autorizzati:
+    - `http://localhost:5000/auth/callback/google`
+    - `https://your-production-domain.com/auth/callback/google`
+6. Copia l'ID Client e il Segreto Client nel tuo file `.env`
+
+### Configurazione GitHub OAuth
+
+1. Vai alle [Impostazioni Sviluppatore GitHub](https://github.com/settings/developers)
+2. Clicca su "New OAuth App"
+3. Configura l'applicazione:
+  - Nome dell'applicazione: CryptoFolio
+  - URL della homepage: `http://localhost:5000` (sviluppo) o il tuo URL di produzione
+  - URL di callback per l'autorizzazione: 
+    - `http://localhost:5000/auth/callback/github` (sviluppo)
+    - `https://your-production-domain.com/auth/callback/github`
+4. Copia l'ID Client e il Segreto Client nel tuo file `.env`
+
+Durante ogni nuovo avvio dell'applicazione, sarà necessario configurare URL di callback per l'autorizzazione di Google e di Github con il link prodotto da ngrok.
+
+## Configurazione Firebase
+
+1. Crea un nuovo progetto Firebase su [Firebase Console](https://console.firebase.google.com/)
+2. Abilita Firestore Database
+3. Configura le regole di sicurezza di Firestore:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+   // Profili utente
+   match /users/{userId} {
+    allow read: if request.auth.uid == userId;
+    allow write: if request.auth.uid == userId;
+    
+    // Sottocollezione del portafoglio
+    match /portfolio/{portfolioId} {
+      allow read: if request.auth.uid == userId;
+      allow write: if request.auth.uid == userId;
+    }
+   }
+   
+   // Dati di sicurezza utente
+   match /user_security/{userId} {
+    allow read: if request.auth.uid == userId;
+    allow write: if request.auth.uid == userId;
+   }
+   
+   // Log di audit
+   match /audit_logs/{logId} {
+    allow read: if false;
+    allow write: if false;
+   }
+  }
+}
+```
+
+4. Genera una chiave privata Firebase Admin SDK:
+  - Vai a Impostazioni Progetto > Account di Servizio
+  - Clicca su "Genera Nuova Chiave Privata"
+  - Salva il file JSON come `firebase_config.json` nella radice del progetto (vedi esempio)
+
+### Chiavi API
+
+#### API CoinGecko
+1. Iscriviti a un [account CoinGecko](https://www.coingecko.com/en/api)
+2. Genera una chiave API dalla tua dashboard
+3. Aggiungi la chiave al tuo file `.env` come `COINGECKO_API_KEY`
+
+#### Configurazione della Struttura delle Directory
+
+Assicurati che le seguenti directory esistano nella radice del tuo progetto (verranno create automaticamente dal sistema):
+```bash
+mkdir cache
+mkdir instance
+mkdir logs
+chmod 700 cache instance logs  # Proteggi i permessi delle directory
+```
+
+### Inizializzazione del Database
+
+L'applicazione creerà automaticamente le collezioni Firestore necessarie al primo avvio:
+- users
+- user_security
+- audit_logs
+- error_logs
+- rate_limits
+- deleted_portfolios
+
+### Esecuzione dell'Applicazione
+
+#### Sviluppo
+```bash
+export FLASK_ENV=development
+flask run
 ```
 
 
-## Deployment
+### Considerazioni sulla Sicurezza
 
-To deploy this project run
+1. Non commettere mai il file `.env` o `firebase_config.json` nel controllo di versione
+2. Ruota regolarmente le chiavi di sicurezza e i token API
+3. Monitora i log di audit per attività sospette
+4. Mantieni tutte le dipendenze aggiornate
+5. Esegui regolarmente il backup dei dati di Firestore
+7. Usa HTTPS in produzione
 
-```bash
-  npm run deploy
-```
 
-## Documentation
+### Risoluzione dei Problemi
+
+#### Problemi Comuni
+
+1. Errori di Callback OAuth
+  - Verifica che gli URL di callback corrispondano esattamente a quelli nelle impostazioni del provider OAuth
+  - Controlla il protocollo corretto (http vs https)
+  - Assicurati che tutti gli ambiti richiesti siano abilitati
+
+2. Problemi di Connessione Firebase
+  - Verifica che `firebase_config.json` sia formattato correttamente
+  - Controlla le impostazioni del progetto Firebase
+  - Verifica la connettività di rete e le regole firewall
+
+3. Errori di Sessione
+  - Controlla che FLASK_SECRET_KEY sia impostato correttamente
+  - Verifica le impostazioni dei cookie di sessione
+  - Controlla la configurazione CORS corretta
+
+
+1. Controlla i log dell'applicazione nella directory `logs`
+2. Rivedi i log della Console Firebase
+3. Controlla la collezione dei log di audit in Firestore
+4. Rivedi la collezione error_logs per informazioni dettagliate sugli errori
+
+Attività di manutenzione regolare:
+1. Monitora e ruota le chiavi API
+2. Aggiorna le dipendenze
+3. Rivedi e analizza i log di audit
+4. Pulisci i token scaduti
+5. Monitora l'efficacia del rate limiting
+6. Rivedi e aggiorna le regole di sicurezza
+
+## Documentazione
 
 [Documentation](https://gabrielcellammare.github.io/CryptoFolio-App/)
 
