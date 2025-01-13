@@ -219,6 +219,205 @@ Le comunicazioni avvengono tutte attraverso le cosìddette **Routes**, messe a d
 Link all'architettura completa: 
 [CryptoFolio(Project).pdf](https://github.com/user-attachments/files/18385195/CryptoFolio.Project.pdf)
 
+## Implementazioni OAuth 2.0 in Google e GitHub
+
+### Implementazioni OAuth
+
+#### Google - OpenID Connect 
+Google implementa OpenID Connect, un'estensione di OAuth 2.0 che fornisce un layer di identità standardizzato. Questo è evidenziato nel codice attraverso la configurazione specifica:
+
+```python
+# Configurazione Google OAuth con OpenID Connect
+oauth.register(
+    name='google',
+    server_metadata_url=os.getenv('SERVER_METADATA_URL_GOOGLE'),
+    client_kwargs={
+        'scope': 'openid email profile',  # Scopes OpenID Connect specifici
+    }
+)
+```
+
+L'utilizzo di OpenID Connect è identificabile attraverso:
+- L'endpoint di metadata `.well-known/openid-configuration`
+- Gli scope standardizzati `openid`, `email` e `profile`
+- La ricezione automatica delle informazioni dell'utente attraverso l'ID token
+
+#### GitHub - OAuth 2.0 Puro
+GitHub utilizza invece OAuth 2.0 standard, come dimostrato dalla configurazione esplicita degli endpoint e degli scope specifici della piattaforma:
+
+```python
+# Configurazione GitHub OAuth standard
+oauth.register(
+    name='github',
+    access_token_url='https://github.com/login/oauth/access_token',
+    authorize_url='https://github.com/login/oauth/authorize',
+    client_kwargs={
+        'scope': 'read:user user:email',  # Scope specifici GitHub
+    }
+)
+```
+
+### Flusso di Authorization Code Grant
+
+Entrambi i provider implementano il flusso Authorization Code Grant, che si articola nelle seguenti fasi:
+
+1. **Inizializzazione Autorizzazione**
+```python
+@app.route('/auth/login/<provider>')
+def login(provider):
+    csrf_token, response = csrf.generate_token(require_user_id=False)
+    session['csrf_token'] = csrf_token
+    
+    oauth_client = oauth.create_client(provider)
+    return oauth_client.authorize_redirect(callback_url)
+```
+
+2. **Gestione Callback**
+```python
+@app.route('/auth/callback/<provider>')
+def auth_callback(provider):
+    if request.args.get('state') != session.get('csrf_token'):
+        raise ValueError("Invalid CSRF state")
+    
+    client = oauth.create_client(provider)
+    token = client.authorize_access_token()
+```
+
+3. **Recupero Informazioni Utente**
+La differenza principale tra i due provider si manifesta qui:
+
+Per Google (OpenID Connect):
+```python
+user_info = client.get('userinfo').json()  # Endpoint standardizzato
+```
+
+Per GitHub (OAuth 2.0):
+```python
+user_info = client.get('https://api.github.com/user').json()
+email_response = client.get('https://api.github.com/user/emails')  # Richiesta aggiuntiva necessaria
+```
+
+### Sicurezza e Protezione
+
+Il sistema implementa diverse misure di sicurezza:
+
+1. **Protezione CSRF**
+```python
+csrf_token = session['csrf_token']  # Token per prevenire attacchi CSRF
+```
+
+2. **Validazione dello Stato**
+```python
+if request.args.get('state') != session.get('csrf_token'):
+    raise ValueError("Invalid CSRF state")
+```
+
+3. **Gestione Sicura delle Sessioni**
+```python
+session.clear()  # Pulizia della sessione precedente
+session['user_id'] = user_id  # Memorizzazione sicura dell'ID utente
+```
+
+Il parametro `state` (che trasporta il token CSRF) è infatti un requisito di sicurezza fondamentale nel protocollo OAuth 2.0, verificato da entrambi i provider.
+
+### Livello Provider (Google e GitHub)
+
+Entrambi i provider mantengono il valore del parametro `state` durante tutto il flusso di autorizzazione. Quando reindirizzano l'utente alla callback URL, includono lo stesso valore di `state` che hanno ricevuto. Questo comportamento è standardizzato nella specifica OAuth 2.0 (_RFC 6749, Sezione 4.1.1_).
+
+Per esempio, quando GitHub riceve una richiesta di autorizzazione:
+```
+https://github.com/login/oauth/authorize?
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=YOUR_CALLBACK&
+  state=CSRF_TOKEN
+```
+
+Restituirà una risposta alla callback URL nella forma:
+```
+YOUR_CALLBACK?code=AUTHORIZATION_CODE&state=CSRF_TOKEN
+```
+
+### Livello Client
+
+Nel codice vediamo la verifica:
+```python
+@app.route('/auth/callback/<provider>')
+def auth_callback(provider):
+    if request.args.get('state') != session.get('csrf_token'):
+        raise ValueError("Invalid CSRF state")
+```
+
+Questa verifica è obbligatoria per due motivi:
+
+1. **Specifiche OAuth 2.0**: La RFC 6749 stabilisce che:
+   > "Se il parametro 'state' era presente nella richiesta di autorizzazione, lo STESSO valore DEVE essere restituito nella risposta."
+
+2. **Requisiti dei Provider**: Sia Google che GitHub rifiuteranno di completare il flusso di autenticazione se:
+   - Il parametro `state` non è presente nella richiesta iniziale
+   - Il client non verifica la corrispondenza del `state` nella callback
+
+Questo doppio livello di controllo (provider e client) rende il sistema particolarmente robusto contro attacchi CSRF e altri attacchi di tipo replay.
+
+Se proviamo a omettere il parametro `state` o a non verificarlo, riceveremo errori sia da Google che da GitHub, del tipo:
+- Google: "Error: Invalid state parameter"
+- GitHub: "Bad verification code. The state parameter is invalid"
+
+Questo dimostra come la sicurezza nel protocollo OAuth 2.0 sia implementata attraverso controlli incrociati e ridondanti, dove sia il provider che il client hanno la responsabilità di mantenere la catena di fiducia.
+
+Questa implementazione fornisce un robusto sistema di autenticazione che mantiene un elevato livello di sicurezza pur rimanendo flessibile per supportare diversi provider di autenticazione.
+
+La differenza sostanziale tra l'implementazione di Google e GitHub non risiede solo nella separazione degli endpoint, ma piuttosto nell'adozione di standard diversi per la gestione dell'identità digitale.
+
+Google utilizza OpenID Connect (_OIDC_), un'estensione di OAuth 2.0 che standardizza il processo di autenticazione. OIDC introduce il concetto di "discovery document", accessibile attraverso l'endpoint `.well-known/openid-configuration`. Questo documento contiene tutti gli endpoint necessari, inclusi quelli per l'autorizzazione e lo scambio del token. Ecco perché nella configurazione di Google vediamo:
+
+```python
+server_metadata_url=os.getenv('SERVER_METADATA_URL_GOOGLE')
+```
+
+Questo URL (tipicamente `https://accounts.google.com/.well-known/openid-configuration`) fornisce dinamicamente tutti gli endpoint necessari, rendendo la configurazione più semplice e standardizzata.
+
+GitHub, d'altra parte, utilizza OAuth 2.0 "puro", che richiede la configurazione esplicita degli endpoint:
+
+```python
+access_token_url='https://github.com/login/oauth/access_token',
+authorize_url='https://github.com/login/oauth/authorize'
+```
+
+Le differenze chiave tra i due approcci sono:
+
+1. **Gestione dell'Identità**:
+   - _OIDC (Google)_: Fornisce un ID Token (**JWT**) che contiene informazioni verificabili sull'utente
+   - _OAuth 2.0 (GitHub)_: Richiede chiamate **API** aggiuntive per ottenere le informazioni dell'utente
+
+2. **Standardizzazione**:
+   - _OIDC_: Endpoints e flussi di dati standardizzati
+   - _OAuth 2.0_: Maggiore flessibilità ma meno standardizzazione
+
+3. **Configurazione**:
+   - _OIDC_: Configurazione automatica tramite discovery document
+   - _OAuth 2.0_: Configurazione manuale degli endpoint
+
+4. **Scambio di Informazioni**:
+   - _OIDC_: Un singolo scambio fornisce sia l'autenticazione che le informazioni di base dell'utente
+   - _OAuth 2.0_: Richiede scambi multipli (autorizzazione, token, informazioni utente)
+
+Per esempio, dopo l'ottenimento del token, con Google possiamo decodificare direttamente l'ID Token:
+```python
+# Google (OIDC)
+id_token = token.get('id_token')
+user_info = jwt.decode(id_token, verify=False)  # In produzione, verificare la firma
+```
+
+Mentre con GitHub dobbiamo fare una richiesta aggiuntiva:
+```python
+# GitHub (OAuth 2.0)
+access_token = token.get('access_token')
+user_response = requests.get('https://api.github.com/user', 
+                           headers={'Authorization': f'Bearer {access_token}'})
+user_info = user_response.json()
+```
+
+Quindi, mentre la differenza negli endpoint è visibile a livello di configurazione, la vera distinzione sta nell'architettura complessiva e nel modo in cui le informazioni dell'utente vengono gestite e trasmesse.
 
 ## Routes
 
