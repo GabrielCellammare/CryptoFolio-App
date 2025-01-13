@@ -58,8 +58,7 @@ Last Modified: 10/01/2025
 """
 
 # Standard library imports - organized by functionality
-from logging import Logger
-from logging.handlers import RotatingFileHandler
+from security.secure_firebase_query_builder import FirebaseQueryBuilder
 from utils.token_jwt_handling import AuthError, TokenJWTHandling
 from datetime import datetime, timedelta, timezone
 from difflib import restore
@@ -112,6 +111,8 @@ csrf = CSRFProtection(app)
 # Initialize database and caching
 # SECURITY NOTE: These handle sensitive data and need proper security configuration
 db = firestore.client()
+
+query_builder = FirebaseQueryBuilder(db)
 crypto_cache = CryptoCache()
 
 # Initialize encryption components
