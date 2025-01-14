@@ -1860,7 +1860,7 @@ Il tunneling sicuro con ngrok offre una soluzione elegante a questa sfida, crean
 
 ### Architettura del Sistema di Tunneling
 Come illustrato nel diagramma, l'architettura del sistema di tunneling si compone di tre elementi principali:
-Ngrok crea una connessione sicura tra l'endpoint pubblico e il computer locale, in modo che il traffico sia crittografato e sicuro. Quando la richiesta arriva all'endpoint pubblico, viene crittografata e inoltrata al nostro server locale. Ngrok utilizza una combinazione di crittografia e tecniche di instradamento della rete per creare una connessione sicura e affidabile tra l'endpoint pubblico e il computer locale. In questo modo Ngrok consente di eseguire facilmente il tunnel del server locale, garantendo al contempo la sicurezza.
+Ngrok crea una connessione sicura tra l'endpoint pubblico e il computer locale, in modo che il traffico sia crittografato e sicuro. Quando la richiesta arriva all'endpoint pubblico, viene crittografata e inoltrata al server locale. Ngrok utilizza una combinazione di crittografia e tecniche di instradamento della rete per creare una connessione sicura e affidabile tra l'endpoint pubblico e il computer locale. In questo modo Ngrok consente di eseguire facilmente il tunnel del server locale, garantendo al contempo la sicurezza.
 
 ![image](https://github.com/user-attachments/assets/96cea708-c744-4b1b-8e6b-c9196c895394)
 
