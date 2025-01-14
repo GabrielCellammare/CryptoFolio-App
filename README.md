@@ -2369,7 +2369,7 @@ Attività di manutenzione regolare:
 
 ## 📚 Documentazione
 
-[Documentation](https://gabrielcellammare.github.io/CryptoFolio-App/)
+[Documentazione](https://gabrielcellammare.github.io/CryptoFolio-App/)
 
 
 ## 📖 Fonti
