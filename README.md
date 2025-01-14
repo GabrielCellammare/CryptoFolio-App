@@ -1,27 +1,29 @@
-# **CryptoFolio**: Tieni traccia delle tue criptovalute in modo semplice e sicuro
+# 🚀 **CryptoFolio**: Tieni traccia delle tue criptovalute in modo semplice e sicuro
+**CryptoFolio** è un'applicazione web incentrata sulla sicurezza, progettata per aiutare gli utenti a tenere traccia e a gestire i loro investimenti in criptovalute, con particolare attenzione alla protezione dei dati e all'autenticazione sicura. Basato su **Flask** , con le moderne politiche di sicurezza offre un robusto set di funzionalità mantenendo rigorosi controlli di sicurezza.
 
-### SAOS 2024-2025: Caso di studio della materia di **Sicurezza delle Architetture Orientate ai Servizi** - Prof. Giulio Mallardi
-### Laurea Magistrale in Sicurezza informatica - Università degli studi di Bari "Aldo Moro" - Dipartimento d'Informatica
+### SAOS 2024-2025: Caso di studio della materia di **Sicurezza delle Architetture Orientate ai Servizi** 
 
-### Author
+#### Laurea Magistrale in Sicurezza informatica - Università degli studi di Bari "Aldo Moro" - Dipartimento d'Informatica
+#### **Prof.** Giulio Mallardi
+
+### 👨‍💻 Autore
 
 - [@GabrielCellammare](https://github.com/GabrielCellammare)
 
-**CryptoFolio** è un'applicazione web incentrata sulla sicurezza, progettata per aiutare gli utenti a tenere traccia e a gestire i loro investimenti in criptovalute, con particolare attenzione alla protezione dei dati e all'autenticazione sicura. Basato su **Flask** , con le moderne politiche di sicurezza offre un robusto set di funzionalità mantenendo rigorosi controlli di sicurezza.
 
-## Caratteristiche principali
+## ✨ Caratteristiche principali
 L'**applicazione** consente agli utenti di:
 
-1. Tracciare le proprie **criptovalute** e i loro valori di mercato attuali
-2. Monitorare le prestazioni del **portfolio** e le metriche di profitto/perdita
-3. *Aggiungere, aggiornare e rimuovere* posizioni in **criptovalute**
-4. Visualizzare le **analisi** del portfolio
-5. Accedere ai prezzi delle criptovalute in tempo reale grazie all'integrazione delle API di [CoinGecko](https://www.coingecko.com/ "CoinGecko")
-6. Gestire il **portfolio** in modo sicuro attraverso l'autenticazione **OAuth 2.0**
-7. Interagire con il proprio portfolio attraverso **un'API Restful** 
-8. Ottenere il **controvalore** del proprio portfolio in diverse valute sfrutando i tassi di conversione aggiornati in tempo reale 
+1. 📊 Tracciare le proprie **criptovalute** e i loro valori di mercato attuali
+2. 📈 Monitorare le prestazioni del **portfolio** e le metriche di profitto/perdita
+3. ✏️ *Aggiungere, aggiornare e rimuovere* posizioni in **criptovalute**
+4. 📉 Visualizzare le **analisi** del portfolio
+5. 💹 Accedere ai prezzi delle criptovalute in tempo reale grazie all'integrazione delle API di [CoinGecko](https://www.coingecko.com/ "CoinGecko")
+6. 🔐 Gestire il **portfolio** in modo sicuro attraverso l'autenticazione **OAuth 2.0**
+7. 🔄 Interagire con il proprio portfolio attraverso **un'API Restful** 
+8. 💱 Ottenere il **controvalore** del proprio portfolio in diverse valute sfrutando i tassi di conversione aggiornati in tempo reale
 
-## CryptoFolio: Architettura del sistema
+## 🏗️ CryptoFolio: Architettura del sistema
 **CryptoFolio** implementa un modello di "**architettura orientata ai servizi (SOA)**", in particolare un approccio simile ai **microservizi**, in cui i diversi componenti hanno un basso accoppiamento ed un'alta coesione, comunicando attraverso interfacce ben definite (***API REST***). 
 
 Questa scelta architettonica offre diversi vantaggi:
@@ -31,7 +33,7 @@ Questa scelta architettonica offre diversi vantaggi:
 - **Isolamento della sicurezza:** La compromissione di un servizio non compromette automaticamente gli altri
 - **Flessibilità tecnologica**: Servizi diversi possono utilizzare tecnologie diverse a seconda delle necessità
 
-### Componenti principali
+### 🔧 Componenti principali
 #### Architettura del Backend - Flask
 ![image](https://github.com/user-attachments/assets/08e8ffc2-91c8-4eb7-9be2-9e5e014ae562)
 
@@ -86,7 +88,7 @@ Firebase fornisce una soluzione di database sicura e scalabile con:
 5. Backup e **disaster** recovery
 6. Archiviazione **crittografata** dei dati
 
-#### Architettura di sicurezza - Servizi di sicurezza
+#### 🔒 Architettura di sicurezza - Servizi di sicurezza
 
 ![image](https://github.com/user-attachments/assets/09c547e3-9a28-40be-8979-a0933ea177f7)
 
@@ -117,7 +119,7 @@ Sono state implementate  - _attraverso API debitamente protette_ - diversi servi
 		Convalida delle richieste
 		Gestione nonce
 
-#### Integrazioni esterne
+#### 🌐 Integrazioni esterne
 
 Il sistema per offrire le funzionalità **core** dello stesso, integra diversi servizi esterni attraverso API RestFul messe a disposizione. Nel caso specifico dei prezzi crypto - per garantire disponibilità del dato agli utenti - è stato implementato un meccanismo di **caching** interno che possa aggirare la problematica della "_sincronia_" delle API RestFul, ovvero una delle caratteristiche principali dei Servizi Rest. Se Coincegko non dovesse essere **disponibile**, l'utente potrà in egual modo accedere ai prezzi delle crypto grazie a tale **sistema**.
 
@@ -149,7 +151,7 @@ Il sistema per offrire le funzionalità **core** dello stesso, integra diversi s
 - Crittografia TLS e utilizzo del protocollo HTTPS
 - Gestione degli URL
 
-### Flusso di comunicazione
+### 🔄 Flusso di comunicazione
 Il flusso di comunicazione del sistema segue diversi schemi chiave:
 
 **Comunicazione utente-frontend**
@@ -242,6 +244,84 @@ L'utilizzo di OpenID Connect è identificabile attraverso:
 - Gli scope standardizzati `openid`, `email` e `profile`
 - La ricezione automatica delle informazioni dell'utente attraverso l'ID token
 
+Il processo avviene principalmente attraverso il meccanismo di "_OpenID Connect Discovery_" implementato nella libreria **Authlib**.
+
+Nel file `init_app.py`:
+
+```python
+oauth.register(
+    name='google',
+    client_id=os.getenv('GOOGLE_CLIENT_ID'),
+    client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),
+    server_metadata_url=os.getenv('SERVER_METADATA_URL_GOOGLE'),
+    client_kwargs={
+        'scope': 'openid email profile',
+        'ssl_verify': True,
+        'token_endpoint_auth_method': 'client_secret_post'
+    },
+    redirect_uri=f"{base_url}/auth/callback/google"
+)
+```
+
+La chiave è il parametro `server_metadata_url`, che nel file `.env` è impostato a:
+```
+SERVER_METADATA_URL_GOOGLE=https://accounts.google.com/.well-known/openid-configuration
+```
+
+Questo URL è il punto di ingresso del processo di "_discovery_". Quando l'applicazione si inizializza:
+
+1. Authlib fa una richiesta GET a https://accounts.google.com/.well-known/openid-configuration
+
+2. Google risponde con un documento JSON che contiene tutti gli endpoint necessari. La risposta sarà del tipo:
+```json
+{
+  "issuer": "https://accounts.google.com",
+  "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+  "token_endpoint": "https://oauth2.googleapis.com/token",
+  "userinfo_endpoint": "https://openidconnect.googleapis.com/v1/userinfo",
+  ...
+}
+```
+
+3. Authlib memorizza questi endpoint e li usa automaticamente quando necessario. Per esempio:
+   - Per l'autenticazione iniziale usa `authorization_endpoint`
+   - Per ottenere il token di accesso usa `token_endpoint` 
+   - Per recuperare le informazioni dell'utente usa `userinfo_endpoint`
+
+Difatti nella callback:
+
+```python
+# Prima ottiene il token usando internamente token_endpoint
+token = client.authorize_access_token()
+
+# Poi usa userinfo_endpoint per ottenere i dati dell'utente
+user_info = client.get(
+    'https://www.googleapis.com/oauth2/v3/userinfo',
+    token=token
+).json()
+```
+
+Questo approccio basato sul discovery ha diversi vantaggi:
+
+1. Sicurezza: gli endpoint sono forniti direttamente da Google invece di essere hardcodati
+2. Manutenibilità: se Google cambia i suoi endpoint, l'applicazione continuerà a funzionare
+3. Standardizzazione: segue le specifiche OpenID Connect per il discovery
+
+Per GitHub, che non supporta OpenID Connect Discovery, gli endpoint devono essere configurati manualmente:
+
+```python
+oauth.register(
+    name='github',
+    client_id=os.getenv('GITHUB_CLIENT_ID'),
+    client_secret=os.getenv('GITHUB_CLIENT_SECRET'),
+    access_token_url='https://github.com/login/oauth/access_token',
+    authorize_url='https://github.com/login/oauth/authorize',
+    client_kwargs={...}
+)
+```
+
+La differenza tra i due approcci mostra il vantaggio di usare provider che supportano OpenID Connect Discovery.
+
 #### GitHub - OAuth 2.0 Puro
 GitHub utilizza invece OAuth 2.0 standard, come dimostrato dalla configurazione esplicita degli endpoint e degli scope specifici della piattaforma:
 
@@ -284,6 +364,7 @@ def auth_callback(provider):
 ```
 
 3. **Recupero Informazioni Utente**
+   
 La differenza principale tra i due provider si manifesta qui:
 
 Per Google (OpenID Connect):
@@ -362,26 +443,6 @@ Se proviamo a omettere il parametro `state` o a non verificarlo, riceveremo erro
 - Google: "Error: Invalid state parameter"
 - GitHub: "Bad verification code. The state parameter is invalid"
 
-Questo dimostra come la sicurezza nel protocollo OAuth 2.0 sia implementata attraverso controlli incrociati e ridondanti, dove sia il provider che il client hanno la responsabilità di mantenere la catena di fiducia.
-
-Questa implementazione fornisce un robusto sistema di autenticazione che mantiene un elevato livello di sicurezza pur rimanendo flessibile per supportare diversi provider di autenticazione.
-
-La differenza sostanziale tra l'implementazione di Google e GitHub non risiede solo nella separazione degli endpoint, ma piuttosto nell'adozione di standard diversi per la gestione dell'identità digitale.
-
-Google utilizza OpenID Connect (_OIDC_), un'estensione di OAuth 2.0 che standardizza il processo di autenticazione. OIDC introduce il concetto di "discovery document", accessibile attraverso l'endpoint `.well-known/openid-configuration`. Questo documento contiene tutti gli endpoint necessari, inclusi quelli per l'autorizzazione e lo scambio del token. Ecco perché nella configurazione di Google vediamo:
-
-```python
-server_metadata_url=os.getenv('SERVER_METADATA_URL_GOOGLE')
-```
-
-Questo URL (tipicamente `https://accounts.google.com/.well-known/openid-configuration`) fornisce dinamicamente tutti gli endpoint necessari, rendendo la configurazione più semplice e standardizzata.
-
-GitHub, d'altra parte, utilizza OAuth 2.0 "puro", che richiede la configurazione esplicita degli endpoint:
-
-```python
-access_token_url='https://github.com/login/oauth/access_token',
-authorize_url='https://github.com/login/oauth/authorize'
-```
 
 Le differenze chiave tra i due approcci sono:
 
@@ -401,23 +462,9 @@ Le differenze chiave tra i due approcci sono:
    - _OIDC_: Un singolo scambio fornisce sia l'autenticazione che le informazioni di base dell'utente
    - _OAuth 2.0_: Richiede scambi multipli (autorizzazione, token, informazioni utente)
 
-Per esempio, dopo l'ottenimento del token, con Google possiamo decodificare direttamente l'ID Token:
-```python
-# Google (OIDC)
-id_token = token.get('id_token')
-user_info = jwt.decode(id_token, verify=False)  # In produzione, verificare la firma
-```
+Questo dimostra come la sicurezza nel protocollo OAuth 2.0 sia implementata attraverso controlli incrociati e ridondanti, dove sia il provider che il client hanno la responsabilità di mantenere la catena di fiducia.
 
-Mentre con GitHub dobbiamo fare una richiesta aggiuntiva:
-```python
-# GitHub (OAuth 2.0)
-access_token = token.get('access_token')
-user_response = requests.get('https://api.github.com/user', 
-                           headers={'Authorization': f'Bearer {access_token}'})
-user_info = user_response.json()
-```
 
-Quindi, mentre la differenza negli endpoint è visibile a livello di configurazione, la vera distinzione sta nell'architettura complessiva e nel modo in cui le informazioni dell'utente vengono gestite e trasmesse.
 
 ## Routes
 
@@ -751,6 +798,7 @@ Anche in questo caso, tutte le routes sono accessibili soltanto dalla pagina **p
 - **Autenticazione** necessaria
 - **Protezione** CSRF
 - Limitazione delle **richieste** (1 token ogni 12 ore, Max 2 token al giorno)
+- Validità del token per 7 giorni
 - La generazione di un nuovo **token** invalida quello precedentemente **generato**
 - Rotazione dei **token**
 - Registrazione di audit
@@ -866,7 +914,7 @@ Anche in questo caso, tutte le routes sono accessibili soltanto dalla pagina **p
 
 ### Routes di gestione delle Cryptovalute disponibili
 
-####  Generazione Token CSRF: api/cryptocurrencies
+####  Restituzione di tutti i prezzi delle crypto disponibili: api/cryptocurrencies
 
 ```
    GET api/cryptocurrencies
@@ -891,7 +939,7 @@ Ogni percorso dell'applicazione è protetto da più livelli di sicurezza, second
 
 1. Convalida e sanificazione dell'input
 2. Gestione degli errori con registrazione sicura
-3. Limitazione della velocità, ove appropriato
+3. Limitazione delle richieste, ove appropriato
 4. Protezione CSRF
 5. Controlli di autenticazione
 6. Registrazione di eventi significativi
@@ -1600,7 +1648,7 @@ Il sistema di protezione CSRF implementa una difesa in profondità attraverso:
    - Anti-replay
    - Anti-DoS
    - Anti-timing
-   - Sanitizzazione input
+   - Sanificazione input
 
 La combinazione di questi meccanismi crea più livelli di protezione, rendendo estremamente difficile bypassare la sicurezza anche se un singolo controllo viene compromesso.
 
@@ -1834,7 +1882,7 @@ Un aspetto critico della sicurezza è la validazione delle origini delle richies
 
 Il sistema di tunneling sicuro con ngrok rappresenta un esempio eccellente di come sia possibile bilanciare la necessità di accessibilità durante lo sviluppo con rigorosi requisiti di sicurezza.
 
-## Documentazione API CryptoFolio
+## 📚 Documentazione API CryptoFolio
 
 ### Introduzione
 
@@ -2070,9 +2118,9 @@ R: Riceverai un errore 429 con un header `Retry-After` che indica dopo quanti se
 
 R: Al momento i prezzi sono forniti solo in USD. La conversione in altre valute deve essere gestita lato client. È necessario cambiare la valuta dalla dashboard per poter ricevere il controvalore correttamente attraverso l'Api.
 
-## Installazione
+## 🛠️ Installazione
 
-### Prerequisiti
+### 📋 Prerequisiti
 
 Prima di installare **CryptoFolio**, assicurati di avere installato quanto segue:
 - **Python** 3.7 o superiore
@@ -2082,7 +2130,7 @@ Prima di installare **CryptoFolio**, assicurati di avere installato quanto segue
 - Un account **Google Cloud Platform** (per OAuth)
 - Un account sviluppatore **GitHub** (per OAuth)**
 
-### Passaggi di Installazione
+### 🔨 Passaggi di Installazione
 
 1. Clona il repository
 ```bash
@@ -2101,7 +2149,7 @@ source venv/bin/activate  # Su Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Configurazione dell'Ambiente
+### ⚙️ Configurazione dell'Ambiente
 
 2. Modifica il file `.env(example)` nella directory principale e configura tutte le variabili:
 
@@ -2286,7 +2334,7 @@ flask run
 7. Usa HTTPS in produzione
 
 
-### Risoluzione dei Problemi
+### ❗ Risoluzione dei Problemi
 
 #### Problemi Comuni
 
@@ -2319,18 +2367,19 @@ Attività di manutenzione regolare:
 5. Monitora l'efficacia del rate limiting
 6. Rivedi e aggiorna le regole di sicurezza
 
-## Documentazione
+## 📚 Documentazione
 
 [Documentation](https://gabrielcellammare.github.io/CryptoFolio-App/)
 
 
-## Fonti
+## 📖 Fonti
 
  - [Bearer Token](https://stackoverflow.com/questions/25838183/what-is-the-oauth-2-0-bearer-token-exactly)
  - [JWT e Bearer Token](https://www.linkedin.com/pulse/jwt-e-bearer-token-facciamo-chiarezza-guido-spadotto/)
  - [Flask Framework](https://flask.palletsprojects.com/en/stable/)
  - [Firebase Cloud Firestore](https://firebase.google.com/docs/firestore?hl=it)
  - [OAuth 2.0 (Google)](https://developers.google.com/identity/protocols/oauth2?hl=it)
+ - [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect?hl=it#python)
  - [OAuth 2.0 (Github)](https://medium.com/@tony.infisical/guide-to-using-oauth-2-0-to-access-github-api-818383862591)
  - [CSP](https://managedserver.it/cose-il-criterio-csp-e-come-aggiungerne-uno-content-security-policy/)
  - [NGROK](https://requestly.com/blog/what-is-ngrok-and-how-does-it-work/)
