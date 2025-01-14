@@ -131,8 +131,8 @@ class SecureConfig:
         self._init_crypto()
         self._request_history = {}
         self._initialized = False
-        self._allowed_origins = set()  # Store allowed origins here
-        self._dynamic_origins = set()  # Store dynamic patterns (like *.ngrok-free.app)
+        self._allowed_origins = set()
+        self._dynamic_origins = set()
         self._security_headers = SecurityHeaders()
 
     def _init_crypto(self) -> None:
@@ -279,33 +279,6 @@ class SecureConfig:
             self.logger.warning(f"Origin validation failed: {
                                 self._sanitize_value(str(e))}")
             return False
-
-    def _check_rate_limit(self, origin: str) -> bool:
-        """
-        Implement rate limiting for origins.
-
-        Args:
-            origin: Origin to check
-
-        Returns:
-            bool: True if within rate limits
-        """
-        now = datetime.now(timezone.utc)
-        window_start = now - timedelta(seconds=3600)
-
-        # Clean up old entries
-        self._request_history = {
-            k: v for k, v in self._request_history.items()
-            if v['timestamp'] > window_start
-        }
-
-        # Check rate limit
-        origin_requests = sum(
-            1 for v in self._request_history.values()
-            if v['timestamp'] > window_start
-        )
-
-        return origin_requests < self._env_config.max_requests
 
     @staticmethod
     def _sanitize_value(value: str) -> str:
@@ -454,29 +427,6 @@ class SecureConfig:
                 return True
 
         return False
-
-    def _parse_origins(self, origins_string: Optional[str]) -> List[str]:
-        """
-        Parse and validate origin strings.
-
-        Args:
-            origins_string: Comma-separated list of origins
-
-        Returns:
-            List[str]: List of validated origins
-        """
-        if not origins_string or not isinstance(origins_string, str):
-            return []
-
-        origins = []
-        for origin in origins_string.split(','):
-            origin = origin.strip()
-            if origin and self._validate_origin_secure(origin):
-                origins.append(origin)
-            else:
-                self.logger.warning(f"Invalid origin rejected: {origin}")
-
-        return origins
 
     @lru_cache(maxsize=100)
     def get_allowed_origins(self) -> List[str]:
