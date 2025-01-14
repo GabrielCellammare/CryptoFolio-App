@@ -2327,11 +2327,11 @@ flask run
 ### Considerazioni sulla Sicurezza
 
 1. Non committare mai il file `.env` o `firebase_config.json` nel controllo di versione
-2. Ruota regolarmente le chiavi di sicurezza e i token API
-3. Monitora i log di audit per attività sospette
-4. Mantieni tutte le dipendenze aggiornate
-5. Esegui regolarmente il backup dei dati di Firestore
-7. Usa HTTPS in produzione
+2. Ruotate regolarmente le chiavi di sicurezza e i token API
+3. Monitorare i log di audit per attività sospette
+4. Mantenere tutte le dipendenze aggiornate
+5. Eseguire regolarmente il backup dei dati di Firestore
+7. Usare HTTPS in produzione
 
 
 ### ❗ Risoluzione dei Problemi
@@ -2339,33 +2339,33 @@ flask run
 #### Problemi Comuni
 
 1. Errori di Callback OAuth
-  - Verifica che gli URL di callback corrispondano esattamente a quelli nelle impostazioni del provider OAuth
-  - Controlla il protocollo corretto (http vs https)
-  - Assicurati che tutti gli ambiti richiesti siano abilitati
+  - Verificare che gli URL di callback corrispondano esattamente a quelli nelle impostazioni del provider OAuth
+  - Controllare il protocollo corretto (http vs https)
+  - Assicurarsi che tutti gli ambiti richiesti siano abilitati
 
 2. Problemi di Connessione Firebase
-  - Verifica che `firebase_config.json` sia formattato correttamente
-  - Controlla le impostazioni del progetto Firebase
-  - Verifica la connettività di rete e le regole firewall
+  - Verificare che `firebase_config.json` sia formattato correttamente
+  - Controllare le impostazioni del progetto Firebase
+  - Verificare la connettività di rete e le regole firewall
 
 3. Errori di Sessione
-  - Controlla che FLASK_SECRET_KEY sia impostato correttamente
-  - Verifica le impostazioni dei cookie di sessione
-  - Controlla la configurazione CORS corretta
+  - Controllare che FLASK_SECRET_KEY sia impostato correttamente
+  - Verificare le impostazioni dei cookie di sessione
+  - Controllare la configurazione CORS corretta
 
 
-1. Controlla i log dell'applicazione nella directory `logs`
-2. Rivedi i log della Console Firebase
-3. Controlla la collezione dei log di audit in Firestore
-4. Rivedi la collezione error_logs per informazioni dettagliate sugli errori
+1. Controllare i log dell'applicazione nella directory `logs`
+2. Rivedere i log della Console Firebase
+3. Controllare la collezione dei log di audit in Firestore
+4. Rivedere la collezione error_logs per informazioni dettagliate sugli errori
 
 Attività di manutenzione regolare:
-1. Monitora e ruota le chiavi API
-2. Aggiorna le dipendenze
-3. Rivedi e analizza i log di audit
-4. Pulisci i token scaduti
-5. Monitora l'efficacia del rate limiting
-6. Rivedi e aggiorna le regole di sicurezza
+1. Monitorare e ruotare le chiavi API
+2. Aggiornare le dipendenze
+3. Rivedere e analizzare i log di audit
+4. Pulire i token scaduti
+5. Monitorare l'efficacia del rate limiting
+6. Rivedere e aggiornare le regole di sicurezza
 
 ## 📚 Documentazione
 
